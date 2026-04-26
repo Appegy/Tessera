@@ -6,6 +6,13 @@
       "source": "local",
       "dependencies": {}
     },
+    "com.appegy.union": {
+      "version": "https://github.com/Appegy/Union.git",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {},
+      "hash": "e9144bc1cf8966ef24c3129d21cc1415f73754f4"
+    },
     "com.unity.ext.nunit": {
       "version": "2.0.5",
       "depth": 1,
