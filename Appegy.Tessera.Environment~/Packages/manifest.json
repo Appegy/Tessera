@@ -2,6 +2,7 @@
   "dependencies": {
     "com.appegy.tessera": "file:../..",
     "com.appegy.union": "https://github.com/Appegy/Union.git",
+    "com.coplaydev.unity-mcp": "9.6.6",
     "com.unity.ide.rider": "3.0.36",
     "com.unity.inputsystem": "1.14.2",
     "com.unity.test-framework": "1.5.1",
@@ -10,6 +11,15 @@
     "com.unity.modules.physics2d": "1.0.0",
     "com.unity.modules.ui": "1.0.0"
   },
+  "scopedRegistries": [
+    {
+      "name": "package.openupm.com",
+      "url": "https://package.openupm.com",
+      "scopes": [
+        "com.coplaydev"
+      ]
+    }
+  ],
   "testables": [
     "com.appegy.tessera"
   ]
