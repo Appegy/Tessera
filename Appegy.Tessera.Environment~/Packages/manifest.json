@@ -1,0 +1,13 @@
+{
+  "dependencies": {
+    "com.appegy.tessera": "file:../..",
+    "com.unity.ide.rider": "3.0.36",
+    "com.unity.test-framework": "1.5.1",
+    "com.unity.modules.imgui": "1.0.0",
+    "com.unity.modules.jsonserialize": "1.0.0",
+    "com.unity.modules.ui": "1.0.0"
+  },
+  "testables": [
+    "com.appegy.tessera"
+  ]
+}
