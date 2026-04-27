@@ -1,0 +1,23 @@
+{
+    "name": "Appegy.Tessera.Tests",
+    "rootNamespace": "Appegy.Tessera.Tests",
+    "references": [
+        "Appegy.Tessera"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": true,
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ]
+}

@@ -1,0 +1,17 @@
+{
+    "name": "Appegy.Tessera.Debug",
+    "rootNamespace": "",
+    "references": [
+        "Appegy.Tessera",
+        "Unity.InputSystem"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

@@ -1,3 +1,5 @@
 .claude/
 .codex/
+.agents/
 .DS_Store
+opencode.json
