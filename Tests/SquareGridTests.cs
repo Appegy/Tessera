@@ -39,12 +39,12 @@ namespace Appegy.Tessera.Tests
         [Test]
         public void IdOf_XYOf_RoundTrip()
         {
-            for (int y = 0; y < _grid.Height; y++)
-            for (int x = 0; x < _grid.Width;  x++)
-            {
-                var id = _grid.IdOf(x, y);
-                Assert.AreEqual((x, y), _grid.XYOf(id));
-            }
+            for (var y = 0; y < _grid.Height; y++)
+                for (var x = 0; x < _grid.Width; x++)
+                {
+                    var id = _grid.IdOf(x, y);
+                    Assert.AreEqual((x, y), _grid.XYOf(id));
+                }
         }
 
         [Test]
@@ -58,7 +58,7 @@ namespace Appegy.Tessera.Tests
         [Test]
         public void GetCornersCount_IsAlways4()
         {
-            for (int id = 0; id < _grid.CellCount; id++)
+            for (var id = 0; id < _grid.CellCount; id++)
                 Assert.AreEqual(4, _grid.GetCornersCount(id));
         }
 
@@ -146,7 +146,7 @@ namespace Appegy.Tessera.Tests
             // of the cell centre across the midpoint of edge i (corner i -> corner (i+1) mod N).
             var id = _grid.IdOf(1, 1);
             var center = _grid.GetCenter(id);
-            for (int i = 0; i < 4; i++)
+            for (var i = 0; i < 4; i++)
             {
                 var c0 = _grid.GetCorner(id, i);
                 var c1 = _grid.GetCorner(id, (i + 1) % 4);
@@ -189,7 +189,7 @@ namespace Appegy.Tessera.Tests
         public void GetNeighborIndex_RoundTripsWithGetNeighbor()
         {
             var id = _grid.IdOf(1, 1);
-            for (int i = 0; i < 4; i++)
+            for (var i = 0; i < 4; i++)
             {
                 var nb = _grid.GetNeighbor(id, i);
                 Assert.AreEqual(i, _grid.GetNeighborIndex(id, nb));
@@ -233,7 +233,7 @@ namespace Appegy.Tessera.Tests
         [Test]
         public void GetCellAt_RoundTripsCenter()
         {
-            for (int id = 0; id < _grid.CellCount; id++)
+            for (var id = 0; id < _grid.CellCount; id++)
                 Assert.AreEqual(id, _grid.GetCellAt(_grid.GetCenter(id)));
         }
 

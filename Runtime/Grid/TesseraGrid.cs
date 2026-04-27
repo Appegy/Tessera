@@ -5,18 +5,12 @@ using System.Collections.Generic;
 namespace Appegy.Tessera
 {
     /// <summary>
-    /// Per-cell data layer over an <see cref="IGrid"/>. Stores one <typeparamref name="T"/> per cell,
-    /// indexed by cell id (or <see cref="Cell"/>). The grid itself is held by composition via <see cref="Grid"/>.
+    ///     Per-cell data layer over an <see cref="IGrid" />. Stores one <typeparamref name="T" /> per cell,
+    ///     indexed by cell id (or <see cref="Cell" />). The grid itself is held by composition via <see cref="Grid" />.
     /// </summary>
     public sealed class TesseraGrid<T> : IReadOnlyCollection<T>
     {
         private readonly T[] _data;
-
-        /// <summary>Underlying grid topology / geometry.</summary>
-        public IGrid Grid { get; }
-
-        /// <summary>Number of cells (== <c>Grid.CellCount</c>).</summary>
-        public int Count => Grid.CellCount;
 
         public TesseraGrid(IGrid grid)
         {
@@ -30,7 +24,7 @@ namespace Appegy.Tessera
             Array.Fill(_data, fill);
         }
 
-        /// <summary>Creates a grid initialised from <paramref name="data"/>. Source array is copied.</summary>
+        /// <summary>Creates a grid initialised from <paramref name="data" />. Source array is copied.</summary>
         public TesseraGrid(IGrid grid, T[] data)
         {
             if (grid == null) throw new ArgumentNullException(nameof(grid));
@@ -42,6 +36,9 @@ namespace Appegy.Tessera
             Grid = grid;
             _data = (T[])data.Clone();
         }
+
+        /// <summary>Underlying grid topology / geometry.</summary>
+        public IGrid Grid { get; }
 
         public T this[int id]
         {
@@ -63,7 +60,8 @@ namespace Appegy.Tessera
             set => this[cell.Id] = value;
         }
 
-        public void Fill(T value) => Array.Fill(_data, value);
+        /// <summary>Number of cells (== <c>Grid.CellCount</c>).</summary>
+        public int Count => Grid.CellCount;
 
         public IEnumerator<T> GetEnumerator()
         {
@@ -71,7 +69,15 @@ namespace Appegy.Tessera
                 yield return _data[i];
         }
 
-        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
+
+        public void Fill(T value)
+        {
+            Array.Fill(_data, value);
+        }
 
         private void ValidateId(int id)
         {

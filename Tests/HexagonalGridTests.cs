@@ -29,19 +29,19 @@ namespace Appegy.Tessera.Tests
         public void IdOf_XYOf_RoundTrip([ValueSource(nameof(AllTypes))] HexagonalGridType type)
         {
             var grid = new HexagonalGrid(4, 3, 1f, type);
-            for (int y = 0; y < grid.Height; y++)
-            for (int x = 0; x < grid.Width;  x++)
-            {
-                var id = grid.IdOf(x, y);
-                Assert.AreEqual((x, y), grid.XYOf(id));
-            }
+            for (var y = 0; y < grid.Height; y++)
+                for (var x = 0; x < grid.Width; x++)
+                {
+                    var id = grid.IdOf(x, y);
+                    Assert.AreEqual((x, y), grid.XYOf(id));
+                }
         }
 
         [Test]
         public void GetCornersCount_IsAlways6([ValueSource(nameof(AllTypes))] HexagonalGridType type)
         {
             var grid = new HexagonalGrid(4, 3, 1f, type);
-            for (int id = 0; id < grid.CellCount; id++)
+            for (var id = 0; id < grid.CellCount; id++)
                 Assert.AreEqual(6, grid.GetCornersCount(id));
         }
 
@@ -71,7 +71,7 @@ namespace Appegy.Tessera.Tests
             var id = grid.IdOf(1, 1);
             Span<float2> buf = stackalloc float2[6];
             grid.CopyCorners(id, buf);
-            for (int i = 0; i < 6; i++)
+            for (var i = 0; i < 6; i++)
             {
                 var direct = grid.GetCorner(id, i);
                 Assert.AreEqual(direct.x, buf[i].x, 1e-5f);
@@ -97,7 +97,7 @@ namespace Appegy.Tessera.Tests
             var grid = new HexagonalGrid(7, 7, 1f, type);
             var id = grid.IdOf(3, 3);
             var center = grid.GetCenter(id);
-            for (int i = 0; i < 6; i++)
+            for (var i = 0; i < 6; i++)
             {
                 var c0 = grid.GetCorner(id, i);
                 var c1 = grid.GetCorner(id, (i + 1) % 6);
@@ -116,9 +116,10 @@ namespace Appegy.Tessera.Tests
         {
             var grid = new HexagonalGrid(2, 2, 1f, type);
             var id = grid.IdOf(0, 0);
-            int boundaryCount = 0;
-            for (int i = 0; i < 6; i++)
-                if (grid.GetNeighbor(id, i) == -1) boundaryCount++;
+            var boundaryCount = 0;
+            for (var i = 0; i < 6; i++)
+                if (grid.GetNeighbor(id, i) == -1)
+                    boundaryCount++;
             Assert.Greater(boundaryCount, 0,
                 $"corner cell of 2x2 {type} should have at least one boundary slot");
         }
@@ -128,7 +129,7 @@ namespace Appegy.Tessera.Tests
         {
             var grid = new HexagonalGrid(7, 7, 1f, type);
             var id = grid.IdOf(3, 3);
-            for (int i = 0; i < 6; i++)
+            for (var i = 0; i < 6; i++)
                 Assert.AreEqual(grid.GetNeighbor(id, i), grid.GetNeighbor(id, i + 6));
         }
 
@@ -137,7 +138,7 @@ namespace Appegy.Tessera.Tests
         {
             var grid = new HexagonalGrid(7, 7, 1f, type);
             var id = grid.IdOf(3, 3);
-            for (int i = 0; i < 6; i++)
+            for (var i = 0; i < 6; i++)
             {
                 var nb = grid.GetNeighbor(id, i);
                 Assert.AreEqual(i, grid.GetNeighborIndex(id, nb));
@@ -149,7 +150,7 @@ namespace Appegy.Tessera.Tests
         {
             var grid = new HexagonalGrid(7, 7, 1f, type);
             var a = grid.IdOf(3, 3);
-            for (int i = 0; i < 6; i++)
+            for (var i = 0; i < 6; i++)
             {
                 var b = grid.GetNeighbor(a, i);
                 var indexFromB = grid.GetNeighborIndex(b, a);
@@ -173,7 +174,7 @@ namespace Appegy.Tessera.Tests
         {
             var grid = new HexagonalGrid(7, 7, 1f, type);
             var a = grid.IdOf(3, 3);
-            for (int i = 0; i < 6; i++)
+            for (var i = 0; i < 6; i++)
             {
                 var b = grid.GetNeighbor(a, i);
                 Assert.IsTrue(grid.AreNeighbors(a, b), $"failed for type={type} i={i}");
@@ -202,7 +203,7 @@ namespace Appegy.Tessera.Tests
         {
             var grid = new HexagonalGrid(7, 7, 1f, type);
             var a = grid.IdOf(3, 3);
-            for (int i = 0; i < 6; i++)
+            for (var i = 0; i < 6; i++)
             {
                 var b = grid.GetNeighbor(a, i);
                 Assert.AreEqual(1, grid.Distance(a, b), $"failed for type={type} i={i}");
@@ -222,7 +223,7 @@ namespace Appegy.Tessera.Tests
         public void GetCellAt_RoundTripsCenter([ValueSource(nameof(AllTypes))] HexagonalGridType type)
         {
             var grid = new HexagonalGrid(4, 4, 1f, type);
-            for (int id = 0; id < grid.CellCount; id++)
+            for (var id = 0; id < grid.CellCount; id++)
             {
                 var center = grid.GetCenter(id);
                 Assert.AreEqual(id, grid.GetCellAt(center),
@@ -243,10 +244,10 @@ namespace Appegy.Tessera.Tests
         {
             var grid = new HexagonalGrid(3, 3, 1f, type);
             Span<float2> buf = stackalloc float2[6];
-            for (int id = 0; id < grid.CellCount; id++)
+            for (var id = 0; id < grid.CellCount; id++)
             {
                 grid.CopyCorners(id, buf);
-                for (int c = 0; c < 6; c++)
+                for (var c = 0; c < 6; c++)
                 {
                     var corner = buf[c];
                     Assert.IsTrue(grid.Bounds.Contains(corner),

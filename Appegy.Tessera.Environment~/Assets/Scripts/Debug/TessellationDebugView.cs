@@ -1,13 +1,12 @@
 using Appegy.Tessera;
 using UnityEngine;
-
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
 
 /// <summary>
-/// Root debug component: holds settings, builds an <see cref="IGrid"/>,
-/// and propagates changes to GridRenderer and CellHighlighter.
+///     Root debug component: holds settings, builds an <see cref="IGrid" />,
+///     and propagates changes to GridRenderer and CellHighlighter.
 /// </summary>
 [ExecuteAlways]
 public class TessellationDebugView : MonoBehaviour
@@ -37,9 +36,9 @@ public class TessellationDebugView : MonoBehaviour
     [SerializeField] private bool _enableHighlighter = true;
     [SerializeField] private Color _hoveredColor = new(0.91f, 0.40f, 0.35f, 0.25f);
     [SerializeField] private Color _neighborColor = new(0.91f, 0.66f, 0.24f, 0.19f);
+    private TessellationCellHighlighter _cellHighlighter;
 
     private TessellationGridRenderer _gridRenderer;
-    private TessellationCellHighlighter _cellHighlighter;
 
     public IGrid Grid { get; private set; }
     public int Width => _width;
@@ -53,19 +52,40 @@ public class TessellationDebugView : MonoBehaviour
     public GridKind Kind
     {
         get => _kind;
-        set { _kind = value; Rebuild(); }
+        set
+        {
+            _kind = value;
+            Rebuild();
+        }
     }
 
     public float InscribedRadius
     {
         get => _inscribedRadius;
-        set { _inscribedRadius = value; Rebuild(); }
+        set
+        {
+            _inscribedRadius = value;
+            Rebuild();
+        }
     }
 
     public bool EnableHighlighter
     {
         get => _enableHighlighter;
         set => _enableHighlighter = value;
+    }
+
+    private void OnEnable()
+    {
+        EnsureChildren();
+        Rebuild();
+    }
+
+    private void OnValidate()
+    {
+#if UNITY_EDITOR
+        EditorApplication.delayCall += RebuildSafe;
+#endif
     }
 
     public void Configure(GridKind kind, float inscribedRadius, int width, int height)
@@ -82,19 +102,6 @@ public class TessellationDebugView : MonoBehaviour
         _width = width;
         _height = height;
         Rebuild();
-    }
-
-    private void OnEnable()
-    {
-        EnsureChildren();
-        Rebuild();
-    }
-
-    private void OnValidate()
-    {
-#if UNITY_EDITOR
-        EditorApplication.delayCall += RebuildSafe;
-#endif
     }
 
     private void RebuildSafe()

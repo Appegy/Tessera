@@ -3,44 +3,41 @@ using Appegy.Tessera;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.InputSystem;
-
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
 
 /// <summary>
-/// Mouse hover highlight for an <see cref="IGrid"/>: paints the hovered cell + its neighbours.
-/// Owned by TessellationDebugView. Works in Play and Edit modes.
+///     Mouse hover highlight for an <see cref="IGrid" />: paints the hovered cell + its neighbours.
+///     Owned by TessellationDebugView. Works in Play and Edit modes.
 /// </summary>
 [ExecuteAlways]
 [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
 public class TessellationCellHighlighter : MonoBehaviour
 {
-    private MeshFilter _meshFilter;
-    private MeshRenderer _meshRenderer;
-    private Mesh _mesh;
     private BoxCollider2D _collider;
-
-    private TessellationDebugView _view;
     private IGrid _grid;
     private Vector2 _gridCenter;
     private int _lastHovered = -1;
+    private Mesh _mesh;
+    private MeshFilter _meshFilter;
+    private MeshRenderer _meshRenderer;
 
-    public void Init(TessellationDebugView view, Vector2 gridSize)
+    private TessellationDebugView _view;
+
+    private void Update()
     {
-        _view = view;
-        _grid = view.Grid;
-        _gridCenter = view.GridCenter;
+        if (!Application.isPlaying) return;
+        if (_view == null) return;
 
-        EnsureComponents();
+        var cam = Camera.main;
+        if (cam == null) return;
+        var mouse = Mouse.current;
+        if (mouse == null) return;
 
-        if (_collider == null) _collider = gameObject.GetComponent<BoxCollider2D>();
-        if (_collider == null) _collider = gameObject.AddComponent<BoxCollider2D>();
-        _collider.size = gridSize;
-        _collider.offset = Vector2.zero;
-
-        _lastHovered = -1;
-        ClearHighlight();
+        var mousePos = mouse.position.ReadValue();
+        var worldPos = cam.ScreenToWorldPoint(new Vector3(mousePos.x, mousePos.y, -cam.transform.position.z));
+        ProcessWorldPoint(new Vector2(worldPos.x, worldPos.y));
     }
 
     private void OnEnable()
@@ -57,19 +54,33 @@ public class TessellationCellHighlighter : MonoBehaviour
 #endif
     }
 
-    private void Update()
+    private void OnDestroy()
     {
-        if (!Application.isPlaying) return;
-        if (_view == null) return;
+        if (_mesh != null)
+        {
+            if (Application.isPlaying) Destroy(_mesh);
+            else DestroyImmediate(_mesh);
+        }
+#if UNITY_EDITOR
+        SceneView.duringSceneGui -= OnSceneGUI;
+#endif
+    }
 
-        var cam = Camera.main;
-        if (cam == null) return;
-        var mouse = Mouse.current;
-        if (mouse == null) return;
+    public void Init(TessellationDebugView view, Vector2 gridSize)
+    {
+        _view = view;
+        _grid = view.Grid;
+        _gridCenter = view.GridCenter;
 
-        var mousePos = mouse.position.ReadValue();
-        var worldPos = cam.ScreenToWorldPoint(new Vector3(mousePos.x, mousePos.y, -cam.transform.position.z));
-        ProcessWorldPoint(new Vector2(worldPos.x, worldPos.y));
+        EnsureComponents();
+
+        if (_collider == null) _collider = gameObject.GetComponent<BoxCollider2D>();
+        if (_collider == null) _collider = gameObject.AddComponent<BoxCollider2D>();
+        _collider.size = gridSize;
+        _collider.offset = Vector2.zero;
+
+        _lastHovered = -1;
+        ClearHighlight();
     }
 
 #if UNITY_EDITOR
@@ -187,17 +198,5 @@ public class TessellationCellHighlighter : MonoBehaviour
             if (shader != null)
                 _meshRenderer.sharedMaterial = new Material(shader);
         }
-    }
-
-    private void OnDestroy()
-    {
-        if (_mesh != null)
-        {
-            if (Application.isPlaying) Destroy(_mesh);
-            else DestroyImmediate(_mesh);
-        }
-#if UNITY_EDITOR
-        SceneView.duringSceneGui -= OnSceneGUI;
-#endif
     }
 }

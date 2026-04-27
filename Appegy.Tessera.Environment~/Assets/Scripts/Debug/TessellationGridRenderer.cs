@@ -3,16 +3,25 @@ using Appegy.Tessera;
 using UnityEngine;
 
 /// <summary>
-/// Builds the grid edge mesh from an <see cref="IGrid"/>.
-/// Owned by TessellationDebugView.
+///     Builds the grid edge mesh from an <see cref="IGrid" />.
+///     Owned by TessellationDebugView.
 /// </summary>
 [ExecuteAlways]
 [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
 public class TessellationGridRenderer : MonoBehaviour
 {
+    private Mesh _mesh;
     private MeshFilter _meshFilter;
     private MeshRenderer _meshRenderer;
-    private Mesh _mesh;
+
+    private void OnDestroy()
+    {
+        if (_mesh != null)
+        {
+            if (Application.isPlaying) Destroy(_mesh);
+            else DestroyImmediate(_mesh);
+        }
+    }
 
     public void Rebuild(TessellationDebugView view)
     {
@@ -79,15 +88,6 @@ public class TessellationGridRenderer : MonoBehaviour
         }
     }
 
-    private void OnDestroy()
-    {
-        if (_mesh != null)
-        {
-            if (Application.isPlaying) Destroy(_mesh);
-            else DestroyImmediate(_mesh);
-        }
-    }
-
     private static HashSet<(Vector2, Vector2)> CollectEdges(IGrid grid)
     {
         var edges = new HashSet<(Vector2, Vector2)>();
@@ -102,7 +102,7 @@ public class TessellationGridRenderer : MonoBehaviour
                 var a = Round(new Vector2(p1.x, p1.y));
                 var b = Round(new Vector2(p2.x, p2.y));
 
-                var edge = a.x < b.x || (Mathf.Approximately(a.x, b.x) && a.y < b.y)
+                var edge = a.x < b.x || Mathf.Approximately(a.x, b.x) && a.y < b.y
                     ? (a, b)
                     : (b, a);
                 edges.Add(edge);
@@ -111,6 +111,8 @@ public class TessellationGridRenderer : MonoBehaviour
         return edges;
     }
 
-    private static Vector2 Round(Vector2 v) =>
-        new Vector2(Mathf.Round(v.x * 1000f) / 1000f, Mathf.Round(v.y * 1000f) / 1000f);
+    private static Vector2 Round(Vector2 v)
+    {
+        return new Vector2(Mathf.Round(v.x * 1000f) / 1000f, Mathf.Round(v.y * 1000f) / 1000f);
+    }
 }
