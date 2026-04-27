@@ -1,37 +1,27 @@
 using Appegy.Tessera;
 using UnityEngine;
-
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
 
 /// <summary>
-/// Root debug component: holds all settings, creates Tessellation,
-/// and propagates changes to GridRenderer and CellHighlighter.
+///     Root debug component: holds settings, builds an <see cref="IGrid" />,
+///     and propagates changes to GridRenderer and CellHighlighter.
 /// </summary>
 [ExecuteAlways]
 public class TessellationDebugView : MonoBehaviour
 {
-    public enum TessellationType
+    public enum GridKind
     {
-        Square4,
-        Square8,
-        HexPointyOddAll,
-        HexPointyOddEven,
-        HexPointyOddOdd,
-        HexPointyEvenAll,
-        HexPointyEvenEven,
-        HexPointyEvenOdd,
-        HexFlatOddAll,
-        HexFlatOddEven,
-        HexFlatOddOdd,
-        HexFlatEvenAll,
-        HexFlatEvenEven,
-        HexFlatEvenOdd
+        Square,
+        HexPointyOdd,
+        HexPointyEven,
+        HexFlatOdd,
+        HexFlatEven
     }
 
-    [Header("Tessellation")]
-    [SerializeField] private TessellationType _type = TessellationType.Square4;
+    [Header("Grid")]
+    [SerializeField] private GridKind _kind = GridKind.Square;
     [SerializeField] private float _inscribedRadius = 0.5f;
 
     [Header("Grid Size")]
@@ -46,11 +36,11 @@ public class TessellationDebugView : MonoBehaviour
     [SerializeField] private bool _enableHighlighter = true;
     [SerializeField] private Color _hoveredColor = new(0.91f, 0.40f, 0.35f, 0.25f);
     [SerializeField] private Color _neighborColor = new(0.91f, 0.66f, 0.24f, 0.19f);
-
-    private TessellationGridRenderer _gridRenderer;
     private TessellationCellHighlighter _cellHighlighter;
 
-    public Tessellation Tessellation { get; private set; }
+    private TessellationGridRenderer _gridRenderer;
+
+    public IGrid Grid { get; private set; }
     public int Width => _width;
     public int Height => _height;
     public float LineWidth => _lineWidth;
@@ -59,12 +49,12 @@ public class TessellationDebugView : MonoBehaviour
     public Color NeighborColor => _neighborColor;
     public Vector2 GridCenter { get; private set; }
 
-    public TessellationType Type
+    public GridKind Kind
     {
-        get => _type;
+        get => _kind;
         set
         {
-            _type = value;
+            _kind = value;
             Rebuild();
         }
     }
@@ -85,22 +75,6 @@ public class TessellationDebugView : MonoBehaviour
         set => _enableHighlighter = value;
     }
 
-    public void Configure(TessellationType type, float inscribedRadius, int width, int height)
-    {
-        _type = type;
-        _inscribedRadius = inscribedRadius;
-        _width = width;
-        _height = height;
-        Rebuild();
-    }
-
-    public void SetGridSize(int width, int height)
-    {
-        _width = width;
-        _height = height;
-        Rebuild();
-    }
-
     private void OnEnable()
     {
         EnsureChildren();
@@ -114,6 +88,22 @@ public class TessellationDebugView : MonoBehaviour
 #endif
     }
 
+    public void Configure(GridKind kind, float inscribedRadius, int width, int height)
+    {
+        _kind = kind;
+        _inscribedRadius = inscribedRadius;
+        _width = width;
+        _height = height;
+        Rebuild();
+    }
+
+    public void SetGridSize(int width, int height)
+    {
+        _width = width;
+        _height = height;
+        Rebuild();
+    }
+
     private void RebuildSafe()
     {
         if (this == null) return;
@@ -125,29 +115,11 @@ public class TessellationDebugView : MonoBehaviour
     {
         EnsureChildren();
 
-        Tessellation = CreateTessellation();
+        Grid = CreateGrid();
 
-        // Calculate grid center from bounding box
-        var min = new Vector2(float.MaxValue, float.MaxValue);
-        var max = new Vector2(float.MinValue, float.MinValue);
-        var corners = Tessellation.CornersCount;
-
-        for (var y = 0; y < _height; y++)
-        {
-            for (var x = 0; x < _width; x++)
-            {
-                for (var c = 0; c < corners; c++)
-                {
-                    var p = Tessellation.GetCornerPoint((x, y), c);
-                    var v = new Vector2(p.X, p.Y);
-                    min = Vector2.Min(min, v);
-                    max = Vector2.Max(max, v);
-                }
-            }
-        }
-
-        GridCenter = (min + max) * 0.5f;
-        var gridSize = max - min;
+        var bounds = Grid.Bounds;
+        GridCenter = new Vector2(bounds.Center.x, bounds.Center.y);
+        var gridSize = new Vector2(bounds.Size.x, bounds.Size.y);
 
         _gridRenderer.Rebuild(this);
         if (_enableHighlighter)
@@ -171,39 +143,34 @@ public class TessellationDebugView : MonoBehaviour
 
     private T GetOrAddChild<T>(string childName) where T : MonoBehaviour
     {
-        // Try to find existing child
         for (var i = 0; i < transform.childCount; i++)
         {
             var existing = transform.GetChild(i).GetComponent<T>();
             if (existing != null) return existing;
         }
 
-        // Create new child
         var go = new GameObject(childName);
         go.transform.SetParent(transform, false);
         go.hideFlags = HideFlags.DontSave;
         return go.AddComponent<T>();
     }
 
-    private Tessellation CreateTessellation()
+    private IGrid CreateGrid()
     {
-        return _type switch
+        switch (_kind)
         {
-            TessellationType.Square4 => new SquareTessellation(_inscribedRadius, false),
-            TessellationType.Square8 => new SquareTessellation(_inscribedRadius, true),
-            TessellationType.HexPointyOddAll => new HexagonalTessellation(_inscribedRadius, HexagonalGridType.PointyOdd, HexNeighborMode.All),
-            TessellationType.HexPointyOddEven => new HexagonalTessellation(_inscribedRadius, HexagonalGridType.PointyOdd, HexNeighborMode.Even),
-            TessellationType.HexPointyOddOdd => new HexagonalTessellation(_inscribedRadius, HexagonalGridType.PointyOdd, HexNeighborMode.Odd),
-            TessellationType.HexPointyEvenAll => new HexagonalTessellation(_inscribedRadius, HexagonalGridType.PointyEven, HexNeighborMode.All),
-            TessellationType.HexPointyEvenEven => new HexagonalTessellation(_inscribedRadius, HexagonalGridType.PointyEven, HexNeighborMode.Even),
-            TessellationType.HexPointyEvenOdd => new HexagonalTessellation(_inscribedRadius, HexagonalGridType.PointyEven, HexNeighborMode.Odd),
-            TessellationType.HexFlatOddAll => new HexagonalTessellation(_inscribedRadius, HexagonalGridType.FlatOdd, HexNeighborMode.All),
-            TessellationType.HexFlatOddEven => new HexagonalTessellation(_inscribedRadius, HexagonalGridType.FlatOdd, HexNeighborMode.Even),
-            TessellationType.HexFlatOddOdd => new HexagonalTessellation(_inscribedRadius, HexagonalGridType.FlatOdd, HexNeighborMode.Odd),
-            TessellationType.HexFlatEvenAll => new HexagonalTessellation(_inscribedRadius, HexagonalGridType.FlatEven, HexNeighborMode.All),
-            TessellationType.HexFlatEvenEven => new HexagonalTessellation(_inscribedRadius, HexagonalGridType.FlatEven, HexNeighborMode.Even),
-            TessellationType.HexFlatEvenOdd => new HexagonalTessellation(_inscribedRadius, HexagonalGridType.FlatEven, HexNeighborMode.Odd),
-            _ => new SquareTessellation(_inscribedRadius, false)
-        };
+            case GridKind.Square:
+                return new SquareGrid(_width, _height, _inscribedRadius * 2f);
+            case GridKind.HexPointyOdd:
+                return new HexagonalGrid(_width, _height, _inscribedRadius, HexagonalGridType.PointyOdd);
+            case GridKind.HexPointyEven:
+                return new HexagonalGrid(_width, _height, _inscribedRadius, HexagonalGridType.PointyEven);
+            case GridKind.HexFlatOdd:
+                return new HexagonalGrid(_width, _height, _inscribedRadius, HexagonalGridType.FlatOdd);
+            case GridKind.HexFlatEven:
+                return new HexagonalGrid(_width, _height, _inscribedRadius, HexagonalGridType.FlatEven);
+            default:
+                return new SquareGrid(_width, _height, _inscribedRadius * 2f);
+        }
     }
 }

@@ -3,26 +3,34 @@ using Appegy.Tessera;
 using UnityEngine;
 
 /// <summary>
-/// Builds the grid edge mesh from tessellation data.
-/// Owned by TessellationDebugView.
+///     Builds the grid edge mesh from an <see cref="IGrid" />.
+///     Owned by TessellationDebugView.
 /// </summary>
 [ExecuteAlways]
 [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
 public class TessellationGridRenderer : MonoBehaviour
 {
+    private Mesh _mesh;
     private MeshFilter _meshFilter;
     private MeshRenderer _meshRenderer;
-    private Mesh _mesh;
+
+    private void OnDestroy()
+    {
+        if (_mesh != null)
+        {
+            if (Application.isPlaying) Destroy(_mesh);
+            else DestroyImmediate(_mesh);
+        }
+    }
 
     public void Rebuild(TessellationDebugView view)
     {
         EnsureComponents();
 
-        var tess = view.Tessellation;
+        var grid = view.Grid;
         var center = view.GridCenter;
-        var edges = CollectEdges(tess, view.Width, view.Height);
+        var edges = CollectEdges(grid);
 
-        // Build mesh — each edge is a quad (2 triangles)
         var halfWidth = view.LineWidth * 0.5f;
         var vertices = new List<Vector3>(edges.Count * 4);
         var indices = new List<int>(edges.Count * 6);
@@ -57,13 +65,9 @@ public class TessellationGridRenderer : MonoBehaviour
         }
 
         if (_mesh == null)
-        {
             _mesh = new Mesh { name = "GridEdges" };
-        }
         else
-        {
             _mesh.Clear();
-        }
 
         _mesh.SetVertices(vertices);
         _mesh.SetColors(colors);
@@ -84,48 +88,31 @@ public class TessellationGridRenderer : MonoBehaviour
         }
     }
 
-    private void OnDestroy()
-    {
-        if (_mesh != null)
-        {
-            if (Application.isPlaying) Destroy(_mesh);
-            else DestroyImmediate(_mesh);
-        }
-    }
-
-    private static HashSet<(Vector2, Vector2)> CollectEdges(Tessellation tess, int width, int height)
+    private static HashSet<(Vector2, Vector2)> CollectEdges(IGrid grid)
     {
         var edges = new HashSet<(Vector2, Vector2)>();
-        var corners = tess.CornersCount;
-
-        for (var y = 0; y < height; y++)
+        for (var id = 0; id < grid.CellCount; id++)
         {
-            for (var x = 0; x < width; x++)
+            var n = grid.GetCornersCount(id);
+            for (var c = 0; c < n; c++)
             {
-                for (var c = 0; c < corners; c++)
-                {
-                    var p1 = tess.GetCornerPoint((x, y), c);
-                    var p2 = tess.GetCornerPoint((x, y), (c + 1) % corners);
+                var p1 = grid.GetCorner(id, c);
+                var p2 = grid.GetCorner(id, (c + 1) % n);
 
-                    var a = Round(new Vector2(p1.X, p1.Y));
-                    var b = Round(new Vector2(p2.X, p2.Y));
+                var a = Round(new Vector2(p1.x, p1.y));
+                var b = Round(new Vector2(p2.x, p2.y));
 
-                    var edge = a.x < b.x || (Mathf.Approximately(a.x, b.x) && a.y < b.y)
-                        ? (a, b)
-                        : (b, a);
-                    edges.Add(edge);
-                }
+                var edge = a.x < b.x || Mathf.Approximately(a.x, b.x) && a.y < b.y
+                    ? (a, b)
+                    : (b, a);
+                edges.Add(edge);
             }
         }
-
         return edges;
     }
 
     private static Vector2 Round(Vector2 v)
     {
-        return new Vector2(
-            Mathf.Round(v.x * 1000f) / 1000f,
-            Mathf.Round(v.y * 1000f) / 1000f
-        );
+        return new Vector2(Mathf.Round(v.x * 1000f) / 1000f, Mathf.Round(v.y * 1000f) / 1000f);
     }
 }

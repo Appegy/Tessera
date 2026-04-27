@@ -1,16 +1,16 @@
 {
-    "name": "Appegy.Tessera",
-    "rootNamespace": "Appegy.Tessera",
-    "references": [
-        "Appegy.Union"
-    ],
-    "includePlatforms": [],
-    "excludePlatforms": [],
-    "allowUnsafeCode": false,
-    "overrideReferences": false,
-    "precompiledReferences": [],
-    "autoReferenced": true,
-    "defineConstraints": [],
-    "versionDefines": [],
-    "noEngineReferences": true
+  "name": "Appegy.Tessera",
+  "rootNamespace": "Appegy.Tessera",
+  "references": [
+    "Unity.Mathematics"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": true
 }
