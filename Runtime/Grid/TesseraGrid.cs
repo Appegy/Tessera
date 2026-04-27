@@ -5,100 +5,78 @@ using System.Collections.Generic;
 namespace Appegy.Tessera
 {
     /// <summary>
-    /// Generic 2D grid collection backed by a flat array with tessellation-aware metadata.
-    /// Coordinates use (X, Y) where X is column and Y is row.
+    /// Per-cell data layer over an <see cref="IGrid"/>. Stores one <typeparamref name="T"/> per cell,
+    /// indexed by cell id (or <see cref="Cell"/>). The grid itself is held by composition via <see cref="Grid"/>.
     /// </summary>
-    public class TesseraGrid<T> : IReadOnlyCollection<T>, IEnumerable<T>
+    public sealed class TesseraGrid<T> : IReadOnlyCollection<T>
     {
         private readonly T[] _data;
 
-        /// <summary>Tessellation geometry associated with this grid.</summary>
-        public Tessellation Tessellation { get; }
+        /// <summary>Underlying grid topology / geometry.</summary>
+        public IGrid Grid { get; }
 
-        /// <summary>Number of columns (X dimension).</summary>
-        public int Width { get; }
+        /// <summary>Number of cells (== <c>Grid.CellCount</c>).</summary>
+        public int Count => Grid.CellCount;
 
-        /// <summary>Number of rows (Y dimension).</summary>
-        public int Height { get; }
-
-        /// <summary>Total number of cells (Width * Height).</summary>
-        public int Count => Width * Height;
-
-        /// <summary>Creates an empty grid with default values for all cells.</summary>
-        public TesseraGrid(Tessellation tessellation, int width, int height)
+        public TesseraGrid(IGrid grid)
         {
-            if (width <= 0) throw new ArgumentOutOfRangeException(nameof(width), "Width must be positive");
-            if (height <= 0) throw new ArgumentOutOfRangeException(nameof(height), "Height must be positive");
-
-            Tessellation = tessellation;
-            Width = width;
-            Height = height;
-            _data = new T[width * height];
+            if (grid == null) throw new ArgumentNullException(nameof(grid));
+            Grid = grid;
+            _data = new T[grid.CellCount];
         }
 
-        /// <summary>Creates a grid from a 2D array where data[x, y] (dimension 0 = width, dimension 1 = height).</summary>
-        public TesseraGrid(Tessellation tessellation, T[,] data)
+        public TesseraGrid(IGrid grid, T fill) : this(grid)
         {
+            Array.Fill(_data, fill);
+        }
+
+        /// <summary>Creates a grid initialised from <paramref name="data"/>. Source array is copied.</summary>
+        public TesseraGrid(IGrid grid, T[] data)
+        {
+            if (grid == null) throw new ArgumentNullException(nameof(grid));
             if (data == null) throw new ArgumentNullException(nameof(data));
-
-            Tessellation = tessellation;
-            Width = data.GetLength(0);
-            Height = data.GetLength(1);
-            _data = new T[Width * Height];
-
-            for (var y = 0; y < Height; y++)
-            {
-                for (var x = 0; x < Width; x++)
-                {
-                    _data[y * Width + x] = data[x, y];
-                }
-            }
+            if (data.Length != grid.CellCount)
+                throw new ArgumentException(
+                    $"data length ({data.Length}) must equal grid.CellCount ({grid.CellCount}).",
+                    nameof(data));
+            Grid = grid;
+            _data = (T[])data.Clone();
         }
 
-        /// <summary>Gets or sets the value at (x, y). Throws IndexOutOfRangeException if out of bounds.</summary>
-        public T this[int x, int y]
+        public T this[int id]
         {
             get
             {
-                ValidateBounds(x, y);
-                return _data[y * Width + x];
+                ValidateId(id);
+                return _data[id];
             }
             set
             {
-                ValidateBounds(x, y);
-                _data[y * Width + x] = value;
+                ValidateId(id);
+                _data[id] = value;
             }
         }
 
-        /// <summary>Returns true if (x, y) is within grid bounds.</summary>
-        public bool Contains(int x, int y)
+        public T this[Cell cell]
         {
-            return x >= 0 && x < Width && y >= 0 && y < Height;
+            get => this[cell.Id];
+            set => this[cell.Id] = value;
         }
 
-        /// <summary>Sets all cells to the specified value.</summary>
-        public void Fill(T value)
-        {
-            Array.Fill(_data, value);
-        }
+        public void Fill(T value) => Array.Fill(_data, value);
 
         public IEnumerator<T> GetEnumerator()
         {
             for (var i = 0; i < _data.Length; i++)
-            {
                 yield return _data[i];
-            }
         }
 
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return GetEnumerator();
-        }
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-        private void ValidateBounds(int x, int y)
+        private void ValidateId(int id)
         {
-            if (x < 0 || x >= Width || y < 0 || y >= Height)
-                throw new IndexOutOfRangeException($"Cell ({x}, {y}) is outside grid bounds ({Width}x{Height})");
+            if (id < 0 || id >= _data.Length)
+                throw new IndexOutOfRangeException($"Cell id {id} is outside [0, {_data.Length}).");
         }
     }
 }

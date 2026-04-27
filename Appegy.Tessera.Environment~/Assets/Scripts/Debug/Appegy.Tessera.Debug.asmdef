@@ -3,7 +3,8 @@
     "rootNamespace": "",
     "references": [
         "Appegy.Tessera",
-        "Unity.InputSystem"
+        "Unity.InputSystem",
+        "Unity.Mathematics"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

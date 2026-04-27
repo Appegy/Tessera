@@ -14,7 +14,7 @@
     "Geometry"
   ],
   "dependencies": {
-    "com.appegy.union": "1.0.2"
+    "com.unity.mathematics": "1.3.2"
   },
   "author": {
     "name": "Appegy",

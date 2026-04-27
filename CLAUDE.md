@@ -1,96 +1,97 @@
 # Tessera Module
 
-Pure-geometry module for infinite 2D grids. No UnityEngine dependencies.
+Pure-geometry module for finite 2D grids. No `UnityEngine` dependencies in the runtime assembly.
 
 ## Module Parts
 
 ```
-Runtime/Tessellation/   ← geometry: neighbors, distance, pixel coords, corners
-Runtime/Grid/           ← (planned) sized grid with per-cell data storage
-Runtime/Pathfinding/    ← (planned) A*, line drawing on grids
-Runtime/MeshGen/        ← (planned) mesh generation from grid geometry
-Tests/                  ← NUnit EditMode tests
-Debug/                  ← Unity debug visualization (scene: TessellationTestScene)
+Runtime/Grid/         ← IGrid + Cell + GridBounds + SquareGrid + HexagonalGrid + TesseraGrid<T>
+Runtime/Pathfinding/  ← (planned) A*, line drawing on grids
+Runtime/MeshGen/      ← (planned) mesh generation from grid geometry
+Tests/                ← NUnit EditMode tests
 ```
+
+Debug visualization scripts live in `Appegy.Tessera.Environment~/Assets/Scripts/Debug/` (host project, assembly `Appegy.Tessera.Debug`, depends on `UnityEngine`).
 
 ## Architecture
 
-`ITessellation` is the unified interface (11 methods). Two readonly struct implementations:
+`IGrid` is the unified interface (11 methods). It models a finite, immutable 2D grid as a connected planar graph of cells. Cells are identified by dense `int` ids in `[0, CellCount)`. See `Documentation~/grid-api-redesign.md` for full rationale.
 
-| Type | Neighbors | Distance | Orientation |
-|------|-----------|----------|-------------|
-| `SquareTessellation` | 4 (cardinal) or 8 (+ diagonals) | Manhattan / Chebyshev | Always same |
-| `HexagonalTessellation` | 6 (All), 3 (Even: phys 0,2,4) or 3 (Odd: phys 1,3,5) | Cubic distance | Always same, rows shift by parity |
+Concrete grid types:
 
-`Tessellation` is a Union struct that wraps both — zero-allocation polymorphism via `[Union]` + `[Expose(typeof(ITessellation))]`. It is `partial struct` (NOT readonly) because the generator creates mutable fields.
+| Type | Topology | Distance | Status |
+|------|----------|----------|--------|
+| `SquareGrid` | 4-connected | Manhattan | shipped |
+| `HexagonalGrid` | 6-connected | Cubic | shipped |
+| `VoronoiGrid` | edge-connected | BFS | planned |
 
-## Hex Neighbor Modes
+Supporting types:
 
-`HexNeighborMode` enum controls which directions are active:
+- `Cell` — `readonly struct (IGrid grid, int id)`. Thin facade forwarding to `IGrid`. Constructed only by grid implementations (internal ctor).
+- `GridBounds` — value-type axis-aligned rectangle returned by `IGrid.Bounds`.
+- `TesseraGrid<T>` — per-cell data layer over an `IGrid`. Composition only — does **not** implement `IGrid`. Indexed by `int id` or `Cell`.
 
-| Mode | DirectionsCount | Physical directions | Use case |
-|------|-----------------|-------------------|----------|
-| `All` | 6 | 0,1,2,3,4,5 | Standard hex grid |
-| `Even` | 3 | 0,2,4 → remapped to 0,1,2 | Triangle-like gameplay |
-| `Odd` | 3 | 1,3,5 → remapped to 0,1,2 | Triangle-like gameplay |
+Geometry uses `Unity.Mathematics.float2` (package `com.unity.mathematics`).
 
-In Even/Odd modes: `AreNeighbors` returns `false` for physically adjacent cells in inactive directions. `CornersCount`, `ToPoint2`, `ToCell`, `GetCornerPoint`, `Distance` are unchanged.
+## Alignment Contract (mandatory for every IGrid implementation)
 
-## Direction Ordering (clockwise, starting from top/top-right)
+For any cell `c` with `N = GetCornersCount(c)`:
+
+- There are `N` corners and `N` neighbour slots.
+- Edge `i` is the segment from `GetCorner(c, i)` to `GetCorner(c, (i+1) % N)`.
+- `GetNeighbor(c, i)` is the neighbour cell across edge `i`, or `-1` if that edge is on the grid boundary.
+
+Mesh-gen, edge-walking, and graph traversal rely on this — keep it.
+
+## Hex Layout (HexagonalGridType)
+
+The enum picks the offset coordinate convention. All four are 6-connected; there are no partial connectivity modes.
+
+| Value | Orientation | Shifted rows / cols |
+|-------|-------------|---------------------|
+| `PointyOdd` | pointy-top | odd rows shifted right |
+| `PointyEven` | pointy-top | odd rows shifted left |
+| `FlatOdd` | flat-top | odd cols shifted up |
+| `FlatEven` | flat-top | odd cols shifted down |
+
+## Index Ordering (clockwise)
+
+Corners start at the top-right corner. Neighbour order is forced by the alignment contract — neighbour `i` sits across edge `i`.
 
 ```
-Square 4-dir:  0=top, 1=right, 2=bottom, 3=left
-Square 8-dir:  0=top, 1=TR, 2=right, 3=BR, 4=bottom, 5=BL, 6=left, 7=TL
-Hex pointy:    0=TR, 1=R, 2=BR, 3=BL, 4=L, 5=TL
-Hex flat:      0=T, 1=TR, 2=BR, 3=B, 4=BL, 5=TL
+SquareGrid (4-conn):     neighbour 0=right, 1=bottom, 2=left, 3=top
+HexagonalGrid pointy:    neighbour 0=R, 1=BR, 2=BL, 3=L, 4=TL, 5=TR
+HexagonalGrid flat:      neighbour 0=TR, 1=BR, 2=B, 3=BL, 4=TL, 5=T
 ```
 
-All direction/corner indices wrap via modulo — negative and out-of-range values are valid.
+Corner / neighbour indices wrap via modulo (negative and out-of-range values are valid).
 
-## Corner Ordering (clockwise)
+## Cell Geometry
 
-```
-Square:        0=TR, 1=BR, 2=BL, 3=TL
-Hex pointy:    corners at -30°, 30°, 90°, 150°, 210°, 270°
-Hex flat:      corners at 0°, 60°, 120°, 180°, 240°, 300°
-```
+`SquareGrid(width, height, cellSize)`: cell `(x, y)` occupies the axis-aligned rectangle `[x*cellSize, (x+1)*cellSize] x [y*cellSize, (y+1)*cellSize]`. Center at `((x+0.5)*cellSize, (y+0.5)*cellSize)`. `Bounds.Min = (0, 0)`, `Bounds.Max = (width*cellSize, height*cellSize)`.
 
-## Key Math (inscribedRadius = r)
+`HexagonalGrid(width, height, inscribedRadius, type)`: cell `(0, 0)` centre sits at pixel `(0, 0)`. `inscribedRadius` is the apothem (centre-to-edge midpoint); `describedRadius = inscribedRadius / cos(π/6)` is the circumradius (centre-to-corner). `Bounds` is computed by sweeping all corner positions and may have negative `Min` for `PointyEven` / `FlatEven` because their natural row/column staggering puts cells at negative coords.
 
-**Square**: side = 2r. Cell center at `(X * 2r, Y * 2r)`.
+## How to Add a New IGrid Method
 
-**Hexagon**: describedRadius = `r / cos(π/6)` = side. Internally converts Offset↔Cubic for all calculations. Offset neighbor tables are different for even/odd rows (pointy) or columns (flat) — 8 static lookup tables total.
-
-## inscribedRadius Note
-
-`inscribedRadius` only affects pixel-space methods: `ToPoint2`, `ToCell`, `GetCornerPoint`. Neighbor and distance calculations are purely integer and size-independent.
-
-## How to Add a New ITessellation Method
-
-1. Add method signature to `ITessellation.cs`
-2. Implement in both structs: `SquareTessellation`, `HexagonalTessellation`
-3. Union auto-generates dispatch via `[Expose]` — no changes needed in `Tessellation.cs`
-4. Add tests for all grid types/configurations in Tests/
-5. Refresh Unity, run tests
+1. Add the method signature to `Runtime/Grid/IGrid.cs`.
+2. Implement in every concrete grid class: `SquareGrid`, `HexagonalGrid`, (later) `VoronoiGrid`.
+3. Optionally add a forwarding accessor on `Cell` if it makes sense per-cell.
+4. Add tests for every grid configuration: `SquareGrid` + 4 hex layouts. Use `[ValueSource(nameof(AllTypes))]` parameterization (see `HexagonalGridTests.cs`).
+5. Refresh Unity (`force` mode for new files), run tests.
 
 ## Debug Visualization
 
-Scene `Scenes/TessellationTestScene.unity` with a `TessellationDebugView` component on `Grid Renderer` GameObject.
-
-**3 scripts** in `Debug/` (not in Tessera assembly — they depend on UnityEngine):
+Scene: `Appegy.Tessera.Environment~/Assets/Scenes/ExampleScene.unity`. Component `TessellationDebugView` on the `Grid Renderer` GameObject.
 
 | Script | Role |
 |--------|------|
-| `TessellationDebugView` | Root hub: holds all settings (type, size, colors), creates `Tessellation`, propagates to children. Public setters for programmatic control. |
-| `TessellationGridRenderer` | Builds quad-based edge mesh (configurable line width) |
-| `TessellationCellHighlighter` | Highlights hovered cell + neighbors. Works in Play Mode (Input System) and Edit Mode (SceneView) |
+| `TessellationDebugView` | Root hub: holds settings (kind, size, colours), constructs an `IGrid`, propagates to children. Inspector enum picks Square or one of 4 hex layouts. |
+| `TessellationGridRenderer` | Builds quad-based edge mesh from `IGrid` corners (configurable line width). |
+| `TessellationCellHighlighter` | Highlights hovered cell + its neighbours. Works in Play (Input System) and Edit (SceneView) modes. Uses `IGrid.GetCellAt` for hit-testing. |
 
-`TessellationDebugView.TessellationType` enum covers: Square4, Square8, and all 12 hex combinations (4 grid types × 3 neighbor modes).
-
-To test: open `TessellationTestScene`, select `Grid Renderer`, change settings in Inspector. Hover mouse over grid in Scene View to see cell highlighting.
-
-URP is configured for flat 2D — no lighting, no shadows, no post-processing. Colors render exactly as set.
+URP is configured for flat 2D — no lighting, no shadows, no post-processing. Colours render as set.
 
 ## How to Add a New Module Part
 
-Create a new folder under `Runtime/` (e.g. `Runtime/Grid/`). Keep it in the same `Appegy.Tessera` assembly and namespace. No separate .asmdef needed.
+Create a new folder under `Runtime/` (e.g. `Runtime/Pathfinding/`). Keep it in the same `Appegy.Tessera` assembly and namespace. No separate .asmdef needed.

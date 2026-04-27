@@ -2,7 +2,8 @@
     "name": "Appegy.Tessera.Tests",
     "rootNamespace": "Appegy.Tessera.Tests",
     "references": [
-        "Appegy.Tessera"
+        "Appegy.Tessera",
+        "Unity.Mathematics"
     ],
     "includePlatforms": [
         "Editor"

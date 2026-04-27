@@ -2,7 +2,7 @@
     "name": "Appegy.Tessera",
     "rootNamespace": "Appegy.Tessera",
     "references": [
-        "Appegy.Union"
+        "Unity.Mathematics"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
