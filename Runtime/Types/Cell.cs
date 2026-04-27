@@ -20,6 +20,7 @@ namespace Appegy.Tessera
         }
 
         public float2 Center => _grid.GetCenter(Id);
+
         public int CornersCount => _grid.GetCornersCount(Id);
 
         public float2 GetCorner(int i)

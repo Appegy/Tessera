@@ -11,16 +11,16 @@ namespace Appegy.Tessera
     /// </summary>
     public sealed class HexagonalGrid : IGrid
     {
-        private static readonly float Sqrt3 = math.sqrt(3f);
+        private static readonly float _sqrt3 = math.sqrt(3f);
 
-        // Neighbour offsets in the new aligned ordering (CW; edge[i] shared with neighbour[i]).
+        // Neighbor offsets in the new aligned ordering (CW; edge[i] shared with neighbor[i]).
         // Pointy: 0=R, 1=BR, 2=BL, 3=L, 4=TL, 5=TR.
         // Flat:   0=TR, 1=BR, 2=B, 3=BL, 4=TL, 5=T.
         // Two tables per orientation: A = unshifted row/col (or shifted-left in PointyEven), B = the other.
-        private static readonly (int dx, int dy)[] PointyA = { (+1, 0), (0, -1), (-1, -1), (-1, 0), (-1, +1), (0, +1) };
-        private static readonly (int dx, int dy)[] PointyB = { (+1, 0), (+1, -1), (0, -1), (-1, 0), (0, +1), (+1, +1) };
-        private static readonly (int dx, int dy)[] FlatA = { (+1, 0), (+1, -1), (0, -1), (-1, -1), (-1, 0), (0, +1) };
-        private static readonly (int dx, int dy)[] FlatB = { (+1, +1), (+1, 0), (0, -1), (-1, 0), (-1, +1), (0, +1) };
+        private static readonly (int dx, int dy)[] _pointyA = { (+1, 0), (0, -1), (-1, -1), (-1, 0), (-1, +1), (0, +1) };
+        private static readonly (int dx, int dy)[] _pointyB = { (+1, 0), (+1, -1), (0, -1), (-1, 0), (0, +1), (+1, +1) };
+        private static readonly (int dx, int dy)[] _flatA = { (+1, 0), (+1, -1), (0, -1), (-1, -1), (-1, 0), (0, +1) };
+        private static readonly (int dx, int dy)[] _flatB = { (+1, +1), (+1, 0), (0, -1), (-1, 0), (-1, +1), (0, +1) };
 
         private readonly float _describedRadius;
         private readonly bool _isPointy;
@@ -38,7 +38,7 @@ namespace Appegy.Tessera
             CellCount = width * height;
 
             _describedRadius = inscribedRadius / math.cos(math.PI / 6f); // = 2/sqrt(3) * inscribedRadius
-            _isPointy = type == HexagonalGridType.PointyOdd || type == HexagonalGridType.PointyEven;
+            _isPointy = type is HexagonalGridType.PointyOdd or HexagonalGridType.PointyEven;
 
             Bounds = ComputeBoundsBySweep();
         }
@@ -49,14 +49,12 @@ namespace Appegy.Tessera
         public HexagonalGridType Type { get; }
 
         public int CellCount { get; }
-        public bounds2 Bounds { get; }
+        public Bounds2 Bounds { get; }
 
         public Cell GetCell(int id)
         {
             return new Cell(this, id);
         }
-
-        // ---------------- Geometry ----------------
 
         public float2 GetCenter(int id)
         {
@@ -132,21 +130,19 @@ namespace Appegy.Tessera
             return -1;
         }
 
-        // ---------------- Cell-at-point ----------------
-
         public int GetCellAt(float2 point)
         {
             // Convert pixel to fractional cubic, round to nearest integer cubic, convert back to offset.
             float fq, fr;
             if (_isPointy)
             {
-                fq = (point.x * Sqrt3 / 3f - point.y / 3f) / _describedRadius;
+                fq = (point.x * _sqrt3 / 3f - point.y / 3f) / _describedRadius;
                 fr = point.y * 2f / 3f / _describedRadius;
             }
             else
             {
                 fq = point.x * 2f / 3f / _describedRadius;
-                fr = (-point.x / 3f + Sqrt3 / 3f * point.y) / _describedRadius;
+                fr = (-point.x / 3f + _sqrt3 / 3f * point.y) / _describedRadius;
             }
 
             var fs = -fq - fr;
@@ -159,11 +155,14 @@ namespace Appegy.Tessera
             var sDiff = math.abs(rs - fs);
 
             if (qDiff > rDiff && qDiff > sDiff)
+            {
                 rq = -rr - rs;
+            }
             else if (rDiff > sDiff)
+            {
                 rr = -rq - rs;
+            }
             // else rs is correct (no need to adjust)
-
             var (ox, oy) = CubicToOffset(rq, rr);
             if (ox < 0 || ox >= Width || oy < 0 || oy >= Height) return -1;
             return IdOf(ox, oy);
@@ -205,8 +204,6 @@ namespace Appegy.Tessera
             return new float2(x * 1.5f * _describedRadius, y * 2f * InscribedRadius + yShift);
         }
 
-        // ---------------- Neighbours ----------------
-
         private (int dx, int dy)[] OffsetsFor(int x, int y)
         {
             if (_isPointy)
@@ -215,20 +212,18 @@ namespace Appegy.Tessera
                 // PointyOdd: odd row → B (shifted right). Even row → A.
                 // PointyEven: odd row → A (shifted left). Even row → B.
                 return Type == HexagonalGridType.PointyOdd
-                    ? oddRow ? PointyB : PointyA
+                    ? oddRow ? _pointyB : _pointyA
                     : oddRow
-                        ? PointyA
-                        : PointyB;
+                        ? _pointyA
+                        : _pointyB;
             }
             var oddCol = (x & 1) == 1;
             return Type == HexagonalGridType.FlatOdd
-                ? oddCol ? FlatB : FlatA
+                ? oddCol ? _flatB : _flatA
                 : oddCol
-                    ? FlatA
-                    : FlatB;
+                    ? _flatA
+                    : _flatB;
         }
-
-        // ---------------- Offset <-> Cubic ----------------
 
         private (int X, int Y, int Z) OffsetToCubic(int ox, int oy)
         {
@@ -273,9 +268,7 @@ namespace Appegy.Tessera
             }
         }
 
-        // ---------------- Bounds (corner sweep) ----------------
-
-        private bounds2 ComputeBoundsBySweep()
+        private Bounds2 ComputeBoundsBySweep()
         {
             var min = new float2(float.MaxValue);
             var max = new float2(float.MinValue);
@@ -288,7 +281,7 @@ namespace Appegy.Tessera
                     max = math.max(max, corner);
                 }
             }
-            return new bounds2(min, max);
+            return new Bounds2(min, max);
         }
     }
 }

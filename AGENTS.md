@@ -23,18 +23,22 @@ Concrete grid types:
 Supporting types:
 
 - `Cell` — `readonly struct (IGrid grid, int id)`. Thin facade forwarding to `IGrid`. Constructed only by grid implementations (internal ctor).
-- `bounds2` — value-type axis-aligned rectangle returned by `IGrid.Bounds`.
-- `TesseraGrid<T>` — per-cell data layer over an `IGrid`. Composition only — does **not** implement `IGrid`. Indexed by `int id` or `Cell`.
+- `Bounds2` — value-type axis-aligned rectangle returned by `IGrid.Bounds`.
+- `PlaneGrid<T>` — per-cell data layer over an `IGrid`. Composition only — does **not** implement `IGrid`. Indexed by `int id` or `Cell`.
 
 Geometry uses `Unity.Mathematics.float2` (package `com.unity.mathematics`).
 
 ## Module Parts
 
 ```
-Runtime/Grid/         ← IGrid + Cell + bounds2 + SquareGrid + HexagonalGrid + TesseraGrid<T>
-Runtime/Pathfinding/  ← (planned) A*, line drawing on grids
-Runtime/MeshGen/      ← (planned) mesh generation from grid geometry
-Tests/                ← NUnit EditMode tests
+Runtime/                  ← IGrid, PlaneGrid<T>
+Runtime/Types/            ← Cell, Bounds2
+Runtime/Utilities/        ← GridExtensions
+Runtime/Grids/Square/     ← SquareGrid
+Runtime/Grids/Hexagonal/  ← HexagonalGrid, HexagonalGridType
+Runtime/Pathfinding/      ← (planned) A*, line drawing on grids
+Runtime/MeshGen/          ← (planned) mesh generation from grid geometry
+Tests/                    ← NUnit EditMode tests
 ```
 
 Debug visualization scripts live in `Appegy.Tessera.Environment~/Assets/Scripts/Debug/` (host project, assembly `Appegy.Tessera.Debug`, depends on `UnityEngine`).
@@ -80,7 +84,7 @@ Corner / neighbour indices wrap via modulo (negative and out-of-range values are
 
 ## Repo layout — what is what
 
-- `Runtime/Grid/` — package code, assembly `Appegy.Tessera`. `noEngineReferences: true` (no `UnityEngine`) and `-nullable:enable` (`Runtime/csc.rsp`). Do not add `UnityEngine` references here. References `Unity.Mathematics` for `float2`.
+- `Runtime/` — package code, assembly `Appegy.Tessera`. `noEngineReferences: true` (no `UnityEngine`) and `-nullable:enable` (`Runtime/csc.rsp`). Do not add `UnityEngine` references here. References `Unity.Mathematics` for `float2`. Sub-folders `Types/`, `Utilities/`, `Grids/<kind>/` group code by role; all share the same assembly and namespace.
 - `Tests/` — EditMode NUnit tests, assembly `Appegy.Tessera.Tests`. `includePlatforms: ["Editor"]`, `optionalUnityReferences: ["TestAssemblies"]`, `noEngineReferences: true`. References `Appegy.Tessera` and `Unity.Mathematics`.
 - `Appegy.Tessera.Environment~/` — Unity 2021.3 host project used to open the package in the editor and run tests. The trailing `~` is required: Unity ignores the folder when the package is consumed downstream. Do not rename. Generated `.csproj` files and `Library/`, `Logs/`, `Temp/`, `obj/` live here and are disposable.
 - `Appegy.Tessera.Environment~/Assets/Scripts/Debug/` — debug visualization scripts (`TessellationDebugView`, `TessellationGridRenderer`, `TessellationCellHighlighter`) in assembly `Appegy.Tessera.Debug`. They depend on `UnityEngine`, which is why they live in the host project, not in the package.
@@ -114,7 +118,7 @@ Tests live as flat `*.cs` files under `Tests/` (no subfolders). When adding beha
 
 ## How to Add a New IGrid Method
 
-1. Add the method signature to `Runtime/Grid/IGrid.cs`.
+1. Add the method signature to `Runtime/IGrid.cs`.
 2. Implement in every concrete grid class: `SquareGrid`, `HexagonalGrid`, (later) `VoronoiGrid`.
 3. Optionally add a forwarding accessor on `Cell` if it makes sense per-cell.
 4. Add tests for every grid configuration: `SquareGrid` + 4 hex layouts. Use `[ValueSource(nameof(AllTypes))]` parameterization (see `HexagonalGridTests.cs`).

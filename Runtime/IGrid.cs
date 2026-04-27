@@ -14,7 +14,7 @@ namespace Appegy.Tessera
         int CellCount { get; }
 
         /// <summary>Axis-aligned rectangle containing all cells in grid-local coordinates.</summary>
-        bounds2 Bounds { get; }
+        Bounds2 Bounds { get; }
 
         /// <summary>Wraps an id into a <see cref="Cell" /> facade for ergonomic access.</summary>
         Cell GetCell(int id);

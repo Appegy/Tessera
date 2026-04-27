@@ -20,7 +20,7 @@ namespace Appegy.Tessera
             Height = height;
             CellSize = cellSize;
             CellCount = width * height;
-            Bounds = new bounds2(float2.zero, new float2(width * cellSize, height * cellSize));
+            Bounds = new Bounds2(float2.zero, new float2(width * cellSize, height * cellSize));
         }
 
         public int Width { get; }
@@ -28,7 +28,7 @@ namespace Appegy.Tessera
         public float CellSize { get; }
 
         public int CellCount { get; }
-        public bounds2 Bounds { get; }
+        public Bounds2 Bounds { get; }
 
         public Cell GetCell(int id)
         {
@@ -75,11 +75,11 @@ namespace Appegy.Tessera
             dest[3] = new float2(x0, y1); // TL
         }
 
-        // Edge i (corner i -> corner (i+1)%4) is shared with neighbour i.
-        // Edge 0: TR -> BR -> right neighbour  (x+1, y)
-        // Edge 1: BR -> BL -> bottom neighbour (x, y-1)
-        // Edge 2: BL -> TL -> left neighbour   (x-1, y)
-        // Edge 3: TL -> TR -> top neighbour    (x, y+1)
+        // Edge i (corner i -> corner (i+1)%4) is shared with neighbor i.
+        // Edge 0: TR -> BR -> right neighbor (x+1, y)
+        // Edge 1: BR -> BL -> bottom neighbor (x, y-1)
+        // Edge 2: BL -> TL -> left neighbor (x-1, y)
+        // Edge 3: TL -> TR -> top neighbor (x, y+1)
         public int GetNeighbor(int id, int neighborIndex)
         {
             var (x, y) = XYOf(id);
