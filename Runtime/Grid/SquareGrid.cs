@@ -20,7 +20,7 @@ namespace Appegy.Tessera
             Height = height;
             CellSize = cellSize;
             CellCount = width * height;
-            Bounds = new GridBounds(float2.zero, new float2(width * cellSize, height * cellSize));
+            Bounds = new bounds2(float2.zero, new float2(width * cellSize, height * cellSize));
         }
 
         public int Width { get; }
@@ -28,7 +28,7 @@ namespace Appegy.Tessera
         public float CellSize { get; }
 
         public int CellCount { get; }
-        public GridBounds Bounds { get; }
+        public bounds2 Bounds { get; }
 
         public Cell GetCell(int id)
         {

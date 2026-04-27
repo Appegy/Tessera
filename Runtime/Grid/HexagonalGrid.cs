@@ -49,7 +49,7 @@ namespace Appegy.Tessera
         public HexagonalGridType Type { get; }
 
         public int CellCount { get; }
-        public GridBounds Bounds { get; }
+        public bounds2 Bounds { get; }
 
         public Cell GetCell(int id)
         {
@@ -275,7 +275,7 @@ namespace Appegy.Tessera
 
         // ---------------- Bounds (corner sweep) ----------------
 
-        private GridBounds ComputeBoundsBySweep()
+        private bounds2 ComputeBoundsBySweep()
         {
             var min = new float2(float.MaxValue);
             var max = new float2(float.MinValue);
@@ -288,7 +288,7 @@ namespace Appegy.Tessera
                     max = math.max(max, corner);
                 }
             }
-            return new GridBounds(min, max);
+            return new bounds2(min, max);
         }
     }
 }

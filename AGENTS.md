@@ -23,7 +23,7 @@ Concrete grid types:
 Supporting types:
 
 - `Cell` — `readonly struct (IGrid grid, int id)`. Thin facade forwarding to `IGrid`. Constructed only by grid implementations (internal ctor).
-- `GridBounds` — value-type axis-aligned rectangle returned by `IGrid.Bounds`.
+- `bounds2` — value-type axis-aligned rectangle returned by `IGrid.Bounds`.
 - `TesseraGrid<T>` — per-cell data layer over an `IGrid`. Composition only — does **not** implement `IGrid`. Indexed by `int id` or `Cell`.
 
 Geometry uses `Unity.Mathematics.float2` (package `com.unity.mathematics`).
@@ -31,7 +31,7 @@ Geometry uses `Unity.Mathematics.float2` (package `com.unity.mathematics`).
 ## Module Parts
 
 ```
-Runtime/Grid/         ← IGrid + Cell + GridBounds + SquareGrid + HexagonalGrid + TesseraGrid<T>
+Runtime/Grid/         ← IGrid + Cell + bounds2 + SquareGrid + HexagonalGrid + TesseraGrid<T>
 Runtime/Pathfinding/  ← (planned) A*, line drawing on grids
 Runtime/MeshGen/      ← (planned) mesh generation from grid geometry
 Tests/                ← NUnit EditMode tests

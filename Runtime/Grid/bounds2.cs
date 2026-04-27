@@ -3,7 +3,7 @@ using Unity.Mathematics;
 namespace Appegy.Tessera
 {
     /// <summary>Axis-aligned rectangle in grid-local coordinates.</summary>
-    public readonly struct GridBounds
+    public readonly struct bounds2
     {
         public float2 Min { get; }
         public float2 Max { get; }
@@ -11,7 +11,7 @@ namespace Appegy.Tessera
         public float2 Size => Max - Min;
         public float2 Center => (Min + Max) * 0.5f;
 
-        public GridBounds(float2 min, float2 max)
+        public bounds2(float2 min, float2 max)
         {
             Min = min;
             Max = max;
@@ -26,7 +26,7 @@ namespace Appegy.Tessera
 
         public override string ToString()
         {
-            return $"GridBounds[{Min} -> {Max}]";
+            return $"bounds2[{Min} -> {Max}]";
         }
     }
 }

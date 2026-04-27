@@ -38,7 +38,7 @@ Generalise Tessera from "regular tessellations only (square / hex)" to "any 2D g
 public interface IGrid
 {
     int CellCount { get; }
-    GridBounds Bounds { get; }
+    bounds2 Bounds { get; }
 
     Cell GetCell(int id);
 
@@ -74,14 +74,14 @@ public readonly struct Cell
     public void   CopyCorners(Span<float2> d)  => _grid.CopyCorners(Id, d);
 }
 
-public readonly struct GridBounds
+public readonly struct bounds2
 {
     public float2 Min { get; }
     public float2 Max { get; }
     public float2 Size   => Max - Min;
     public float2 Center => (Min + Max) * 0.5f;
 
-    public GridBounds(float2 min, float2 max);
+    public bounds2(float2 min, float2 max);
     public bool Contains(float2 p);
 }
 
@@ -141,7 +141,7 @@ public sealed class HexagonalGrid : IGrid
 public sealed class VoronoiGrid : IGrid
 {
     // v1: uniform random sampling of seed points + Lloyd relaxation. No IPointSampler injection.
-    public VoronoiGrid(GridBounds bounds, int cellCount, int seed, int relaxationIterations);
+    public VoronoiGrid(bounds2 bounds, int cellCount, int seed, int relaxationIterations);
 }
 ```
 
@@ -161,7 +161,7 @@ public sealed class VoronoiGrid : IGrid
 ### Phase 1 — new core types
 - `Runtime/Grid/IGrid.cs`
 - `Runtime/Grid/Cell.cs`
-- `Runtime/Grid/GridBounds.cs`
+- `Runtime/Grid/bounds2.cs`
 - `Runtime/Grid/GridExtensions.cs`
 
 ### Phase 2 — square
