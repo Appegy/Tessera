@@ -1,0 +1,23 @@
+{
+    "name": "Appegy.Lattice.Tests",
+    "rootNamespace": "Appegy.Lattice.Tests",
+    "references": [
+        "Appegy.Lattice"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": true,
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ]
+}

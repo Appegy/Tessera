@@ -1,0 +1,16 @@
+{
+    "name": "Appegy.Lattice",
+    "rootNamespace": "Appegy.Lattice",
+    "references": [
+        "Appegy.Union"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": true
+}

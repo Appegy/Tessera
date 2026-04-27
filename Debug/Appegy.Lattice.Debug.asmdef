@@ -1,0 +1,17 @@
+{
+    "name": "Appegy.Lattice.Debug",
+    "rootNamespace": "",
+    "references": [
+        "Appegy.Lattice",
+        "Unity.InputSystem"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
