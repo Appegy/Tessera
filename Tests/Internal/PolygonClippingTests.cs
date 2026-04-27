@@ -37,10 +37,7 @@ namespace Appegy.Tessera.Tests.Internal
             var (oc, on) = Tessera.PolygonClipping.ClipToBounds(corners, neighbors, Unit);
             Assert.AreEqual(4, oc.Length, "Triangle clipped at top should produce a 4-gon.");
             Assert.AreEqual(4, on.Length);
-            // Exactly one edge is on the y=1 boundary -> tag -1.
-            var minusOnes = 0;
-            for (var i = 0; i < on.Length; i++) if (on[i] == -1) minusOnes++;
-            Assert.AreEqual(1, minusOnes);
+            AssertBoundaryEdgeHasTag(oc, on, 3, -1);
         }
 
         [Test]
@@ -73,11 +70,58 @@ namespace Appegy.Tessera.Tests.Internal
         }
 
         [Test]
+        public void Clip_BoundaryEdgeAlreadyOnBounds_TaggedAsBoundary()
+        {
+            var corners = new[] { new float2(0.8f, 1f), new float2(0.8f, 0.2f), new float2(0.2f, 0.2f), new float2(0.2f, 1f) };
+            var neighbors = new[] { 10, 20, 30, 40 };
+            var (oc, on) = Tessera.PolygonClipping.ClipToBounds(corners, neighbors, Unit);
+
+            CollectionAssert.AreEqual(corners, oc);
+            CollectionAssert.AreEqual(new[] { 10, 20, 30, -1 }, on);
+        }
+
+        [Test]
+        public void Clip_BoundaryTouchingCorner_DoesNotEmitDuplicateVertices()
+        {
+            var corners = new[] { new float2(0.2f, 1f), new float2(0.8f, 1.4f), new float2(0.8f, 0.2f), new float2(0.2f, 0.2f) };
+            var neighbors = new[] { 10, 20, 30, 40 };
+            var (oc, on) = Tessera.PolygonClipping.ClipToBounds(corners, neighbors, Unit);
+
+            var expectedCorners = new[] { new float2(0.2f, 1f), new float2(0.8f, 1f), new float2(0.8f, 0.2f), new float2(0.2f, 0.2f) };
+            CollectionAssert.AreEqual(expectedCorners, oc);
+            CollectionAssert.AreEqual(new[] { -1, 20, 30, 40 }, on);
+            AssertNoDuplicateConsecutiveCorners(oc);
+            AssertBoundaryEdgeHasTag(oc, on, 0, -1);
+        }
+
+        [Test]
         public void Clip_MismatchedInputLengths_Throws()
         {
             var corners = new[] { new float2(0, 0), new float2(1, 0), new float2(0, 1) };
             var neighbors = new[] { 1, 2 };
             Assert.Throws<ArgumentException>(() => Tessera.PolygonClipping.ClipToBounds(corners, neighbors, Unit));
+        }
+
+        [Test]
+        public void Clip_NullInputs_Throw()
+        {
+            var corners = new[] { new float2(0, 0), new float2(1, 0), new float2(0, 1) };
+            var neighbors = new[] { 1, 2, 3 };
+            Assert.Throws<ArgumentNullException>(() => Tessera.PolygonClipping.ClipToBounds(null, neighbors, Unit));
+            Assert.Throws<ArgumentNullException>(() => Tessera.PolygonClipping.ClipToBounds(corners, null, Unit));
+        }
+
+        private static void AssertNoDuplicateConsecutiveCorners(float2[] corners)
+        {
+            for (var i = 0; i < corners.Length; i++)
+                Assert.AreNotEqual(corners[i], corners[(i + 1) % corners.Length], $"Duplicate corner at edge {i}");
+        }
+
+        private static void AssertBoundaryEdgeHasTag(float2[] corners, int[] neighbors, int edge, int tag)
+        {
+            Assert.AreEqual(tag, neighbors[edge]);
+            Assert.AreEqual(1f, corners[edge].y, 1e-5f);
+            Assert.AreEqual(1f, corners[(edge + 1) % corners.Length].y, 1e-5f);
         }
     }
 }

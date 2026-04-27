@@ -13,6 +13,10 @@ namespace Appegy.Tessera
             int[] neighbors,
             Bounds2 bounds)
         {
+            if (corners == null)
+                throw new ArgumentNullException(nameof(corners));
+            if (neighbors == null)
+                throw new ArgumentNullException(nameof(neighbors));
             if (corners.Length != neighbors.Length)
                 throw new ArgumentException("Corners and neighbors must have the same length.", nameof(neighbors));
 
@@ -36,23 +40,35 @@ namespace Appegy.Tessera
                     var tag = inNeighbors[i];
                     var currentInside = IsInside(current, plane, bounds);
                     var nextInside = IsInside(next, plane, bounds);
+                    var currentOnPlane = IsOnPlane(current, plane, bounds);
+                    var nextOnPlane = IsOnPlane(next, plane, bounds);
 
                     if (currentInside && nextInside)
                     {
                         outCorners.Add(current);
-                        outNeighbors.Add(tag);
+                        outNeighbors.Add(currentOnPlane && nextOnPlane ? -1 : tag);
                     }
                     else if (currentInside)
                     {
                         outCorners.Add(current);
-                        outNeighbors.Add(tag);
-                        outCorners.Add(Intersect(current, next, plane, bounds));
-                        outNeighbors.Add(-1);
+                        if (currentOnPlane)
+                        {
+                            outNeighbors.Add(-1);
+                        }
+                        else
+                        {
+                            outNeighbors.Add(tag);
+                            outCorners.Add(Intersect(current, next, plane, bounds));
+                            outNeighbors.Add(-1);
+                        }
                     }
                     else if (nextInside)
                     {
-                        outCorners.Add(Intersect(current, next, plane, bounds));
-                        outNeighbors.Add(tag);
+                        if (!nextOnPlane)
+                        {
+                            outCorners.Add(Intersect(current, next, plane, bounds));
+                            outNeighbors.Add(tag);
+                        }
                     }
                 }
 
@@ -77,6 +93,18 @@ namespace Appegy.Tessera
                 2 => point.y >= bounds.Min.y,
                 3 => point.y <= bounds.Max.y,
                 _ => true
+            };
+        }
+
+        private static bool IsOnPlane(float2 point, int plane, Bounds2 bounds)
+        {
+            return plane switch
+            {
+                0 => point.x == bounds.Min.x,
+                1 => point.x == bounds.Max.x,
+                2 => point.y == bounds.Min.y,
+                3 => point.y == bounds.Max.y,
+                _ => false
             };
         }
 
