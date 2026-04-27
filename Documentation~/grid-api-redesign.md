@@ -13,7 +13,7 @@ Generalise Tessera from "regular tessellations only (square / hex)" to "any 2D g
 ## Locked decisions
 
 - **Finite grids only.** No infinite worlds. Construction declares total cell count.
-- **Immutable topology.** Once constructed, structure does not change. Per-cell *data* (`TesseraGrid<T>`) is mutable.
+- **Immutable topology.** Once constructed, structure does not change. Per-cell *data* (`PlaneGrid<T>`) is mutable.
 - **Identity = `int` id**, dense `[0, CellCount)`. Coordinates (X/Y, axial, ...) are concrete-grid extras, not part of `IGrid`.
 - **`IGrid` is an interface, not a Union.** Each implementation decides whether to cache or compute.
 - **No precomputed caches for square / hex.** Their geometry is closed-form; computing on demand is cheap. Voronoi caches because it has no formula.
@@ -38,7 +38,7 @@ Generalise Tessera from "regular tessellations only (square / hex)" to "any 2D g
 public interface IGrid
 {
     int CellCount { get; }
-    bounds2 Bounds { get; }
+    Bounds2 Bounds { get; }
 
     Cell GetCell(int id);
 
@@ -74,18 +74,18 @@ public readonly struct Cell
     public void   CopyCorners(Span<float2> d)  => _grid.CopyCorners(Id, d);
 }
 
-public readonly struct bounds2
+public readonly struct Bounds2
 {
     public float2 Min { get; }
     public float2 Max { get; }
     public float2 Size   => Max - Min;
     public float2 Center => (Min + Max) * 0.5f;
 
-    public bounds2(float2 min, float2 max);
+    public Bounds2(float2 min, float2 max);
     public bool Contains(float2 p);
 }
 
-public sealed class TesseraGrid<T> : IReadOnlyCollection<T>
+public sealed class PlaneGrid<T> : IReadOnlyCollection<T>
 {
     public IGrid Grid { get; }
     public int   Count => Grid.CellCount;
@@ -93,9 +93,8 @@ public sealed class TesseraGrid<T> : IReadOnlyCollection<T>
     public T this[int id]    { get; set; }
     public T this[Cell cell] { get; set; }   // forwards to this[cell.Id]
 
-    public TesseraGrid(IGrid grid);
-    public TesseraGrid(IGrid grid, T fill);
-    public TesseraGrid(IGrid grid, T[] data); // length must equal grid.CellCount
+    public PlaneGrid(IGrid grid);
+    public PlaneGrid(IGrid grid, T fill);
 
     public void Fill(T value);
     public IEnumerator<T> GetEnumerator();
@@ -141,7 +140,7 @@ public sealed class HexagonalGrid : IGrid
 public sealed class VoronoiGrid : IGrid
 {
     // v1: uniform random sampling of seed points + Lloyd relaxation. No IPointSampler injection.
-    public VoronoiGrid(bounds2 bounds, int cellCount, int seed, int relaxationIterations);
+    public VoronoiGrid(Bounds2 bounds, int cellCount, int seed, int relaxationIterations);
 }
 ```
 
@@ -159,24 +158,24 @@ public sealed class VoronoiGrid : IGrid
 ## Migration plan
 
 ### Phase 1 — new core types
-- `Runtime/Grid/IGrid.cs`
-- `Runtime/Grid/Cell.cs`
-- `Runtime/Grid/bounds2.cs`
-- `Runtime/Grid/GridExtensions.cs`
+- `Runtime/IGrid.cs`
+- `Runtime/Types/Cell.cs`
+- `Runtime/Types/Bounds2.cs`
+- `Runtime/Utilities/GridExtensions.cs`
 
 ### Phase 2 — square
-- `Runtime/Grid/SquareGrid.cs` (closed-form, no caching)
+- `Runtime/Grids/Square/SquareGrid.cs` (closed-form, no caching)
 - Migrate `SquareTessellationTests` -> `SquareGridTests`
 - Migrate square parts of `GetDirectionTests` -> `SquareGridGetNeighborIndexTests`
 
 ### Phase 3 — hex
-- `Runtime/Grid/HexagonalGrid.cs` (closed-form, no caching, 6-connected only)
+- `Runtime/Grids/Hexagonal/HexagonalGrid.cs` (closed-form, no caching, 6-connected only)
 - Migrate `HexagonalTessellationTests`. `HexNeighborModeTests` is **dropped** (Even/Odd modes are gone).
 - Migrate hex parts of `GetDirectionTests`. `GetOppositeDirectionTests` mostly disappears; what remains is `GetNeighborIndex(b, a)` round-trip checks.
 
-### Phase 4 — TesseraGrid<T>
-- Rewrite `Runtime/Grid/TesseraGrid.cs` per the new shape (id-indexed, no Width/Height of its own).
-- Rewrite `TesseraGridTests`.
+### Phase 4 — PlaneGrid<T>
+- Rewrite `Runtime/PlaneGrid.cs` per the new shape (id-indexed, no Width/Height of its own).
+- Rewrite `PlaneGridTests`.
 
 ### Phase 5 — delete old
 - Remove `Runtime/Tessellation/*` entirely.
@@ -203,7 +202,7 @@ Separate session. Out of scope for this redesign pass.
 - Chunked / streamed worlds.
 - Burst-compiled hot paths. `float2` keeps this option open.
 - Pluggable point samplers for Voronoi (`IPointSampler`).
-- Per-edge / per-corner data layers analogous to `TesseraGrid<T>`.
+- Per-edge / per-corner data layers analogous to `PlaneGrid<T>`.
 
 ## Open implementation choices (decide while coding)
 
