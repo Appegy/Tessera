@@ -6,6 +6,8 @@ namespace Appegy.Tessera
 {
     internal static class BowyerWatson
     {
+        private const float DegeneracyEpsilon = 1e-6f;
+
         public static int[] Triangulate(ReadOnlySpan<float2> points)
         {
             if (points.Length < 3)
@@ -25,6 +27,7 @@ namespace Appegy.Tessera
 
             var dmax = math.max(maxX - minX, maxY - minY);
             if (dmax <= 0f) throw new InvalidOperationException("Degenerate point set (zero extent).");
+            ValidatePointSet(points, dmax);
             var midx = (minX + maxX) * 0.5f;
             var midy = (minY + maxY) * 0.5f;
 
@@ -65,6 +68,7 @@ namespace Appegy.Tessera
                 }
 
                 // Mark duplicate edges (shared between two bad triangles) for removal.
+                // O(e^2) dedup is acceptable for v1 point sets (<= 500 sites).
                 for (var i = 0; i < edges.Count; i += 2)
                 {
                     if (edges[i] == -1) continue;
@@ -113,7 +117,7 @@ namespace Appegy.Tessera
         public static float2 Circumcenter(float2 a, float2 b, float2 c)
         {
             var d = 2f * (a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y));
-            if (math.abs(d) < 1e-12f)
+            if (math.abs(d) <= 2f * OrientationTolerance(a, b, c))
                 throw new InvalidOperationException("Degenerate triangle: collinear vertices.");
             var asq = a.x * a.x + a.y * a.y;
             var bsq = b.x * b.x + b.y * b.y;
@@ -123,17 +127,65 @@ namespace Appegy.Tessera
             return new float2(ux, uy);
         }
 
+        private static void ValidatePointSet(ReadOnlySpan<float2> points, float scale)
+        {
+            var pointToleranceSq = scale * scale * DegeneracyEpsilon * DegeneracyEpsilon;
+            for (var i = 0; i < points.Length; i++)
+            {
+                for (var j = i + 1; j < points.Length; j++)
+                {
+                    if (math.distancesq(points[i], points[j]) <= pointToleranceSq)
+                        throw new InvalidOperationException("Degenerate point set: duplicated points.");
+                }
+            }
+
+            for (var i = 0; i < points.Length - 2; i++)
+            {
+                for (var j = i + 1; j < points.Length - 1; j++)
+                {
+                    for (var k = j + 1; k < points.Length; k++)
+                    {
+                        if (!IsDegenerateTriangle(points[i], points[j], points[k]))
+                            return;
+                    }
+                }
+            }
+
+            throw new InvalidOperationException("Degenerate point set: collinear points.");
+        }
+
         private static bool InCircumcircle(float2 a, float2 b, float2 c, float2 p)
         {
             // Sign-aware in-circle test independent of winding.
+            var orient = Orientation(a, b, c);
+            if (math.abs(orient) <= OrientationTolerance(a, b, c))
+                throw new InvalidOperationException("Degenerate triangle: collinear vertices.");
+
             var ax = a.x - p.x; var ay = a.y - p.y;
             var bx = b.x - p.x; var by = b.y - p.y;
             var cx = c.x - p.x; var cy = c.y - p.y;
             var det = (ax * ax + ay * ay) * (bx * cy - cx * by)
                     - (bx * bx + by * by) * (ax * cy - cx * ay)
                     + (cx * cx + cy * cy) * (ax * by - bx * ay);
-            var orient = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
             return orient > 0 ? det > 0 : det < 0;
+        }
+
+        private static bool IsDegenerateTriangle(float2 a, float2 b, float2 c)
+        {
+            return math.abs(Orientation(a, b, c)) <= OrientationTolerance(a, b, c);
+        }
+
+        private static float Orientation(float2 a, float2 b, float2 c)
+        {
+            return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+        }
+
+        private static float OrientationTolerance(float2 a, float2 b, float2 c)
+        {
+            var ab = math.distancesq(a, b);
+            var bc = math.distancesq(b, c);
+            var ca = math.distancesq(c, a);
+            return math.max(ab, math.max(bc, ca)) * DegeneracyEpsilon;
         }
     }
 }

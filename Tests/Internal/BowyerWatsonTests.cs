@@ -23,6 +23,21 @@ namespace Appegy.Tessera.Tests.Internal
             };
             var tri = Tessera.BowyerWatson.Triangulate(points);
             Assert.AreEqual(6, tri.Length); // 2 triangles
+            AssertTrianglesAreValid(points.Length, tri);
+        }
+
+        [Test]
+        public void Triangulate_CollinearNonZeroExtent_Throws()
+        {
+            var points = new[] { new float2(0, 0), new float2(1, 1), new float2(2, 2), new float2(3, 3) };
+            Assert.Throws<System.InvalidOperationException>(() => Tessera.BowyerWatson.Triangulate(points));
+        }
+
+        [Test]
+        public void Triangulate_DuplicatePoint_Throws()
+        {
+            var points = new[] { new float2(0, 0), new float2(1, 0), new float2(0, 1), new float2(0, 1) };
+            Assert.Throws<System.InvalidOperationException>(() => Tessera.BowyerWatson.Triangulate(points));
         }
 
         [Test]
@@ -35,6 +50,14 @@ namespace Appegy.Tessera.Tests.Internal
 
             var tri = Tessera.BowyerWatson.Triangulate(points);
             Assert.IsTrue(tri.Length % 3 == 0);
+            AssertTrianglesAreValid(points.Length, tri);
+
+            var used = new bool[points.Length];
+            for (var i = 0; i < tri.Length; i++)
+                used[tri[i]] = true;
+
+            for (var i = 0; i < used.Length; i++)
+                Assert.IsTrue(used[i], $"Point {i} is missing from triangulation");
 
             // Empty-circumcircle property: for every triangle, no other point is strictly inside its circumcircle.
             for (var t = 0; t < tri.Length; t += 3)
@@ -62,6 +85,31 @@ namespace Appegy.Tessera.Tests.Internal
             var cc = Tessera.BowyerWatson.Circumcenter(a, b, c);
             Assert.AreEqual(1f, cc.x, 1e-5f);
             Assert.AreEqual(1f, cc.y, 1e-5f);
+        }
+
+        [Test]
+        public void Circumcenter_NearlyCollinearLargeScale_Throws()
+        {
+            var a = new float2(0, 0);
+            var b = new float2(1000000f, 0);
+            var c = new float2(2000000f, 0.001f);
+            Assert.Throws<System.InvalidOperationException>(() => Tessera.BowyerWatson.Circumcenter(a, b, c));
+        }
+
+        private static void AssertTrianglesAreValid(int pointCount, int[] tri)
+        {
+            for (var t = 0; t < tri.Length; t += 3)
+            {
+                Assert.GreaterOrEqual(tri[t], 0);
+                Assert.Less(tri[t], pointCount);
+                Assert.GreaterOrEqual(tri[t + 1], 0);
+                Assert.Less(tri[t + 1], pointCount);
+                Assert.GreaterOrEqual(tri[t + 2], 0);
+                Assert.Less(tri[t + 2], pointCount);
+                Assert.AreNotEqual(tri[t], tri[t + 1], $"Triangle {t / 3} has duplicate vertices");
+                Assert.AreNotEqual(tri[t + 1], tri[t + 2], $"Triangle {t / 3} has duplicate vertices");
+                Assert.AreNotEqual(tri[t + 2], tri[t], $"Triangle {t / 3} has duplicate vertices");
+            }
         }
     }
 }
