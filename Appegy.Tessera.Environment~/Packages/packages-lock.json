@@ -5,15 +5,8 @@
       "depth": 0,
       "source": "local",
       "dependencies": {
-        "com.appegy.union": "1.0.2"
+        "com.unity.mathematics": "1.3.2"
       }
-    },
-    "com.appegy.union": {
-      "version": "https://github.com/Appegy/Union.git",
-      "depth": 0,
-      "source": "git",
-      "dependencies": {},
-      "hash": "e9144bc1cf8966ef24c3129d21cc1415f73754f4"
     },
     "com.coplaydev.unity-mcp": {
       "version": "9.6.6",
@@ -47,6 +40,13 @@
       "dependencies": {
         "com.unity.modules.uielements": "1.0.0"
       },
+      "url": "https://packages.unity.com"
+    },
+    "com.unity.mathematics": {
+      "version": "1.3.3",
+      "depth": 1,
+      "source": "registry",
+      "dependencies": {},
       "url": "https://packages.unity.com"
     },
     "com.unity.nuget.newtonsoft-json": {
