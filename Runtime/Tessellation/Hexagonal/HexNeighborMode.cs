@@ -1,4 +1,4 @@
-namespace Appegy.Lattice
+namespace Appegy.Tessera
 {
     public enum HexNeighborMode : byte
     {

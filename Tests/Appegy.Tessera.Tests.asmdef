@@ -1,8 +1,8 @@
 {
-    "name": "Appegy.Lattice.Tests",
-    "rootNamespace": "Appegy.Lattice.Tests",
+    "name": "Appegy.Tessera.Tests",
+    "rootNamespace": "Appegy.Tessera.Tests",
     "references": [
-        "Appegy.Lattice"
+        "Appegy.Tessera"
     ],
     "includePlatforms": [
         "Editor"

@@ -1,6 +1,6 @@
 using Appegy.Union;
 
-namespace Appegy.Lattice
+namespace Appegy.Tessera
 {
     [Union(typeof(SquareTessellation), typeof(HexagonalTessellation))]
     [Expose(typeof(ITessellation))]

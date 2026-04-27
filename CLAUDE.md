@@ -1,4 +1,4 @@
-# Lattice Module
+# Tessera Module
 
 Pure-geometry module for infinite 2D grids. No UnityEngine dependencies.
 
@@ -77,7 +77,7 @@ Hex flat:      corners at 0°, 60°, 120°, 180°, 240°, 300°
 
 Scene `Scenes/TessellationTestScene.unity` with a `TessellationDebugView` component on `Grid Renderer` GameObject.
 
-**3 scripts** in `Debug/` (not in Lattice assembly — they depend on UnityEngine):
+**3 scripts** in `Debug/` (not in Tessera assembly — they depend on UnityEngine):
 
 | Script | Role |
 |--------|------|
@@ -93,4 +93,4 @@ URP is configured for flat 2D — no lighting, no shadows, no post-processing. C
 
 ## How to Add a New Module Part
 
-Create a new folder under `Runtime/` (e.g. `Runtime/Grid/`). Keep it in the same `Appegy.Lattice` assembly and namespace. No separate .asmdef needed.
+Create a new folder under `Runtime/` (e.g. `Runtime/Grid/`). Keep it in the same `Appegy.Tessera` assembly and namespace. No separate .asmdef needed.

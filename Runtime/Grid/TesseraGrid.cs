@@ -2,13 +2,13 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 
-namespace Appegy.Lattice
+namespace Appegy.Tessera
 {
     /// <summary>
     /// Generic 2D grid collection backed by a flat array with tessellation-aware metadata.
     /// Coordinates use (X, Y) where X is column and Y is row.
     /// </summary>
-    public class LatticeGrid<T> : IReadOnlyCollection<T>, IEnumerable<T>
+    public class TesseraGrid<T> : IReadOnlyCollection<T>, IEnumerable<T>
     {
         private readonly T[] _data;
 
@@ -25,7 +25,7 @@ namespace Appegy.Lattice
         public int Count => Width * Height;
 
         /// <summary>Creates an empty grid with default values for all cells.</summary>
-        public LatticeGrid(Tessellation tessellation, int width, int height)
+        public TesseraGrid(Tessellation tessellation, int width, int height)
         {
             if (width <= 0) throw new ArgumentOutOfRangeException(nameof(width), "Width must be positive");
             if (height <= 0) throw new ArgumentOutOfRangeException(nameof(height), "Height must be positive");
@@ -37,7 +37,7 @@ namespace Appegy.Lattice
         }
 
         /// <summary>Creates a grid from a 2D array where data[x, y] (dimension 0 = width, dimension 1 = height).</summary>
-        public LatticeGrid(Tessellation tessellation, T[,] data)
+        public TesseraGrid(Tessellation tessellation, T[,] data)
         {
             if (data == null) throw new ArgumentNullException(nameof(data));
 

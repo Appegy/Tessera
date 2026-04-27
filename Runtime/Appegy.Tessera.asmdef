@@ -1,6 +1,6 @@
 {
-    "name": "Appegy.Lattice",
-    "rootNamespace": "Appegy.Lattice",
+    "name": "Appegy.Tessera",
+    "rootNamespace": "Appegy.Tessera",
     "references": [
         "Appegy.Union"
     ],

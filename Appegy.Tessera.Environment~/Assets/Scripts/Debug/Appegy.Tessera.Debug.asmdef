@@ -1,8 +1,8 @@
 {
-    "name": "Appegy.Lattice.Debug",
+    "name": "Appegy.Tessera.Debug",
     "rootNamespace": "",
     "references": [
-        "Appegy.Lattice",
+        "Appegy.Tessera",
         "Unity.InputSystem"
     ],
     "includePlatforms": [],

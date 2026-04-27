@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace Appegy.Lattice
+namespace Appegy.Tessera
 {
     /// <summary>
     /// Unified geometry interface for regular tessellations (square, hexagon).

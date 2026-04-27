@@ -1,6 +1,6 @@
 using NUnit.Framework;
 
-namespace Appegy.Lattice.Tests
+namespace Appegy.Tessera.Tests
 {
     [TestFixture]
     public class GetOppositeDirectionTests

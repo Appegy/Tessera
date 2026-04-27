@@ -4,7 +4,9 @@
       "version": "file:../..",
       "depth": 0,
       "source": "local",
-      "dependencies": {}
+      "dependencies": {
+        "com.appegy.union": "1.0.2"
+      }
     },
     "com.appegy.union": {
       "version": "https://github.com/Appegy/Union.git",

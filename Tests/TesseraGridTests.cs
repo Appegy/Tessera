@@ -2,10 +2,10 @@ using System;
 using System.Linq;
 using NUnit.Framework;
 
-namespace Appegy.Lattice.Tests
+namespace Appegy.Tessera.Tests
 {
     [TestFixture]
-    public class LatticeGridTests
+    public class TesseraGridTests
     {
         private Tessellation _square;
         private Tessellation _hex;
@@ -22,7 +22,7 @@ namespace Appegy.Lattice.Tests
         [Test]
         public void Constructor_SetsProperties()
         {
-            var grid = new LatticeGrid<int>(_square, 5, 3);
+            var grid = new TesseraGrid<int>(_square, 5, 3);
             Assert.AreEqual(5, grid.Width);
             Assert.AreEqual(3, grid.Height);
             Assert.AreEqual(15, grid.Count);
@@ -31,22 +31,22 @@ namespace Appegy.Lattice.Tests
         [Test]
         public void Constructor_StoresTessellation()
         {
-            var grid = new LatticeGrid<int>(_hex, 4, 4);
+            var grid = new TesseraGrid<int>(_hex, 4, 4);
             Assert.AreEqual(6, grid.Tessellation.DirectionsCount);
         }
 
         [Test]
         public void Constructor_InvalidWidth_Throws()
         {
-            Assert.Throws<ArgumentOutOfRangeException>(() => new LatticeGrid<int>(_square, 0, 5));
-            Assert.Throws<ArgumentOutOfRangeException>(() => new LatticeGrid<int>(_square, -1, 5));
+            Assert.Throws<ArgumentOutOfRangeException>(() => new TesseraGrid<int>(_square, 0, 5));
+            Assert.Throws<ArgumentOutOfRangeException>(() => new TesseraGrid<int>(_square, -1, 5));
         }
 
         [Test]
         public void Constructor_InvalidHeight_Throws()
         {
-            Assert.Throws<ArgumentOutOfRangeException>(() => new LatticeGrid<int>(_square, 5, 0));
-            Assert.Throws<ArgumentOutOfRangeException>(() => new LatticeGrid<int>(_square, 5, -1));
+            Assert.Throws<ArgumentOutOfRangeException>(() => new TesseraGrid<int>(_square, 5, 0));
+            Assert.Throws<ArgumentOutOfRangeException>(() => new TesseraGrid<int>(_square, 5, -1));
         }
 
         [Test]
@@ -56,7 +56,7 @@ namespace Appegy.Lattice.Tests
             data[0, 0] = 10;
             data[2, 1] = 42;
 
-            var grid = new LatticeGrid<int>(_square, data);
+            var grid = new TesseraGrid<int>(_square, data);
             Assert.AreEqual(3, grid.Width);
             Assert.AreEqual(2, grid.Height);
             Assert.AreEqual(10, grid[0, 0]);
@@ -70,7 +70,7 @@ namespace Appegy.Lattice.Tests
         [Test]
         public void Indexer_GetSet_Works()
         {
-            var grid = new LatticeGrid<int>(_square, 3, 3);
+            var grid = new TesseraGrid<int>(_square, 3, 3);
             grid[0, 0] = 1;
             grid[2, 2] = 9;
             grid[1, 0] = 5;
@@ -83,18 +83,18 @@ namespace Appegy.Lattice.Tests
         [Test]
         public void Indexer_DefaultValue_IsDefault()
         {
-            var intGrid = new LatticeGrid<int>(_square, 3, 3);
+            var intGrid = new TesseraGrid<int>(_square, 3, 3);
             Assert.AreEqual(0, intGrid[0, 0]);
             Assert.AreEqual(0, intGrid[2, 2]);
 
-            var stringGrid = new LatticeGrid<string>(_square, 2, 2);
+            var stringGrid = new TesseraGrid<string>(_square, 2, 2);
             Assert.IsNull(stringGrid[0, 0]);
         }
 
         [Test]
         public void Indexer_OutOfBounds_Throws()
         {
-            var grid = new LatticeGrid<int>(_square, 3, 3);
+            var grid = new TesseraGrid<int>(_square, 3, 3);
 
             Assert.Throws<IndexOutOfRangeException>(() => { var _ = grid[-1, 0]; });
             Assert.Throws<IndexOutOfRangeException>(() => { var _ = grid[0, -1]; });
@@ -105,7 +105,7 @@ namespace Appegy.Lattice.Tests
         [Test]
         public void Indexer_SetOutOfBounds_Throws()
         {
-            var grid = new LatticeGrid<int>(_square, 3, 3);
+            var grid = new TesseraGrid<int>(_square, 3, 3);
 
             Assert.Throws<IndexOutOfRangeException>(() => grid[-1, 0] = 1);
             Assert.Throws<IndexOutOfRangeException>(() => grid[3, 0] = 1);
@@ -114,7 +114,7 @@ namespace Appegy.Lattice.Tests
         [Test]
         public void Indexer_AllCells_Writable()
         {
-            var grid = new LatticeGrid<int>(_square, 4, 3);
+            var grid = new TesseraGrid<int>(_square, 4, 3);
             var counter = 0;
             for (var y = 0; y < 3; y++)
             for (var x = 0; x < 4; x++)
@@ -133,7 +133,7 @@ namespace Appegy.Lattice.Tests
         [Test]
         public void Contains_ValidCoords_ReturnsTrue()
         {
-            var grid = new LatticeGrid<int>(_square, 3, 3);
+            var grid = new TesseraGrid<int>(_square, 3, 3);
             Assert.IsTrue(grid.Contains(0, 0));
             Assert.IsTrue(grid.Contains(2, 2));
             Assert.IsTrue(grid.Contains(1, 1));
@@ -142,7 +142,7 @@ namespace Appegy.Lattice.Tests
         [Test]
         public void Contains_InvalidCoords_ReturnsFalse()
         {
-            var grid = new LatticeGrid<int>(_square, 3, 3);
+            var grid = new TesseraGrid<int>(_square, 3, 3);
             Assert.IsFalse(grid.Contains(-1, 0));
             Assert.IsFalse(grid.Contains(0, -1));
             Assert.IsFalse(grid.Contains(3, 0));
@@ -156,7 +156,7 @@ namespace Appegy.Lattice.Tests
         [Test]
         public void Enumeration_IteratesAllElements()
         {
-            var grid = new LatticeGrid<int>(_square, 3, 2);
+            var grid = new TesseraGrid<int>(_square, 3, 2);
             grid.Fill(7);
 
             var items = grid.ToList();
@@ -167,7 +167,7 @@ namespace Appegy.Lattice.Tests
         [Test]
         public void Enumeration_RowByRow()
         {
-            var grid = new LatticeGrid<int>(_square, 2, 2);
+            var grid = new TesseraGrid<int>(_square, 2, 2);
             grid[0, 0] = 1;
             grid[1, 0] = 2;
             grid[0, 1] = 3;
@@ -180,7 +180,7 @@ namespace Appegy.Lattice.Tests
         [Test]
         public void Count_MatchesWidthTimesHeight()
         {
-            var grid = new LatticeGrid<int>(_hex, 7, 5);
+            var grid = new TesseraGrid<int>(_hex, 7, 5);
             Assert.AreEqual(35, grid.Count);
             Assert.AreEqual(35, grid.Count());
         }
@@ -192,7 +192,7 @@ namespace Appegy.Lattice.Tests
         [Test]
         public void Fill_SetsAllCells()
         {
-            var grid = new LatticeGrid<string>(_square, 3, 3);
+            var grid = new TesseraGrid<string>(_square, 3, 3);
             grid.Fill("x");
 
             for (var y = 0; y < 3; y++)
@@ -207,7 +207,7 @@ namespace Appegy.Lattice.Tests
         [Test]
         public void Works_WithEnum()
         {
-            var grid = new LatticeGrid<HexNeighborMode>(_hex, 2, 2);
+            var grid = new TesseraGrid<HexNeighborMode>(_hex, 2, 2);
             grid[0, 0] = HexNeighborMode.Even;
             grid[1, 1] = HexNeighborMode.Odd;
 
@@ -219,7 +219,7 @@ namespace Appegy.Lattice.Tests
         [Test]
         public void Works_WithString()
         {
-            var grid = new LatticeGrid<string>(_square, 2, 2);
+            var grid = new TesseraGrid<string>(_square, 2, 2);
             grid[0, 0] = "hello";
             Assert.AreEqual("hello", grid[0, 0]);
             Assert.IsNull(grid[1, 1]);
@@ -233,7 +233,7 @@ namespace Appegy.Lattice.Tests
         public void Works_WithHexTessellation()
         {
             var hex = new HexagonalTessellation(1.0f, HexagonalGridType.FlatEven, HexNeighborMode.Even);
-            var grid = new LatticeGrid<int>(hex, 4, 4);
+            var grid = new TesseraGrid<int>(hex, 4, 4);
             Assert.AreEqual(3, grid.Tessellation.DirectionsCount);
             grid[3, 3] = 42;
             Assert.AreEqual(42, grid[3, 3]);
@@ -243,7 +243,7 @@ namespace Appegy.Lattice.Tests
         public void Works_WithSquare8Tessellation()
         {
             Tessellation sq8 = new SquareTessellation(1.0f, true);
-            var grid = new LatticeGrid<int>(sq8, 5, 5);
+            var grid = new TesseraGrid<int>(sq8, 5, 5);
             Assert.AreEqual(8, grid.Tessellation.DirectionsCount);
         }
 

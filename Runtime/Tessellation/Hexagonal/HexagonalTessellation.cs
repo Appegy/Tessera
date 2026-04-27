@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Appegy.Lattice
+namespace Appegy.Tessera
 {
     public readonly struct HexagonalTessellation : ITessellation
     {

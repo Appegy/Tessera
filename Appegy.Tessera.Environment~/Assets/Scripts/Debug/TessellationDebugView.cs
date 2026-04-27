@@ -1,4 +1,4 @@
-using Appegy.Lattice;
+using Appegy.Tessera;
 using UnityEngine;
 
 #if UNITY_EDITOR

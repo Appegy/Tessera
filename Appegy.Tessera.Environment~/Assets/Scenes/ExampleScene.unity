@@ -230,7 +230,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ce01b75bf32e02946a10e187970af101, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Appegy.Lattice.Debug::TessellationDebugView
+  m_EditorClassIdentifier: Appegy.Tessera.Debug::TessellationDebugView
   _type: 2
   _inscribedRadius: 0.5
   _width: 10
