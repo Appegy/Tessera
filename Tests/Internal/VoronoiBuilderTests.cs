@@ -120,6 +120,8 @@ namespace Appegy.Tessera.Tests.Internal
                 Tessera.VoronoiBuilder.ExtractRaw(seeds, new Bounds2(new float2(0, 0), new float2(0, 1))));
             Assert.Throws<System.InvalidOperationException>(() =>
                 Tessera.VoronoiBuilder.ExtractRaw(seeds, new Bounds2(new float2(0, 0), new float2(float.PositiveInfinity, 1))));
+            Assert.Throws<System.InvalidOperationException>(() =>
+                Tessera.VoronoiBuilder.ExtractRaw(seeds, new Bounds2(new float2(-float.MaxValue, 0), new float2(float.MaxValue, 1))));
         }
 
         [Test]
@@ -127,6 +129,9 @@ namespace Appegy.Tessera.Tests.Internal
         {
             var seeds = new[] { new float2(0, 0), new float2(float.NaN, 0), new float2(0, 1) };
             Assert.Throws<System.InvalidOperationException>(() => Tessera.VoronoiBuilder.ExtractRaw(seeds, Unit));
+
+            var outsideSeeds = new[] { new float2(0, 0), new float2(1.1f, 0), new float2(0, 1) };
+            Assert.Throws<System.InvalidOperationException>(() => Tessera.VoronoiBuilder.ExtractRaw(outsideSeeds, Unit));
         }
 
         private static float2[] CreateRandomSeeds(int count, int seed)

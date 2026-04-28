@@ -7,6 +7,7 @@ namespace Appegy.Tessera
     internal static class VoronoiBuilder
     {
         private const float MatchEpsilonSq = 1e-8f;
+        private const float BoundsToleranceFactor = 1e-5f;
 
         internal readonly struct RawCells
         {
@@ -60,7 +61,7 @@ namespace Appegy.Tessera
             if (seeds.Length < 3)
                 throw new InvalidOperationException("Voronoi needs at least 3 seeds.");
             ValidateBounds(bounds);
-            ValidateSeeds(seeds);
+            ValidateSeeds(seeds, bounds);
 
             var triangles = BowyerWatson.Triangulate(seeds);
             var triangleCount = triangles.Length / 3;
@@ -236,17 +237,26 @@ namespace Appegy.Tessera
         private static void ValidateBounds(Bounds2 bounds)
         {
             var size = bounds.Size;
-            if (!IsFinite(bounds.Min) || !IsFinite(bounds.Max) || size.x <= 0f || size.y <= 0f)
+            if (!IsFinite(bounds.Min) || !IsFinite(bounds.Max) || !IsFinite(size) || size.x <= 0f || size.y <= 0f)
                 throw new InvalidOperationException("Voronoi bounds must have positive finite size.");
         }
 
-        private static void ValidateSeeds(ReadOnlySpan<float2> seeds)
+        private static void ValidateSeeds(ReadOnlySpan<float2> seeds, Bounds2 bounds)
         {
+            var tolerance = math.max(bounds.Size.x, bounds.Size.y) * BoundsToleranceFactor;
             for (var i = 0; i < seeds.Length; i++)
             {
                 if (!IsFinite(seeds[i]))
                     throw new InvalidOperationException("Voronoi seeds must be finite.");
+                if (!Contains(bounds, seeds[i], tolerance))
+                    throw new InvalidOperationException("Voronoi seeds must be inside bounds.");
             }
+        }
+
+        private static bool Contains(Bounds2 bounds, float2 point, float tolerance)
+        {
+            return point.x >= bounds.Min.x - tolerance && point.x <= bounds.Max.x + tolerance &&
+                   point.y >= bounds.Min.y - tolerance && point.y <= bounds.Max.y + tolerance;
         }
 
         private static void AddUnique(List<float2> points, float2 point)
