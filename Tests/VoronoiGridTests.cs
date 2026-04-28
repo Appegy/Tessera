@@ -107,5 +107,71 @@ namespace Appegy.Tessera.Tests
             for (var i = 0; i < n; i++)
                 Assert.AreEqual(g.GetCorner(0, i), dest[i]);
         }
+
+        [Test]
+        public void GetCorner_ModWrapsNegativeAndOversizedIndex()
+        {
+            var g = new VoronoiGrid(Unit, 16, 0, 2);
+            var n = g.GetCornersCount(0);
+            Assert.AreEqual(g.GetCorner(0, 0), g.GetCorner(0, n));
+            Assert.AreEqual(g.GetCorner(0, 0), g.GetCorner(0, -n));
+            Assert.AreEqual(g.GetCorner(0, 1), g.GetCorner(0, n + 1));
+        }
+
+        [Test]
+        public void GetNeighbor_ModWrapsNegativeAndOversizedIndex()
+        {
+            var g = new VoronoiGrid(Unit, 16, 0, 2);
+            var n = g.GetCornersCount(0);
+            Assert.AreEqual(g.GetNeighbor(0, 0), g.GetNeighbor(0, n));
+            Assert.AreEqual(g.GetNeighbor(0, 0), g.GetNeighbor(0, -n));
+            Assert.AreEqual(g.GetNeighbor(0, 1), g.GetNeighbor(0, n + 1));
+        }
+
+        [Test]
+        public void AreNeighbors_SelfReturnsFalse()
+        {
+            var g = new VoronoiGrid(Unit, 16, 0, 2);
+            for (var id = 0; id < g.CellCount; id++)
+                Assert.IsFalse(g.AreNeighbors(id, id));
+        }
+
+        [Test]
+        public void AreNeighbors_OutOfRangeReturnsFalse()
+        {
+            var g = new VoronoiGrid(Unit, 16, 0, 2);
+            Assert.IsFalse(g.AreNeighbors(-1, 0));
+            Assert.IsFalse(g.AreNeighbors(0, g.CellCount));
+            Assert.IsFalse(g.AreNeighbors(g.CellCount, 0));
+        }
+
+        [Test]
+        public void GetNeighborIndex_OutOfRangeReturnsMinusOne()
+        {
+            var g = new VoronoiGrid(Unit, 16, 0, 2);
+            Assert.AreEqual(-1, g.GetNeighborIndex(-1, 0));
+            Assert.AreEqual(-1, g.GetNeighborIndex(g.CellCount, 0));
+        }
+
+        [Test]
+        public void Distance_BetweenNonAdjacentCells_IsAtLeastTwo()
+        {
+            var g = new VoronoiGrid(Unit, 64, 0, 3);
+            // Find a cell pair that are not neighbours and assert their hop distance >= 2.
+            var found = false;
+            for (var a = 0; a < g.CellCount && !found; a++)
+            {
+                for (var b = a + 1; b < g.CellCount && !found; b++)
+                {
+                    if (!g.AreNeighbors(a, b))
+                    {
+                        Assert.GreaterOrEqual(g.Distance(a, b), 2,
+                            $"Distance({a}, {b}) should be at least 2 for non-adjacent cells");
+                        found = true;
+                    }
+                }
+            }
+            Assert.IsTrue(found, "Expected at least one non-adjacent cell pair");
+        }
     }
 }
