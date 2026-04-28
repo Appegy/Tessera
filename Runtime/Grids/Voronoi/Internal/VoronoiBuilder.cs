@@ -141,39 +141,32 @@ namespace Appegy.Tessera
             ValidateBounds(bounds);
 
             var seeds = SampleSeeds(bounds, cellCount, seed);
-            try
+            if (cellCount < 3)
+                return BuildSmall(bounds, seeds, seed, relaxationIterations);
+
+            for (var iteration = 0; iteration < relaxationIterations; iteration++)
             {
-                if (cellCount < 3)
-                    return BuildSmall(bounds, seeds, seed, relaxationIterations);
-
-                for (var iteration = 0; iteration < relaxationIterations; iteration++)
+                var raw = ExtractRaw(seeds, bounds);
+                for (var i = 0; i < seeds.Length; i++)
                 {
-                    var raw = ExtractRaw(seeds, bounds);
-                    for (var i = 0; i < seeds.Length; i++)
-                    {
-                        var clipped = PolygonClipping.ClipToBounds(raw.Corners[i], raw.Neighbors[i], bounds);
-                        if (clipped.corners.Length >= 3)
-                            seeds[i] = ClampToBounds(Centroid(clipped.corners), bounds);
-                    }
+                    var clipped = PolygonClipping.ClipToBounds(raw.Corners[i], raw.Neighbors[i], bounds);
+                    if (clipped.corners.Length >= 3)
+                        seeds[i] = ClampToBounds(Centroid(clipped.corners), bounds);
                 }
-
-                var finalRaw = ExtractRaw(seeds, bounds);
-                var finalCorners = new float2[cellCount][];
-                var finalNeighbors = new int[cellCount][];
-                for (var i = 0; i < cellCount; i++)
-                {
-                    var clipped = PolygonClipping.ClipToBounds(finalRaw.Corners[i], finalRaw.Neighbors[i], bounds);
-                    finalCorners[i] = clipped.corners;
-                    finalNeighbors[i] = clipped.neighbors;
-                }
-
-                ValidateResult(seeds, finalCorners, finalNeighbors, seed);
-                return new Result(seeds, finalCorners, finalNeighbors);
             }
-            catch (InvalidOperationException ex) when (!ex.Message.Contains("seed="))
+
+            var finalRaw = ExtractRaw(seeds, bounds);
+            var finalCorners = new float2[cellCount][];
+            var finalNeighbors = new int[cellCount][];
+            for (var i = 0; i < cellCount; i++)
             {
-                throw new InvalidOperationException($"Voronoi build failed for seed={seed}: {ex.Message}", ex);
+                var clipped = PolygonClipping.ClipToBounds(finalRaw.Corners[i], finalRaw.Neighbors[i], bounds);
+                finalCorners[i] = clipped.corners;
+                finalNeighbors[i] = clipped.neighbors;
             }
+
+            ValidateResult(seeds, finalCorners, finalNeighbors, seed);
+            return new Result(seeds, finalCorners, finalNeighbors);
         }
 
         private static float2[] SampleSeeds(Bounds2 bounds, int cellCount, int seed)
@@ -305,7 +298,10 @@ namespace Appegy.Tessera
         {
             var fa = math.distancesq(a, owner) - math.distancesq(a, other);
             var fb = math.distancesq(b, owner) - math.distancesq(b, other);
-            var t = fa / (fa - fb);
+            var denom = fa - fb;
+            if (math.abs(denom) < 1e-12f)
+                return (a + b) * 0.5f;
+            var t = fa / denom;
             return a + (b - a) * math.clamp(t, 0f, 1f);
         }
 

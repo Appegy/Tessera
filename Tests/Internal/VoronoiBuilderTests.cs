@@ -206,9 +206,30 @@ namespace Appegy.Tessera.Tests.Internal
             var result = Tessera.VoronoiBuilder.Build(Unit, 2, 5, 2);
 
             Assert.AreEqual(2, result.Centers.Length);
+            Assert.AreEqual(1, CountNeighbor(result.Neighbors[0], 1), "Cell 0 should reference cell 1 exactly once");
+            Assert.AreEqual(1, CountNeighbor(result.Neighbors[1], 0), "Cell 1 should reference cell 0 exactly once");
             AssertNeighborEdgesAreReversed(result.Corners, result.Neighbors);
-            CollectionAssert.Contains(result.Neighbors[0], 1);
-            CollectionAssert.Contains(result.Neighbors[1], 0);
+        }
+
+        [Test]
+        public void Build_CellCountLessThanOne_Throws()
+        {
+            Assert.Throws<System.ArgumentOutOfRangeException>(() => Tessera.VoronoiBuilder.Build(Unit, 0, 0, 0));
+        }
+
+        [Test]
+        public void Build_NegativeRelaxationIterations_Throws()
+        {
+            Assert.Throws<System.ArgumentOutOfRangeException>(() => Tessera.VoronoiBuilder.Build(Unit, 16, 0, -1));
+        }
+
+        [Test]
+        public void Build_DegenerateBounds_Throws()
+        {
+            var degenerate = new Bounds2(new float2(0, 0), new float2(0, 1));
+            // VoronoiBuilder.ValidateBounds raises InvalidOperationException for non-positive size.
+            // VoronoiGrid (Task 6) will need ArgumentException for the same condition.
+            Assert.Throws<System.InvalidOperationException>(() => Tessera.VoronoiBuilder.Build(degenerate, 16, 0, 0));
         }
 
         private static float2[] CreateRandomSeeds(int count, int seed)
