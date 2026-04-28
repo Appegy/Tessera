@@ -173,5 +173,73 @@ namespace Appegy.Tessera.Tests
             }
             Assert.IsTrue(found, "Expected at least one non-adjacent cell pair");
         }
+
+        [TestCase(0, 16)] [TestCase(0, 64)] [TestCase(0, 256)]
+        [TestCase(1, 64)] [TestCase(2, 64)] [TestCase(3, 64)]
+        [TestCase(4, 256)] [TestCase(5, 256)] [TestCase(6, 256)]
+        public void Contracts_HoldOverManySeeds(int seedValue, int cellCount)
+        {
+            var g = new VoronoiGrid(Unit, cellCount, seedValue, 3);
+
+            // Counts match.
+            for (var id = 0; id < g.CellCount; id++)
+            {
+                var n = g.GetCornersCount(id);
+                Assert.GreaterOrEqual(n, 3);
+                for (var k = 0; k < n; k++) g.GetCorner(id, k); // shouldn't throw
+                for (var k = 0; k < n; k++) g.GetNeighbor(id, k);
+            }
+
+            // Symmetry of neighbour relation.
+            for (var a = 0; a < g.CellCount; a++)
+            {
+                var n = g.GetCornersCount(a);
+                for (var k = 0; k < n; k++)
+                {
+                    var b = g.GetNeighbor(a, k);
+                    if (b == -1) continue;
+                    Assert.IsTrue(g.AreNeighbors(a, b));
+                    Assert.IsTrue(g.AreNeighbors(b, a));
+                }
+            }
+
+            // Distance metric.
+            var rng = new System.Random(seedValue);
+            for (var i = 0; i < 8; i++)
+            {
+                var a = rng.Next(g.CellCount);
+                var b = rng.Next(g.CellCount);
+                Assert.AreEqual(g.Distance(a, b), g.Distance(b, a));
+                if (a != b) Assert.Greater(g.Distance(a, b), 0);
+            }
+
+            // Centre round-trip.
+            for (var id = 0; id < g.CellCount; id++)
+                Assert.AreEqual(id, g.GetCellAt(g.GetCenter(id)), $"round-trip cell {id}");
+
+            // Corners CW (signed area negative in Y-up frame).
+            for (var id = 0; id < g.CellCount; id++)
+            {
+                var n = g.GetCornersCount(id);
+                var area = 0f;
+                for (var k = 0; k < n; k++)
+                {
+                    var p = g.GetCorner(id, k);
+                    var q = g.GetCorner(id, (k + 1) % n);
+                    area += p.x * q.y - q.x * p.y;
+                }
+                Assert.Less(area, 0f, $"cell {id} not CW");
+            }
+
+            // At least one boundary edge exists somewhere (we expect some cells to clip).
+            var sawBoundary = false;
+            for (var id = 0; id < g.CellCount && !sawBoundary; id++)
+            {
+                var n = g.GetCornersCount(id);
+                for (var k = 0; k < n; k++)
+                    if (g.GetNeighbor(id, k) == -1) { sawBoundary = true; break; }
+            }
+            Assert.IsTrue(sawBoundary, "no boundary slots found - expected at least one");
+        }
     }
 }
