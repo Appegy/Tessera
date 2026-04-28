@@ -9,7 +9,7 @@ using UnityEditor;
 ///     and propagates changes to GridRenderer and CellHighlighter.
 /// </summary>
 [ExecuteAlways]
-public class TessellationDebugView : MonoBehaviour
+public class GridDebugView : MonoBehaviour
 {
     public enum GridKind
     {
@@ -36,9 +36,9 @@ public class TessellationDebugView : MonoBehaviour
     [SerializeField] private bool _enableHighlighter = true;
     [SerializeField] private Color _hoveredColor = new(0.91f, 0.40f, 0.35f, 0.25f);
     [SerializeField] private Color _neighborColor = new(0.91f, 0.66f, 0.24f, 0.19f);
-    private TessellationCellHighlighter _cellHighlighter;
+    private CellHighlighter _cellHighlighter;
 
-    private TessellationGridRenderer _gridRenderer;
+    private GridRenderer _gridRenderer;
 
     public IGrid Grid { get; private set; }
     public int Width => _width;
@@ -136,9 +136,9 @@ public class TessellationDebugView : MonoBehaviour
     private void EnsureChildren()
     {
         if (_gridRenderer == null)
-            _gridRenderer = GetOrAddChild<TessellationGridRenderer>("GridMesh");
+            _gridRenderer = GetOrAddChild<GridRenderer>("GridMesh");
         if (_cellHighlighter == null)
-            _cellHighlighter = GetOrAddChild<TessellationCellHighlighter>("CellHighlight");
+            _cellHighlighter = GetOrAddChild<CellHighlighter>("CellHighlight");
     }
 
     private T GetOrAddChild<T>(string childName) where T : MonoBehaviour

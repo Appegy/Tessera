@@ -4,11 +4,11 @@ using UnityEngine;
 
 /// <summary>
 ///     Builds the grid edge mesh from an <see cref="IGrid" />.
-///     Owned by TessellationDebugView.
+///     Owned by GridDebugView.
 /// </summary>
 [ExecuteAlways]
 [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
-public class TessellationGridRenderer : MonoBehaviour
+public class GridRenderer : MonoBehaviour
 {
     private Mesh _mesh;
     private MeshFilter _meshFilter;
@@ -23,7 +23,7 @@ public class TessellationGridRenderer : MonoBehaviour
         }
     }
 
-    public void Rebuild(TessellationDebugView view)
+    public void Rebuild(GridDebugView view)
     {
         EnsureComponents();
 
