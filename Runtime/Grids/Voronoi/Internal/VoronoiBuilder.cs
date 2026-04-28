@@ -383,9 +383,9 @@ namespace Appegy.Tessera
             return false;
         }
 
-        private static Dictionary<long, EdgeAdjacency> BuildEdgeMap(int[] triangles, int triangleCount)
+        private static SortedDictionary<long, EdgeAdjacency> BuildEdgeMap(int[] triangles, int triangleCount)
         {
-            var edgeMap = new Dictionary<long, EdgeAdjacency>(triangleCount * 3);
+            var edgeMap = new SortedDictionary<long, EdgeAdjacency>();
             for (var t = 0; t < triangleCount; t++)
             {
                 AddDelaunayEdge(edgeMap, triangles[3 * t], triangles[3 * t + 1], t);
@@ -396,7 +396,7 @@ namespace Appegy.Tessera
             return edgeMap;
         }
 
-        private static void AddDelaunayEdge(Dictionary<long, EdgeAdjacency> edgeMap, int a, int b, int triangle)
+        private static void AddDelaunayEdge(SortedDictionary<long, EdgeAdjacency> edgeMap, int a, int b, int triangle)
         {
             var lo = math.min(a, b);
             var hi = math.max(a, b);
