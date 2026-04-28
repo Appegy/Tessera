@@ -21,6 +21,20 @@ namespace Appegy.Tessera
             }
         }
 
+        internal readonly struct Result
+        {
+            public readonly float2[] Centers;
+            public readonly float2[][] Corners;
+            public readonly int[][] Neighbors;
+
+            public Result(float2[] c, float2[][] cs, int[][] ns)
+            {
+                Centers = c;
+                Corners = cs;
+                Neighbors = ns;
+            }
+        }
+
         private readonly struct EdgeAdjacency
         {
             public readonly int A;
@@ -116,6 +130,261 @@ namespace Appegy.Tessera
                 BuildCell(seeds[s], cellEdges[s], out corners[s], out neighbors[s]);
 
             return new RawCells(corners, neighbors);
+        }
+
+        internal static Result Build(Bounds2 bounds, int cellCount, int seed, int relaxationIterations)
+        {
+            if (cellCount < 1)
+                throw new ArgumentOutOfRangeException(nameof(cellCount));
+            if (relaxationIterations < 0)
+                throw new ArgumentOutOfRangeException(nameof(relaxationIterations));
+            ValidateBounds(bounds);
+
+            var seeds = SampleSeeds(bounds, cellCount, seed);
+            try
+            {
+                if (cellCount < 3)
+                    return BuildSmall(bounds, seeds, seed, relaxationIterations);
+
+                for (var iteration = 0; iteration < relaxationIterations; iteration++)
+                {
+                    var raw = ExtractRaw(seeds, bounds);
+                    for (var i = 0; i < seeds.Length; i++)
+                    {
+                        var clipped = PolygonClipping.ClipToBounds(raw.Corners[i], raw.Neighbors[i], bounds);
+                        if (clipped.corners.Length >= 3)
+                            seeds[i] = ClampToBounds(Centroid(clipped.corners), bounds);
+                    }
+                }
+
+                var finalRaw = ExtractRaw(seeds, bounds);
+                var finalCorners = new float2[cellCount][];
+                var finalNeighbors = new int[cellCount][];
+                for (var i = 0; i < cellCount; i++)
+                {
+                    var clipped = PolygonClipping.ClipToBounds(finalRaw.Corners[i], finalRaw.Neighbors[i], bounds);
+                    finalCorners[i] = clipped.corners;
+                    finalNeighbors[i] = clipped.neighbors;
+                }
+
+                ValidateResult(seeds, finalCorners, finalNeighbors, seed);
+                return new Result(seeds, finalCorners, finalNeighbors);
+            }
+            catch (InvalidOperationException ex) when (!ex.Message.Contains("seed="))
+            {
+                throw new InvalidOperationException($"Voronoi build failed for seed={seed}: {ex.Message}", ex);
+            }
+        }
+
+        private static float2[] SampleSeeds(Bounds2 bounds, int cellCount, int seed)
+        {
+            var random = new System.Random(seed);
+            var seeds = new float2[cellCount];
+            for (var i = 0; i < seeds.Length; i++)
+            {
+                seeds[i] = new float2(
+                    bounds.Min.x + (float)random.NextDouble() * bounds.Size.x,
+                    bounds.Min.y + (float)random.NextDouble() * bounds.Size.y);
+            }
+
+            return seeds;
+        }
+
+        private static Result BuildSmall(Bounds2 bounds, float2[] seeds, int seed, int relaxationIterations)
+        {
+            for (var iteration = 0; iteration < relaxationIterations; iteration++)
+            {
+                BuildSmallCells(bounds, seeds, out var corners, out _);
+                for (var i = 0; i < seeds.Length; i++)
+                {
+                    if (corners[i].Length >= 3)
+                        seeds[i] = ClampToBounds(Centroid(corners[i]), bounds);
+                }
+            }
+
+            BuildSmallCells(bounds, seeds, out var finalCorners, out var finalNeighbors);
+            ValidateResult(seeds, finalCorners, finalNeighbors, seed);
+            return new Result(seeds, finalCorners, finalNeighbors);
+        }
+
+        private static void BuildSmallCells(Bounds2 bounds, float2[] seeds, out float2[][] corners, out int[][] neighbors)
+        {
+            corners = new float2[seeds.Length][];
+            neighbors = new int[seeds.Length][];
+            if (seeds.Length == 1)
+            {
+                corners[0] = BoundsCorners(bounds);
+                neighbors[0] = BoundaryNeighbors();
+                return;
+            }
+
+            for (var i = 0; i < seeds.Length; i++)
+            {
+                var other = 1 - i;
+                var clipped = ClipToCloserSeed(BoundsCorners(bounds), BoundaryNeighbors(), seeds[i], seeds[other], other);
+                corners[i] = clipped.corners;
+                neighbors[i] = clipped.neighbors;
+            }
+        }
+
+        private static float2[] BoundsCorners(Bounds2 bounds)
+        {
+            return new[]
+            {
+                new float2(bounds.Max.x, bounds.Max.y),
+                new float2(bounds.Max.x, bounds.Min.y),
+                new float2(bounds.Min.x, bounds.Min.y),
+                new float2(bounds.Min.x, bounds.Max.y)
+            };
+        }
+
+        private static int[] BoundaryNeighbors()
+        {
+            return new[] { -1, -1, -1, -1 };
+        }
+
+        private static (float2[] corners, int[] neighbors) ClipToCloserSeed(
+            float2[] corners,
+            int[] neighbors,
+            float2 owner,
+            float2 other,
+            int otherIndex)
+        {
+            var outCorners = new List<float2>(corners.Length + 1);
+            var outNeighbors = new List<int>(neighbors.Length + 1);
+            for (var i = 0; i < corners.Length; i++)
+            {
+                var current = corners[i];
+                var next = corners[(i + 1) % corners.Length];
+                var currentInside = IsCloserOrEqual(current, owner, other);
+                var nextInside = IsCloserOrEqual(next, owner, other);
+
+                if (currentInside && nextInside)
+                {
+                    AddClippedVertex(outCorners, outNeighbors, current, neighbors[i]);
+                }
+                else if (currentInside)
+                {
+                    AddClippedVertex(outCorners, outNeighbors, current, neighbors[i]);
+                    AddClippedVertex(outCorners, outNeighbors, IntersectBisector(current, next, owner, other), otherIndex);
+                }
+                else if (nextInside)
+                {
+                    AddClippedVertex(outCorners, outNeighbors, IntersectBisector(current, next, owner, other), neighbors[i]);
+                }
+            }
+
+            if (outCorners.Count > 1 && SamePoint(outCorners[0], outCorners[outCorners.Count - 1]))
+            {
+                outNeighbors[0] = outNeighbors[outNeighbors.Count - 1];
+                outCorners.RemoveAt(outCorners.Count - 1);
+                outNeighbors.RemoveAt(outNeighbors.Count - 1);
+            }
+
+            return (outCorners.ToArray(), outNeighbors.ToArray());
+        }
+
+        private static void AddClippedVertex(List<float2> corners, List<int> neighbors, float2 corner, int neighbor)
+        {
+            if (corners.Count > 0 && SamePoint(corners[corners.Count - 1], corner))
+            {
+                neighbors[neighbors.Count - 1] = neighbor;
+                return;
+            }
+
+            corners.Add(corner);
+            neighbors.Add(neighbor);
+        }
+
+        private static bool IsCloserOrEqual(float2 point, float2 owner, float2 other)
+        {
+            return math.distancesq(point, owner) <= math.distancesq(point, other) + 1e-6f;
+        }
+
+        private static float2 IntersectBisector(float2 a, float2 b, float2 owner, float2 other)
+        {
+            var fa = math.distancesq(a, owner) - math.distancesq(a, other);
+            var fb = math.distancesq(b, owner) - math.distancesq(b, other);
+            var t = fa / (fa - fb);
+            return a + (b - a) * math.clamp(t, 0f, 1f);
+        }
+
+        private static float2 Centroid(float2[] polygon)
+        {
+            var twiceArea = 0f;
+            var cx = 0f;
+            var cy = 0f;
+            for (var i = 0; i < polygon.Length; i++)
+            {
+                var p = polygon[i];
+                var q = polygon[(i + 1) % polygon.Length];
+                var cross = p.x * q.y - q.x * p.y;
+                twiceArea += cross;
+                cx += (p.x + q.x) * cross;
+                cy += (p.y + q.y) * cross;
+            }
+
+            var area = twiceArea * 0.5f;
+            if (math.abs(area) < 1e-12f)
+            {
+                var average = float2.zero;
+                for (var i = 0; i < polygon.Length; i++)
+                    average += polygon[i];
+                return average / polygon.Length;
+            }
+
+            return new float2(cx / (6f * area), cy / (6f * area));
+        }
+
+        private static float2 ClampToBounds(float2 point, Bounds2 bounds)
+        {
+            return math.clamp(point, bounds.Min, bounds.Max);
+        }
+
+        private static void ValidateResult(float2[] centers, float2[][] corners, int[][] neighbors, int seed)
+        {
+            if (corners.Length != centers.Length || neighbors.Length != centers.Length)
+                throw new InvalidOperationException($"Voronoi result count mismatch (seed={seed}).");
+
+            for (var i = 0; i < centers.Length; i++)
+            {
+                if (corners[i].Length < 3)
+                    throw new InvalidOperationException($"Voronoi cell {i} has fewer than 3 corners (seed={seed}).");
+                if (corners[i].Length != neighbors[i].Length)
+                    throw new InvalidOperationException($"Voronoi cell {i} corner/neighbor count mismatch (seed={seed}).");
+            }
+
+            for (var a = 0; a < neighbors.Length; a++)
+            {
+                for (var edge = 0; edge < neighbors[a].Length; edge++)
+                {
+                    var b = neighbors[a][edge];
+                    if (b == -1)
+                        continue;
+                    if (b < 0 || b >= neighbors.Length)
+                        throw new InvalidOperationException($"Voronoi cell {a} has out-of-range neighbor {b} (seed={seed}).");
+                    if (!HasReversedNeighborEdge(corners, neighbors, a, edge, b))
+                        throw new InvalidOperationException($"Voronoi neighbor symmetry failed for {a}->{b} (seed={seed}).");
+                }
+            }
+        }
+
+        private static bool HasReversedNeighborEdge(float2[][] corners, int[][] neighbors, int a, int edge, int b)
+        {
+            var from = corners[a][edge];
+            var to = corners[a][(edge + 1) % corners[a].Length];
+            for (var otherEdge = 0; otherEdge < neighbors[b].Length; otherEdge++)
+            {
+                if (neighbors[b][otherEdge] != a)
+                    continue;
+
+                var otherFrom = corners[b][otherEdge];
+                var otherTo = corners[b][(otherEdge + 1) % corners[b].Length];
+                if (SamePoint(from, otherTo) && SamePoint(to, otherFrom))
+                    return true;
+            }
+
+            return false;
         }
 
         private static Dictionary<long, EdgeAdjacency> BuildEdgeMap(int[] triangles, int triangleCount)
