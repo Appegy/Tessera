@@ -46,7 +46,7 @@ namespace Appegy.Tessera
                     if (currentInside && nextInside)
                     {
                         outCorners.Add(current);
-                        outNeighbors.Add(currentOnPlane && nextOnPlane ? -1 : tag);
+                        outNeighbors.Add(tag);
                     }
                     else if (currentInside)
                     {

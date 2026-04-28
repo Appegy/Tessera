@@ -70,14 +70,14 @@ namespace Appegy.Tessera.Tests.Internal
         }
 
         [Test]
-        public void Clip_BoundaryEdgeAlreadyOnBounds_TaggedAsBoundary()
+        public void Clip_OriginalBoundaryEdgeAlreadyOnBounds_PreservesTag()
         {
             var corners = new[] { new float2(0.8f, 1f), new float2(0.8f, 0.2f), new float2(0.2f, 0.2f), new float2(0.2f, 1f) };
             var neighbors = new[] { 10, 20, 30, 40 };
             var (oc, on) = Tessera.PolygonClipping.ClipToBounds(corners, neighbors, Unit);
 
             CollectionAssert.AreEqual(corners, oc);
-            CollectionAssert.AreEqual(new[] { 10, 20, 30, -1 }, on);
+            CollectionAssert.AreEqual(neighbors, on);
         }
 
         [Test]
