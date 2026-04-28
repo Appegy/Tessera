@@ -193,7 +193,7 @@ public sealed class VoronoiGrid : IGrid
 - Update `CLAUDE.md` and `AGENTS.md` once the dust settles.
 
 ### Phase 7 — Voronoi
-Separate session. Out of scope for this redesign pass.
+Implemented. See `Documentation~/voronoi-grid-design.md` and `Documentation~/voronoi-grid-plan.md`.
 
 ## Out of scope (v1)
 
