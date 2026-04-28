@@ -59,6 +59,8 @@ namespace Appegy.Tessera
         {
             if (seeds.Length < 3)
                 throw new InvalidOperationException("Voronoi needs at least 3 seeds.");
+            ValidateBounds(bounds);
+            ValidateSeeds(seeds);
 
             var triangles = BowyerWatson.Triangulate(seeds);
             var triangleCount = triangles.Length / 3;
@@ -196,27 +198,55 @@ namespace Appegy.Tessera
             corners = uniqueCorners.ToArray();
             neighbors = new int[corners.Length];
             for (var i = 0; i < corners.Length; i++)
-                neighbors[i] = FindEdgeNeighbor(edges, corners[i], corners[(i + 1) % corners.Length]);
+                neighbors[i] = GetEdgeNeighbor(edges, corners[i], corners[(i + 1) % corners.Length]);
 
             if (SignedArea(corners) > 0f)
             {
                 Array.Reverse(corners);
                 for (var i = 0; i < corners.Length; i++)
-                    neighbors[i] = FindEdgeNeighbor(edges, corners[i], corners[(i + 1) % corners.Length]);
+                    neighbors[i] = GetEdgeNeighbor(edges, corners[i], corners[(i + 1) % corners.Length]);
             }
         }
 
-        private static int FindEdgeNeighbor(List<CellEdge> edges, float2 from, float2 to)
+        private static int GetEdgeNeighbor(List<CellEdge> edges, float2 from, float2 to)
+        {
+            if (TryFindEdgeNeighbor(edges, from, to, out var neighbor))
+                return neighbor;
+
+            throw new InvalidOperationException("Voronoi raw cell has consecutive corners without a matching edge.");
+        }
+
+        private static bool TryFindEdgeNeighbor(List<CellEdge> edges, float2 from, float2 to, out int neighbor)
         {
             for (var i = 0; i < edges.Count; i++)
             {
                 var edge = edges[i];
                 if ((SamePoint(edge.From, from) && SamePoint(edge.To, to)) ||
                     (SamePoint(edge.From, to) && SamePoint(edge.To, from)))
-                    return edge.Neighbor;
+                {
+                    neighbor = edge.Neighbor;
+                    return true;
+                }
             }
 
-            return -1;
+            neighbor = -1;
+            return false;
+        }
+
+        private static void ValidateBounds(Bounds2 bounds)
+        {
+            var size = bounds.Size;
+            if (!IsFinite(bounds.Min) || !IsFinite(bounds.Max) || size.x <= 0f || size.y <= 0f)
+                throw new InvalidOperationException("Voronoi bounds must have positive finite size.");
+        }
+
+        private static void ValidateSeeds(ReadOnlySpan<float2> seeds)
+        {
+            for (var i = 0; i < seeds.Length; i++)
+            {
+                if (!IsFinite(seeds[i]))
+                    throw new InvalidOperationException("Voronoi seeds must be finite.");
+            }
         }
 
         private static void AddUnique(List<float2> points, float2 point)
@@ -253,6 +283,16 @@ namespace Appegy.Tessera
         private static bool SamePoint(float2 a, float2 b)
         {
             return math.distancesq(a, b) <= MatchEpsilonSq;
+        }
+
+        private static bool IsFinite(float2 value)
+        {
+            return IsFinite(value.x) && IsFinite(value.y);
+        }
+
+        private static bool IsFinite(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
         }
 
         private static long EdgeKey(int lo, int hi)
