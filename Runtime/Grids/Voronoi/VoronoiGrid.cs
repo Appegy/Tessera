@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Unity.Mathematics;
 
 namespace Appegy.Tessera
@@ -9,22 +10,113 @@ namespace Appegy.Tessera
     /// </summary>
     public sealed class VoronoiGrid : IGrid
     {
+        private readonly Bounds2 _bounds;
+        private readonly float2[] _centers;
+        private readonly float2[][] _corners;
+        private readonly int[][] _neighbors;
+
         public VoronoiGrid(Bounds2 bounds, int cellCount, int seed, int relaxationIterations)
         {
-            throw new NotImplementedException();
+            if (cellCount < 1) throw new ArgumentOutOfRangeException(nameof(cellCount));
+            if (relaxationIterations < 0) throw new ArgumentOutOfRangeException(nameof(relaxationIterations));
+            if (bounds.Size.x <= 0 || bounds.Size.y <= 0)
+                throw new ArgumentException("Bounds must have positive size.", nameof(bounds));
+
+            var r = VoronoiBuilder.Build(bounds, cellCount, seed, relaxationIterations);
+            _bounds = bounds;
+            _centers = r.Centers;
+            _corners = r.Corners;
+            _neighbors = r.Neighbors;
         }
 
-        public int CellCount => throw new NotImplementedException();
-        public Bounds2 Bounds => throw new NotImplementedException();
-        public Cell GetCell(int id) => throw new NotImplementedException();
-        public float2 GetCenter(int id) => throw new NotImplementedException();
-        public int GetCornersCount(int id) => throw new NotImplementedException();
-        public float2 GetCorner(int id, int cornerIndex) => throw new NotImplementedException();
-        public void CopyCorners(int id, Span<float2> dest) => throw new NotImplementedException();
-        public int GetNeighbor(int id, int neighborIndex) => throw new NotImplementedException();
-        public bool AreNeighbors(int a, int b) => throw new NotImplementedException();
-        public int GetNeighborIndex(int cell, int neighbor) => throw new NotImplementedException();
-        public int GetCellAt(float2 point) => throw new NotImplementedException();
-        public int Distance(int a, int b) => throw new NotImplementedException();
+        public int CellCount => _centers.Length;
+        public Bounds2 Bounds => _bounds;
+
+        public Cell GetCell(int id) => new Cell(this, id);
+        public float2 GetCenter(int id) => _centers[id];
+        public int GetCornersCount(int id) => _corners[id].Length;
+
+        public float2 GetCorner(int id, int cornerIndex)
+        {
+            var arr = _corners[id];
+            var n = arr.Length;
+            var idx = (cornerIndex % n + n) % n;
+            return arr[idx];
+        }
+
+        public void CopyCorners(int id, Span<float2> dest)
+        {
+            var arr = _corners[id];
+            if (dest.Length < arr.Length)
+                throw new ArgumentException($"dest must have length >= {arr.Length}.", nameof(dest));
+            for (var i = 0; i < arr.Length; i++) dest[i] = arr[i];
+        }
+
+        public int GetNeighbor(int id, int neighborIndex)
+        {
+            var arr = _neighbors[id];
+            var n = arr.Length;
+            var idx = (neighborIndex % n + n) % n;
+            return arr[idx];
+        }
+
+        public bool AreNeighbors(int a, int b)
+        {
+            if (a == b) return false;
+            var arr = _neighbors[a];
+            for (var i = 0; i < arr.Length; i++)
+                if (arr[i] == b)
+                    return true;
+            return false;
+        }
+
+        public int GetNeighborIndex(int cell, int neighbor)
+        {
+            var arr = _neighbors[cell];
+            for (var i = 0; i < arr.Length; i++)
+                if (arr[i] == neighbor)
+                    return i;
+            return -1;
+        }
+
+        public int GetCellAt(float2 point)
+        {
+            if (!_bounds.Contains(point)) return -1;
+            var bestId = 0;
+            var bestSq = math.distancesq(_centers[0], point);
+            for (var i = 1; i < _centers.Length; i++)
+            {
+                var d = math.distancesq(_centers[i], point);
+                if (d < bestSq)
+                {
+                    bestSq = d;
+                    bestId = i;
+                }
+            }
+            return bestId;
+        }
+
+        public int Distance(int a, int b)
+        {
+            if (a == b) return 0;
+            var visited = new bool[_centers.Length];
+            var queue = new Queue<(int id, int dist)>();
+            queue.Enqueue((a, 0));
+            visited[a] = true;
+            while (queue.Count > 0)
+            {
+                var (cur, d) = queue.Dequeue();
+                var ns = _neighbors[cur];
+                for (var i = 0; i < ns.Length; i++)
+                {
+                    var n = ns[i];
+                    if (n == -1 || visited[n]) continue;
+                    if (n == b) return d + 1;
+                    visited[n] = true;
+                    queue.Enqueue((n, d + 1));
+                }
+            }
+            throw new InvalidOperationException($"Cells {a} and {b} are in disconnected components.");
+        }
     }
 }
