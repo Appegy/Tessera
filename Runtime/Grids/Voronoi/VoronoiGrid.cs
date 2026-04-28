@@ -20,7 +20,9 @@ namespace Appegy.Tessera
             if (cellCount < 1) throw new ArgumentOutOfRangeException(nameof(cellCount));
             if (relaxationIterations < 0) throw new ArgumentOutOfRangeException(nameof(relaxationIterations));
             if (bounds.Size.x <= 0 || bounds.Size.y <= 0)
+            {
                 throw new ArgumentException("Bounds must have positive size.", nameof(bounds));
+            }
 
             var r = VoronoiBuilder.Build(bounds, cellCount, seed, relaxationIterations);
             _bounds = bounds;
@@ -48,7 +50,9 @@ namespace Appegy.Tessera
         {
             var arr = _corners[id];
             if (dest.Length < arr.Length)
+            {
                 throw new ArgumentException($"dest must have length >= {arr.Length}.", nameof(dest));
+            }
             for (var i = 0; i < arr.Length; i++) dest[i] = arr[i];
         }
 
@@ -66,8 +70,12 @@ namespace Appegy.Tessera
             if (a == b) return false;
             var arr = _neighbors[a];
             for (var i = 0; i < arr.Length; i++)
+            {
                 if (arr[i] == b)
+                {
                     return true;
+                }
+            }
             return false;
         }
 
@@ -76,8 +84,12 @@ namespace Appegy.Tessera
             if (cell < 0 || cell >= CellCount) return -1;
             var arr = _neighbors[cell];
             for (var i = 0; i < arr.Length; i++)
+            {
                 if (arr[i] == neighbor)
+                {
                     return i;
+                }
+            }
             return -1;
         }
 

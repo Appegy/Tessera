@@ -8,17 +8,11 @@ namespace Appegy.Tessera
     {
         private const int PlaneCount = 4;
 
-        public static (float2[] corners, int[] neighbors) ClipToBounds(
-            float2[] corners,
-            int[] neighbors,
-            Bounds2 bounds)
+        public static (float2[] corners, int[] neighbors) ClipToBounds(float2[] corners, int[] neighbors, Bounds2 bounds)
         {
-            if (corners == null)
-                throw new ArgumentNullException(nameof(corners));
-            if (neighbors == null)
-                throw new ArgumentNullException(nameof(neighbors));
-            if (corners.Length != neighbors.Length)
-                throw new ArgumentException("Corners and neighbors must have the same length.", nameof(neighbors));
+            if (corners == null) throw new ArgumentNullException(nameof(corners));
+            if (neighbors == null) throw new ArgumentNullException(nameof(neighbors));
+            if (corners.Length != neighbors.Length) throw new ArgumentException("Corners and neighbors must have the same length.", nameof(neighbors));
 
             var inCorners = new List<float2>(corners);
             var inNeighbors = new List<int>(neighbors);
@@ -32,7 +26,9 @@ namespace Appegy.Tessera
             for (var plane = 0; plane < PlaneCount; plane++)
             {
                 if (inCorners.Count == 0)
+                {
                     break;
+                }
 
                 outCorners.Clear();
                 outNeighbors.Clear();
@@ -76,13 +72,8 @@ namespace Appegy.Tessera
                     }
                 }
 
-                var tempCorners = inCorners;
-                inCorners = outCorners;
-                outCorners = tempCorners;
-
-                var tempNeighbors = inNeighbors;
-                inNeighbors = outNeighbors;
-                outNeighbors = tempNeighbors;
+                (inCorners, outCorners) = (outCorners, inCorners);
+                (inNeighbors, outNeighbors) = (outNeighbors, inNeighbors);
             }
 
             return (inCorners.ToArray(), inNeighbors.ToArray());

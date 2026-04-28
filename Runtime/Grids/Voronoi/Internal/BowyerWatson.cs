@@ -10,8 +10,7 @@ namespace Appegy.Tessera
 
         public static int[] Triangulate(ReadOnlySpan<float2> points)
         {
-            if (points.Length < 3)
-                throw new InvalidOperationException("Need at least 3 points to triangulate.");
+            if (points.Length < 3) throw new InvalidOperationException("Need at least 3 points to triangulate.");
 
             // Bounding box
             float minX = points[0].x, minY = points[0].y;
@@ -39,10 +38,12 @@ namespace Appegy.Tessera
             ext[points.Length + 2] = new float2(midx + 20f * dmax, midy - dmax);
 
             // Triangle list, 3 ints per triangle.
-            var tris = new List<int>(points.Length * 6);
-            tris.Add(points.Length);
-            tris.Add(points.Length + 1);
-            tris.Add(points.Length + 2);
+            var tris = new List<int>(points.Length * 6)
+            {
+                points.Length,
+                points.Length + 1,
+                points.Length + 2
+            };
 
             var edges = new List<int>(); // pairs (a, b)
 
@@ -58,9 +59,12 @@ namespace Appegy.Tessera
                     var c = tris[ti + 2];
                     if (InCircumcircle(ext[a], ext[b], ext[c], ext[pi]))
                     {
-                        edges.Add(a); edges.Add(b);
-                        edges.Add(b); edges.Add(c);
-                        edges.Add(c); edges.Add(a);
+                        edges.Add(a);
+                        edges.Add(b);
+                        edges.Add(b);
+                        edges.Add(c);
+                        edges.Add(c);
+                        edges.Add(a);
                         tris.RemoveAt(ti + 2);
                         tris.RemoveAt(ti + 1);
                         tris.RemoveAt(ti);
@@ -78,8 +82,10 @@ namespace Appegy.Tessera
                         if ((edges[i] == edges[j] && edges[i + 1] == edges[j + 1]) ||
                             (edges[i] == edges[j + 1] && edges[i + 1] == edges[j]))
                         {
-                            edges[i] = -1; edges[i + 1] = -1;
-                            edges[j] = -1; edges[j + 1] = -1;
+                            edges[i] = -1;
+                            edges[i + 1] = -1;
+                            edges[j] = -1;
+                            edges[j + 1] = -1;
                             break;
                         }
                     }
@@ -109,7 +115,9 @@ namespace Appegy.Tessera
             }
 
             if (result.Count == 0)
+            {
                 throw new InvalidOperationException("Bowyer-Watson produced no triangles.");
+            }
 
             return result.ToArray();
         }
@@ -118,7 +126,9 @@ namespace Appegy.Tessera
         {
             var d = 2f * (a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y));
             if (math.abs(d) <= 2f * OrientationTolerance(a, b, c))
+            {
                 throw new InvalidOperationException("Degenerate triangle: collinear vertices.");
+            }
             var asq = a.x * a.x + a.y * a.y;
             var bsq = b.x * b.x + b.y * b.y;
             var csq = c.x * c.x + c.y * c.y;
@@ -135,7 +145,9 @@ namespace Appegy.Tessera
                 for (var j = i + 1; j < points.Length; j++)
                 {
                     if (math.distancesq(points[i], points[j]) <= pointToleranceSq)
+                    {
                         throw new InvalidOperationException("Degenerate point set: duplicated points.");
+                    }
                 }
             }
 
@@ -146,7 +158,9 @@ namespace Appegy.Tessera
                     for (var k = j + 1; k < points.Length; k++)
                     {
                         if (!IsDegenerateTriangle(points[i], points[j], points[k]))
+                        {
                             return;
+                        }
                     }
                 }
             }
@@ -159,14 +173,20 @@ namespace Appegy.Tessera
             // Sign-aware in-circle test independent of winding.
             var orient = Orientation(a, b, c);
             if (math.abs(orient) <= OrientationTolerance(a, b, c))
+            {
                 throw new InvalidOperationException("Degenerate triangle: collinear vertices.");
+            }
 
-            var ax = a.x - p.x; var ay = a.y - p.y;
-            var bx = b.x - p.x; var by = b.y - p.y;
-            var cx = c.x - p.x; var cy = c.y - p.y;
-            var det = (ax * ax + ay * ay) * (bx * cy - cx * by)
-                    - (bx * bx + by * by) * (ax * cy - cx * ay)
-                    + (cx * cx + cy * cy) * (ax * by - bx * ay);
+            var ax = a.x - p.x;
+            var ay = a.y - p.y;
+            var bx = b.x - p.x;
+            var by = b.y - p.y;
+            var cx = c.x - p.x;
+            var cy = c.y - p.y;
+            var det
+                = (ax * ax + ay * ay) * (bx * cy - cx * by)
+                - (bx * bx + by * by) * (ax * cy - cx * ay)
+                + (cx * cx + cy * cy) * (ax * by - bx * ay);
             return orient > 0 ? det > 0 : det < 0;
         }
 

@@ -72,8 +72,7 @@ namespace Appegy.Tessera
 
         internal static RawCells ExtractRaw(ReadOnlySpan<float2> seeds, Bounds2 bounds)
         {
-            if (seeds.Length < 3)
-                throw new InvalidOperationException("Voronoi needs at least 3 seeds.");
+            if (seeds.Length < 3) throw new InvalidOperationException("Voronoi needs at least 3 seeds.");
             ValidateBounds(bounds);
             ValidateSeeds(seeds, bounds);
 
@@ -120,29 +119,33 @@ namespace Appegy.Tessera
                     var seed = seeds[s];
                     farPoints.Sort((a, b) => AngleDescendingCompare(seed, a, b));
                     for (var i = 0; i < farPoints.Count; i++)
+                    {
                         AddCellEdge(cellEdges[s], farPoints[i], farPoints[(i + 1) % farPoints.Count], -1);
+                    }
                 }
             }
 
             var corners = new float2[seeds.Length][];
             var neighbors = new int[seeds.Length][];
             for (var s = 0; s < seeds.Length; s++)
+            {
                 BuildCell(seeds[s], cellEdges[s], out corners[s], out neighbors[s]);
+            }
 
             return new RawCells(corners, neighbors);
         }
 
         internal static Result Build(Bounds2 bounds, int cellCount, int seed, int relaxationIterations)
         {
-            if (cellCount < 1)
-                throw new ArgumentOutOfRangeException(nameof(cellCount));
-            if (relaxationIterations < 0)
-                throw new ArgumentOutOfRangeException(nameof(relaxationIterations));
+            if (cellCount < 1) throw new ArgumentOutOfRangeException(nameof(cellCount));
+            if (relaxationIterations < 0) throw new ArgumentOutOfRangeException(nameof(relaxationIterations));
             ValidateBounds(bounds);
 
             var seeds = SampleSeeds(bounds, cellCount, seed);
             if (cellCount < 3)
+            {
                 return BuildSmall(bounds, seeds, seed, relaxationIterations);
+            }
 
             for (var iteration = 0; iteration < relaxationIterations; iteration++)
             {
@@ -151,7 +154,9 @@ namespace Appegy.Tessera
                 {
                     var clipped = PolygonClipping.ClipToBounds(raw.Corners[i], raw.Neighbors[i], bounds);
                     if (clipped.corners.Length >= 3)
+                    {
                         seeds[i] = ClampToBounds(Centroid(clipped.corners), bounds);
+                    }
                 }
             }
 
@@ -191,7 +196,9 @@ namespace Appegy.Tessera
                 for (var i = 0; i < seeds.Length; i++)
                 {
                     if (corners[i].Length >= 3)
+                    {
                         seeds[i] = ClampToBounds(Centroid(corners[i]), bounds);
+                    }
                 }
             }
 
@@ -236,12 +243,7 @@ namespace Appegy.Tessera
             return new[] { -1, -1, -1, -1 };
         }
 
-        private static (float2[] corners, int[] neighbors) ClipToCloserSeed(
-            float2[] corners,
-            int[] neighbors,
-            float2 owner,
-            float2 other,
-            int otherIndex)
+        private static (float2[] corners, int[] neighbors) ClipToCloserSeed(float2[] corners, int[] neighbors, float2 owner, float2 other, int otherIndex)
         {
             var outCorners = new List<float2>(corners.Length + 1);
             var outNeighbors = new List<int>(neighbors.Length + 1);
@@ -267,9 +269,9 @@ namespace Appegy.Tessera
                 }
             }
 
-            if (outCorners.Count > 1 && SamePoint(outCorners[0], outCorners[outCorners.Count - 1]))
+            if (outCorners.Count > 1 && SamePoint(outCorners[0], outCorners[^1]))
             {
-                outNeighbors[0] = outNeighbors[outNeighbors.Count - 1];
+                outNeighbors[0] = outNeighbors[^1];
                 outCorners.RemoveAt(outCorners.Count - 1);
                 outNeighbors.RemoveAt(outNeighbors.Count - 1);
             }
@@ -279,9 +281,9 @@ namespace Appegy.Tessera
 
         private static void AddClippedVertex(List<float2> corners, List<int> neighbors, float2 corner, int neighbor)
         {
-            if (corners.Count > 0 && SamePoint(corners[corners.Count - 1], corner))
+            if (corners.Count > 0 && SamePoint(corners[^1], corner))
             {
-                neighbors[neighbors.Count - 1] = neighbor;
+                neighbors[^1] = neighbor;
                 return;
             }
 
@@ -300,7 +302,9 @@ namespace Appegy.Tessera
             var fb = math.distancesq(b, owner) - math.distancesq(b, other);
             var denom = fa - fb;
             if (math.abs(denom) < 1e-12f)
+            {
                 return (a + b) * 0.5f;
+            }
             var t = fa / denom;
             return a + (b - a) * math.clamp(t, 0f, 1f);
         }
@@ -325,7 +329,9 @@ namespace Appegy.Tessera
             {
                 var average = float2.zero;
                 for (var i = 0; i < polygon.Length; i++)
+                {
                     average += polygon[i];
+                }
                 return average / polygon.Length;
             }
 
@@ -339,15 +345,18 @@ namespace Appegy.Tessera
 
         private static void ValidateResult(float2[] centers, float2[][] corners, int[][] neighbors, int seed)
         {
-            if (corners.Length != centers.Length || neighbors.Length != centers.Length)
-                throw new InvalidOperationException($"Voronoi result count mismatch (seed={seed}).");
+            if (corners.Length != centers.Length || neighbors.Length != centers.Length) throw new InvalidOperationException($"Voronoi result count mismatch (seed={seed}).");
 
             for (var i = 0; i < centers.Length; i++)
             {
                 if (corners[i].Length < 3)
+                {
                     throw new InvalidOperationException($"Voronoi cell {i} has fewer than 3 corners (seed={seed}).");
+                }
                 if (corners[i].Length != neighbors[i].Length)
+                {
                     throw new InvalidOperationException($"Voronoi cell {i} corner/neighbor count mismatch (seed={seed}).");
+                }
             }
 
             for (var a = 0; a < neighbors.Length; a++)
@@ -356,11 +365,17 @@ namespace Appegy.Tessera
                 {
                     var b = neighbors[a][edge];
                     if (b == -1)
+                    {
                         continue;
+                    }
                     if (b < 0 || b >= neighbors.Length)
+                    {
                         throw new InvalidOperationException($"Voronoi cell {a} has out-of-range neighbor {b} (seed={seed}).");
+                    }
                     if (!HasReversedNeighborEdge(corners, neighbors, a, edge, b))
+                    {
                         throw new InvalidOperationException($"Voronoi neighbor symmetry failed for {a}->{b} (seed={seed}).");
+                    }
                 }
             }
         }
@@ -372,12 +387,16 @@ namespace Appegy.Tessera
             for (var otherEdge = 0; otherEdge < neighbors[b].Length; otherEdge++)
             {
                 if (neighbors[b][otherEdge] != a)
+                {
                     continue;
+                }
 
                 var otherFrom = corners[b][otherEdge];
                 var otherTo = corners[b][(otherEdge + 1) % corners[b].Length];
                 if (SamePoint(from, otherTo) && SamePoint(to, otherFrom))
+                {
                     return true;
+                }
             }
 
             return false;
@@ -402,9 +421,13 @@ namespace Appegy.Tessera
             var hi = math.max(a, b);
             var key = EdgeKey(lo, hi);
             if (edgeMap.TryGetValue(key, out var existing))
+            {
                 edgeMap[key] = existing.WithSecondTriangle(triangle);
+            }
             else
+            {
                 edgeMap.Add(key, new EdgeAdjacency(lo, hi, triangle, -1));
+            }
         }
 
         private static float2 CreateHullFarPoint(ReadOnlySpan<float2> seeds, int[] triangles, float2[] circumcenters, EdgeAdjacency edge, float farDistance)
@@ -416,7 +439,9 @@ namespace Appegy.Tessera
             var delta = b - a;
             var outward = math.normalizesafe(new float2(-delta.y, delta.x));
             if (math.dot(third - midpoint, outward) > 0f)
+            {
                 outward = -outward;
+            }
 
             var farFromMidpoint = midpoint + outward * farDistance;
             var farFromCircumcenter = circumcenters[edge.T1] + outward * farDistance;
@@ -431,7 +456,9 @@ namespace Appegy.Tessera
             {
                 var vertex = triangles[3 * triangle + i];
                 if (vertex != a && vertex != b)
+                {
                     return vertex;
+                }
             }
 
             throw new InvalidOperationException("Delaunay edge does not belong to triangle.");
@@ -446,7 +473,9 @@ namespace Appegy.Tessera
         private static void AddCellEdge(List<CellEdge> edges, float2 from, float2 to, int neighbor)
         {
             if (SamePoint(from, to))
+            {
                 return;
+            }
 
             edges.Add(new CellEdge(from, to, neighbor));
         }
@@ -464,20 +493,26 @@ namespace Appegy.Tessera
             corners = uniqueCorners.ToArray();
             neighbors = new int[corners.Length];
             for (var i = 0; i < corners.Length; i++)
+            {
                 neighbors[i] = GetEdgeNeighbor(edges, corners[i], corners[(i + 1) % corners.Length]);
+            }
 
             if (SignedArea(corners) > 0f)
             {
                 Array.Reverse(corners);
                 for (var i = 0; i < corners.Length; i++)
+                {
                     neighbors[i] = GetEdgeNeighbor(edges, corners[i], corners[(i + 1) % corners.Length]);
+                }
             }
         }
 
         private static int GetEdgeNeighbor(List<CellEdge> edges, float2 from, float2 to)
         {
             if (TryFindEdgeNeighbor(edges, from, to, out var neighbor))
+            {
                 return neighbor;
+            }
 
             throw new InvalidOperationException("Voronoi raw cell has consecutive corners without a matching edge.");
         }
@@ -487,8 +522,8 @@ namespace Appegy.Tessera
             for (var i = 0; i < edges.Count; i++)
             {
                 var edge = edges[i];
-                if ((SamePoint(edge.From, from) && SamePoint(edge.To, to)) ||
-                    (SamePoint(edge.From, to) && SamePoint(edge.To, from)))
+                if (SamePoint(edge.From, from) && SamePoint(edge.To, to) ||
+                    SamePoint(edge.From, to) && SamePoint(edge.To, from))
                 {
                     neighbor = edge.Neighbor;
                     return true;
@@ -503,7 +538,9 @@ namespace Appegy.Tessera
         {
             var size = bounds.Size;
             if (!IsFinite(bounds.Min) || !IsFinite(bounds.Max) || !IsFinite(size) || size.x <= 0f || size.y <= 0f)
+            {
                 throw new InvalidOperationException("Voronoi bounds must have positive finite size.");
+            }
         }
 
         private static void ValidateSeeds(ReadOnlySpan<float2> seeds, Bounds2 bounds)
@@ -512,9 +549,13 @@ namespace Appegy.Tessera
             for (var i = 0; i < seeds.Length; i++)
             {
                 if (!IsFinite(seeds[i]))
+                {
                     throw new InvalidOperationException("Voronoi seeds must be finite.");
+                }
                 if (!Contains(bounds, seeds[i], tolerance))
+                {
                     throw new InvalidOperationException("Voronoi seeds must be inside bounds.");
+                }
             }
         }
 
@@ -529,7 +570,9 @@ namespace Appegy.Tessera
             for (var i = 0; i < points.Count; i++)
             {
                 if (SamePoint(points[i], point))
+                {
                     return;
+                }
             }
 
             points.Add(point);
