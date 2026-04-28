@@ -25,6 +25,10 @@ namespace Appegy.Tessera
             var outCorners = new List<float2>(corners.Length + 4);
             var outNeighbors = new List<int>(neighbors.Length + 4);
 
+            var eps = math.max(
+                math.max(math.abs(bounds.Min.x), math.abs(bounds.Max.x)),
+                math.max(math.abs(bounds.Min.y), math.abs(bounds.Max.y))) * 1e-6f + 1e-9f;
+
             for (var plane = 0; plane < PlaneCount; plane++)
             {
                 if (inCorners.Count == 0)
@@ -40,8 +44,8 @@ namespace Appegy.Tessera
                     var tag = inNeighbors[i];
                     var currentInside = IsInside(current, plane, bounds);
                     var nextInside = IsInside(next, plane, bounds);
-                    var currentOnPlane = IsOnPlane(current, plane, bounds);
-                    var nextOnPlane = IsOnPlane(next, plane, bounds);
+                    var currentOnPlane = IsOnPlane(current, plane, bounds, eps);
+                    var nextOnPlane = IsOnPlane(next, plane, bounds, eps);
 
                     if (currentInside && nextInside)
                     {
@@ -96,14 +100,14 @@ namespace Appegy.Tessera
             };
         }
 
-        private static bool IsOnPlane(float2 point, int plane, Bounds2 bounds)
+        private static bool IsOnPlane(float2 point, int plane, Bounds2 bounds, float eps)
         {
             return plane switch
             {
-                0 => point.x == bounds.Min.x,
-                1 => point.x == bounds.Max.x,
-                2 => point.y == bounds.Min.y,
-                3 => point.y == bounds.Max.y,
+                0 => math.abs(point.x - bounds.Min.x) <= eps,
+                1 => math.abs(point.x - bounds.Max.x) <= eps,
+                2 => math.abs(point.y - bounds.Min.y) <= eps,
+                3 => math.abs(point.y - bounds.Max.y) <= eps,
                 _ => false
             };
         }

@@ -95,6 +95,31 @@ namespace Appegy.Tessera.Tests.Internal
         }
 
         [Test]
+        public void Clip_VertexWithinEpsilonOfPlane_TreatedAsOnPlane()
+        {
+            // V0 is just inside the top plane (y = 1) — within float epsilon of the bound,
+            // not exactly on it. V1 is well outside. With exact equality the clipper emits
+            // V0 (with the original tag) AND an intersection point a few nanometres away
+            // from V0 — a spurious near-duplicate vertex. With epsilon comparison V0 is
+            // treated as on the plane, so no intersection is inserted.
+            var corners = new[]
+            {
+                new float2(0.2f, 1f - 1e-7f),
+                new float2(0.8f, 1.4f),
+                new float2(0.8f, 0.2f),
+                new float2(0.2f, 0.2f)
+            };
+            var neighbors = new[] { 10, 20, 30, 40 };
+            var (oc, on) = Tessera.PolygonClipping.ClipToBounds(corners, neighbors, Unit);
+
+            Assert.AreEqual(4, oc.Length,
+                "Vertex within epsilon of the plane should be treated as on-plane (no spurious split).");
+            Assert.AreEqual(4, on.Length);
+            CollectionAssert.AreEqual(new[] { -1, 20, 30, 40 }, on);
+            AssertNoDuplicateConsecutiveCorners(oc);
+        }
+
+        [Test]
         public void Clip_MismatchedInputLengths_Throws()
         {
             var corners = new[] { new float2(0, 0), new float2(1, 0), new float2(0, 1) };
