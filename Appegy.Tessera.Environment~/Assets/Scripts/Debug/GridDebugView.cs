@@ -1,4 +1,5 @@
 using Appegy.Tessera;
+using Unity.Mathematics;
 using UnityEngine;
 #if UNITY_EDITOR
 using UnityEditor;
@@ -17,7 +18,8 @@ public class GridDebugView : MonoBehaviour
         HexPointyOdd,
         HexPointyEven,
         HexFlatOdd,
-        HexFlatEven
+        HexFlatEven,
+        Voronoi
     }
 
     [Header("Grid")]
@@ -27,6 +29,11 @@ public class GridDebugView : MonoBehaviour
     [Header("Grid Size")]
     [SerializeField] [Range(1, 100)] private int _width = 10;
     [SerializeField] [Range(1, 100)] private int _height = 10;
+
+    [Header("Voronoi")]
+    [SerializeField] [Range(4, 500)] private int _cellCount = 64;
+    [SerializeField] private int _voronoiSeed = 0;
+    [SerializeField] [Range(0, 16)] private int _relaxationIterations = 3;
 
     [Header("Grid Appearance")]
     [SerializeField] [Range(0.001f, 0.2f)] private float _lineWidth = 0.02f;
@@ -169,6 +176,12 @@ public class GridDebugView : MonoBehaviour
                 return new HexagonalGrid(_width, _height, _inscribedRadius, HexagonalGridType.FlatOdd);
             case GridKind.HexFlatEven:
                 return new HexagonalGrid(_width, _height, _inscribedRadius, HexagonalGridType.FlatEven);
+            case GridKind.Voronoi:
+            {
+                var size = new float2(_width * _inscribedRadius * 2f, _height * _inscribedRadius * 2f);
+                var bounds = new Bounds2(float2.zero, size);
+                return new VoronoiGrid(bounds, _cellCount, _voronoiSeed, _relaxationIterations);
+            }
             default:
                 return new SquareGrid(_width, _height, _inscribedRadius * 2f);
         }
