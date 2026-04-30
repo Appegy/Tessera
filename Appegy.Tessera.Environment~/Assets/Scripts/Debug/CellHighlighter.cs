@@ -8,22 +8,22 @@ using UnityEditor;
 #endif
 
 /// <summary>
-///     Mouse hover highlight for an <see cref="IGrid" />: paints the hovered cell + its neighbours.
-///     Owned by TessellationDebugView. Works in Play and Edit modes.
+///     Mouse hover highlight for an <see cref="ITessellation" />: paints the hovered cell + its neighbours.
+///     Owned by GridDebugView. Works in Play and Edit modes.
 /// </summary>
 [ExecuteAlways]
 [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
-public class TessellationCellHighlighter : MonoBehaviour
+public class CellHighlighter : MonoBehaviour
 {
     private BoxCollider2D _collider;
-    private IGrid _grid;
+    private ITessellation _grid;
     private Vector2 _gridCenter;
     private int _lastHovered = -1;
     private Mesh _mesh;
     private MeshFilter _meshFilter;
     private MeshRenderer _meshRenderer;
 
-    private TessellationDebugView _view;
+    private GridDebugView _view;
 
     private void Update()
     {
@@ -66,7 +66,7 @@ public class TessellationCellHighlighter : MonoBehaviour
 #endif
     }
 
-    public void Init(TessellationDebugView view, Vector2 gridSize)
+    public void Init(GridDebugView view, Vector2 gridSize)
     {
         _view = view;
         _grid = view.Grid;

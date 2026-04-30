@@ -9,7 +9,7 @@ namespace Appegy.Tessera
     ///     Cell <c>(x, y)</c> has id <c>y * Width + x</c>. Cell (0, 0) center sits at pixel (0, 0).
     ///     Note: <c>Bounds.Min</c> is not necessarily at the origin; consult <c>Bounds</c> directly.
     /// </summary>
-    public sealed class HexagonalGrid : IGrid
+    public sealed class HexagonalGrid : ITessellation
     {
         private static readonly float _sqrt3 = math.sqrt(3f);
 
@@ -50,11 +50,6 @@ namespace Appegy.Tessera
 
         public int CellCount { get; }
         public Bounds2 Bounds { get; }
-
-        public Cell GetCell(int id)
-        {
-            return new Cell(this, id);
-        }
 
         public float2 GetCenter(int id)
         {
