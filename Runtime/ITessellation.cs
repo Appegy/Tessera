@@ -4,20 +4,17 @@ using Unity.Mathematics;
 namespace Appegy.Tessera
 {
     /// <summary>
-    ///     Generic grid: a finite, immutable collection of cells whose adjacency forms a connected planar graph.
-    ///     Cells are identified by dense integer ids in the range <c>[0, CellCount)</c>.
-    ///     See <c>Documentation~/grid-api-redesign.md</c> for the full contract and rationale.
+    ///     A finite, immutable tessellation of the plane: a collection of cells whose adjacency forms
+    ///     a connected planar graph. Cells are identified by dense integer ids in the range
+    ///     <c>[0, CellCount)</c>.
     /// </summary>
-    public interface IGrid
+    public interface ITessellation
     {
-        /// <summary>Number of cells in the grid.</summary>
+        /// <summary>Number of cells in the tessellation.</summary>
         int CellCount { get; }
 
-        /// <summary>Axis-aligned rectangle containing all cells in grid-local coordinates.</summary>
+        /// <summary>Axis-aligned rectangle containing all cells in tessellation-local coordinates.</summary>
         Bounds2 Bounds { get; }
-
-        /// <summary>Wraps an id into a <see cref="Cell" /> facade for ergonomic access.</summary>
-        Cell GetCell(int id);
 
         /// <summary>Centre of the cell.</summary>
         float2 GetCenter(int id);
@@ -37,7 +34,7 @@ namespace Appegy.Tessera
         /// <summary>
         ///     Neighbour cell across the edge from corner <paramref name="neighborIndex" /> to corner
         ///     <c>(neighborIndex + 1) % GetCornersCount(id)</c>. Returns <c>-1</c> if that edge is on the
-        ///     grid boundary (no neighbour).
+        ///     tessellation boundary (no neighbour).
         /// </summary>
         int GetNeighbor(int id, int neighborIndex);
 
@@ -50,7 +47,7 @@ namespace Appegy.Tessera
         /// </summary>
         int GetNeighborIndex(int cell, int neighbor);
 
-        /// <summary>Returns the id of the cell containing <paramref name="point" />, or <c>-1</c> if outside the grid.</summary>
+        /// <summary>Returns the id of the cell containing <paramref name="point" />, or <c>-1</c> if outside the tessellation.</summary>
         int GetCellAt(float2 point);
 
         /// <summary>Minimum number of cell-to-cell hops between <paramref name="a" /> and <paramref name="b" />.</summary>

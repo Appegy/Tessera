@@ -1,15 +1,16 @@
 using Appegy.Tessera;
+using Unity.Mathematics;
 using UnityEngine;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
 
 /// <summary>
-///     Root debug component: holds settings, builds an <see cref="IGrid" />,
+///     Root debug component: holds settings, builds an <see cref="ITessellation" />,
 ///     and propagates changes to GridRenderer and CellHighlighter.
 /// </summary>
 [ExecuteAlways]
-public class TessellationDebugView : MonoBehaviour
+public class GridDebugView : MonoBehaviour
 {
     public enum GridKind
     {
@@ -17,7 +18,8 @@ public class TessellationDebugView : MonoBehaviour
         HexPointyOdd,
         HexPointyEven,
         HexFlatOdd,
-        HexFlatEven
+        HexFlatEven,
+        Voronoi
     }
 
     [Header("Grid")]
@@ -28,6 +30,11 @@ public class TessellationDebugView : MonoBehaviour
     [SerializeField] [Range(1, 100)] private int _width = 10;
     [SerializeField] [Range(1, 100)] private int _height = 10;
 
+    [Header("Voronoi")]
+    [SerializeField] [Range(4, 500)] private int _cellCount = 64;
+    [SerializeField] private int _voronoiSeed = 0;
+    [SerializeField] [Range(0, 16)] private int _relaxationIterations = 3;
+
     [Header("Grid Appearance")]
     [SerializeField] [Range(0.001f, 0.2f)] private float _lineWidth = 0.02f;
     [SerializeField] private Color _lineColor = Color.white;
@@ -36,11 +43,11 @@ public class TessellationDebugView : MonoBehaviour
     [SerializeField] private bool _enableHighlighter = true;
     [SerializeField] private Color _hoveredColor = new(0.91f, 0.40f, 0.35f, 0.25f);
     [SerializeField] private Color _neighborColor = new(0.91f, 0.66f, 0.24f, 0.19f);
-    private TessellationCellHighlighter _cellHighlighter;
+    private CellHighlighter _cellHighlighter;
 
-    private TessellationGridRenderer _gridRenderer;
+    private GridRenderer _gridRenderer;
 
-    public IGrid Grid { get; private set; }
+    public ITessellation Grid { get; private set; }
     public int Width => _width;
     public int Height => _height;
     public float LineWidth => _lineWidth;
@@ -136,9 +143,9 @@ public class TessellationDebugView : MonoBehaviour
     private void EnsureChildren()
     {
         if (_gridRenderer == null)
-            _gridRenderer = GetOrAddChild<TessellationGridRenderer>("GridMesh");
+            _gridRenderer = GetOrAddChild<GridRenderer>("GridMesh");
         if (_cellHighlighter == null)
-            _cellHighlighter = GetOrAddChild<TessellationCellHighlighter>("CellHighlight");
+            _cellHighlighter = GetOrAddChild<CellHighlighter>("CellHighlight");
     }
 
     private T GetOrAddChild<T>(string childName) where T : MonoBehaviour
@@ -155,7 +162,7 @@ public class TessellationDebugView : MonoBehaviour
         return go.AddComponent<T>();
     }
 
-    private IGrid CreateGrid()
+    private ITessellation CreateGrid()
     {
         switch (_kind)
         {
@@ -169,6 +176,12 @@ public class TessellationDebugView : MonoBehaviour
                 return new HexagonalGrid(_width, _height, _inscribedRadius, HexagonalGridType.FlatOdd);
             case GridKind.HexFlatEven:
                 return new HexagonalGrid(_width, _height, _inscribedRadius, HexagonalGridType.FlatEven);
+            case GridKind.Voronoi:
+            {
+                var size = new float2(_width * _inscribedRadius * 2f, _height * _inscribedRadius * 2f);
+                var bounds = new Bounds2(float2.zero, size);
+                return new VoronoiGrid(bounds, _cellCount, _voronoiSeed, _relaxationIterations);
+            }
             default:
                 return new SquareGrid(_width, _height, _inscribedRadius * 2f);
         }

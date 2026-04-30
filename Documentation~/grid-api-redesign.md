@@ -17,7 +17,6 @@ Generalise Tessera from "regular tessellations only (square / hex)" to "any 2D g
 - **Identity = `int` id**, dense `[0, CellCount)`. Coordinates (X/Y, axial, ...) are concrete-grid extras, not part of `IGrid`.
 - **`IGrid` is an interface, not a Union.** Each implementation decides whether to cache or compute.
 - **No precomputed caches for square / hex.** Their geometry is closed-form; computing on demand is cheap. Voronoi caches because it has no formula.
-- **`Cell` is a thin `readonly struct`** holding `(IGrid grid, int id)`. All accessors forward to the grid. Virtual dispatch per call is acceptable at this scale.
 - **Edge-connected only.** Each grid is a planar graph where one polygon edge = one neighbour relation. Square is 4-connected (no diagonals). Hexagon is 6-connected (no Even/Odd partial modes). Voronoi: each cell connects to all cells sharing an edge in the diagram.
 - **Variable corner / neighbour count per cell.** Voronoi has 5-7 corners depending on the cell; square = 4, hex = 6 fixed. The core API treats variability as the norm.
 - **Corners count == neighbours count.** Each polygon edge has exactly one neighbour slot. A boundary edge stores `-1` in that slot; the corners are still present.
@@ -40,8 +39,6 @@ public interface IGrid
     int CellCount { get; }
     Bounds2 Bounds { get; }
 
-    Cell GetCell(int id);
-
     // Geometry
     float2 GetCenter(int id);
     int GetCornersCount(int id);
@@ -56,22 +53,6 @@ public interface IGrid
     // Spatial / metric
     int GetCellAt(float2 point);                       // -1 if outside grid
     int Distance(int a, int b);                        // graph distance
-}
-
-public readonly struct Cell
-{
-    private readonly IGrid _grid;
-    public int Id { get; }
-
-    internal Cell(IGrid grid, int id) { _grid = grid; Id = id; }
-
-    public float2 Center                       => _grid.GetCenter(Id);
-    public int    CornersCount                 => _grid.GetCornersCount(Id);
-    public float2 GetCorner(int i)             => _grid.GetCorner(Id, i);
-    public int    GetNeighbor(int i)           => _grid.GetNeighbor(Id, i);
-    public int    GetNeighborIndex(int other)  => _grid.GetNeighborIndex(Id, other);
-    public int    DistanceTo(int other)        => _grid.Distance(Id, other);
-    public void   CopyCorners(Span<float2> d)  => _grid.CopyCorners(Id, d);
 }
 
 public readonly struct Bounds2
@@ -91,7 +72,6 @@ public sealed class PlaneGrid<T> : IReadOnlyCollection<T>
     public int   Count => Grid.CellCount;
 
     public T this[int id]    { get; set; }
-    public T this[Cell cell] { get; set; }   // forwards to this[cell.Id]
 
     public PlaneGrid(IGrid grid);
     public PlaneGrid(IGrid grid, T fill);
@@ -159,7 +139,6 @@ public sealed class VoronoiGrid : IGrid
 
 ### Phase 1 — new core types
 - `Runtime/IGrid.cs`
-- `Runtime/Types/Cell.cs`
 - `Runtime/Types/Bounds2.cs`
 - `Runtime/Utilities/GridExtensions.cs`
 
@@ -188,12 +167,12 @@ public sealed class VoronoiGrid : IGrid
   - `_tess.ToCell(x, y)` -> `grid.GetCellAt(point)`
   - `_tess.ToPoint2(cell)` -> `grid.GetCenter(id)`
   - `_tess.GetCornerPoint(cell, i)` -> `grid.GetCorner(id, i)`
-  - `_tess.GetNeighbors(cell)` -> `for (i = 0; i < cell.CornersCount; i++) { var n = cell.GetNeighbor(i); if (n != -1) ... }` (or `grid.Neighbors(id)` extension)
+  - `_tess.GetNeighbors(cell)` -> `for (i = 0; i < grid.GetCornersCount(id); i++) { var n = grid.GetNeighbor(id, i); if (n != -1) ... }` (or `grid.Neighbors(id)` extension)
   - bounds-check `cell.X < 0 || cell.X >= Width` -> `id == -1`
 - Update `CLAUDE.md` and `AGENTS.md` once the dust settles.
 
 ### Phase 7 — Voronoi
-Separate session. Out of scope for this redesign pass.
+Implemented. See `Documentation~/voronoi-grid-design.md` and `Documentation~/voronoi-grid-plan.md`.
 
 ## Out of scope (v1)
 

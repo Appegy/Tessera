@@ -3,12 +3,12 @@ using Appegy.Tessera;
 using UnityEngine;
 
 /// <summary>
-///     Builds the grid edge mesh from an <see cref="IGrid" />.
-///     Owned by TessellationDebugView.
+///     Builds the grid edge mesh from an <see cref="ITessellation" />.
+///     Owned by GridDebugView.
 /// </summary>
 [ExecuteAlways]
 [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
-public class TessellationGridRenderer : MonoBehaviour
+public class GridRenderer : MonoBehaviour
 {
     private Mesh _mesh;
     private MeshFilter _meshFilter;
@@ -23,7 +23,7 @@ public class TessellationGridRenderer : MonoBehaviour
         }
     }
 
-    public void Rebuild(TessellationDebugView view)
+    public void Rebuild(GridDebugView view)
     {
         EnsureComponents();
 
@@ -88,7 +88,7 @@ public class TessellationGridRenderer : MonoBehaviour
         }
     }
 
-    private static HashSet<(Vector2, Vector2)> CollectEdges(IGrid grid)
+    private static HashSet<(Vector2, Vector2)> CollectEdges(ITessellation grid)
     {
         var edges = new HashSet<(Vector2, Vector2)>();
         for (var id = 0; id < grid.CellCount; id++)
