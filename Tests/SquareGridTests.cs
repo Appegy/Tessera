@@ -256,17 +256,6 @@ namespace Appegy.Tessera.Tests
         }
 
         [Test]
-        public void Cell_ForwardsToGrid()
-        {
-            var cell = _grid.GetCell(_grid.IdOf(1, 1));
-            Assert.AreEqual(_grid.IdOf(1, 1), cell.Id);
-            Assert.AreEqual(new float2(1.5f, 1.5f), cell.Center);
-            Assert.AreEqual(4, cell.CornersCount);
-            Assert.AreEqual(_grid.IdOf(2, 1), cell.GetNeighbor(0));
-            Assert.AreEqual(2, cell.DistanceTo(_grid.IdOf(2, 2)));
-        }
-
-        [Test]
         public void Constructor_RejectsBadArgs()
         {
             Assert.Throws<ArgumentOutOfRangeException>(() => new SquareGrid(0, 1, 1f));

@@ -2,7 +2,7 @@
 
 Status: design accepted 2026-04-28, implementation pending.
 
-Builds on `grid-api-redesign.md`. This document covers only the Voronoi-specific decisions; everything in the v2 redesign (`IGrid`, `Cell`, `Bounds2`, `PlaneGrid<T>`, contracts, alignment rule, boundary marker `-1`) applies as-is.
+Builds on `grid-api-redesign.md`. This document covers only the Voronoi-specific decisions; everything in the v2 redesign (`IGrid`, `Bounds2`, `PlaneGrid<T>`, contracts, alignment rule, boundary marker `-1`) applies as-is.
 
 ## Working note on flexibility
 
@@ -36,7 +36,7 @@ public sealed class VoronoiGrid : IGrid
 }
 ```
 
-No new public types. `Cell`, `Bounds2`, `PlaneGrid<T>`, `IGrid` are reused unchanged.
+No new public types. `Bounds2`, `PlaneGrid<T>`, `IGrid` are reused unchanged.
 
 Constructor argument validation:
 - `cellCount >= 1` else `ArgumentOutOfRangeException`
@@ -71,7 +71,6 @@ For each cell `id` with `N = _corners[id].Length`:
 |---|---|
 | `CellCount` | `_centers.Length` |
 | `Bounds` | `_bounds` |
-| `GetCell(id)` | `new Cell(this, id)` |
 | `GetCenter(id)` | `_centers[id]` |
 | `GetCornersCount(id)` | `_corners[id].Length` |
 | `GetCorner(id, k)` | `_corners[id][k]` |

@@ -8,7 +8,7 @@ namespace Appegy.Tessera
     ///     Cell <c>(x, y)</c> has id <c>y * Width + x</c> and occupies the rectangle
     ///     <c>[x*CellSize, (x+1)*CellSize] x [y*CellSize, (y+1)*CellSize]</c>.
     /// </summary>
-    public sealed class SquareGrid : IGrid
+    public sealed class SquareGrid : ITessellation
     {
         public SquareGrid(int width, int height, float cellSize)
         {
@@ -29,11 +29,6 @@ namespace Appegy.Tessera
 
         public int CellCount { get; }
         public Bounds2 Bounds { get; }
-
-        public Cell GetCell(int id)
-        {
-            return new Cell(this, id);
-        }
 
         public float2 GetCenter(int id)
         {

@@ -69,7 +69,6 @@ namespace Appegy.Tessera
 
         public int CellCount => throw new NotImplementedException();
         public Bounds2 Bounds => throw new NotImplementedException();
-        public Cell GetCell(int id) => throw new NotImplementedException();
         public float2 GetCenter(int id) => throw new NotImplementedException();
         public int GetCornersCount(int id) => throw new NotImplementedException();
         public float2 GetCorner(int id, int cornerIndex) => throw new NotImplementedException();
@@ -1285,7 +1284,6 @@ namespace Appegy.Tessera
 
         public int CellCount => _centers.Length;
         public Bounds2 Bounds => _bounds;
-        public Cell GetCell(int id) => new Cell(this, id);
         public float2 GetCenter(int id) => _centers[id];
         public int GetCornersCount(int id) => _corners[id].Length;
         public float2 GetCorner(int id, int cornerIndex)

@@ -132,8 +132,8 @@ namespace Appegy.Tessera.Tests.Internal
         {
             var corners = new[] { new float2(0, 0), new float2(1, 0), new float2(0, 1) };
             var neighbors = new[] { 1, 2, 3 };
-            Assert.Throws<ArgumentNullException>(() => Tessera.PolygonClipping.ClipToBounds(null, neighbors, Unit));
-            Assert.Throws<ArgumentNullException>(() => Tessera.PolygonClipping.ClipToBounds(corners, null, Unit));
+            Assert.Throws<ArgumentNullException>(() => Tessera.PolygonClipping.ClipToBounds((float2[])null!, neighbors, Unit));
+            Assert.Throws<ArgumentNullException>(() => Tessera.PolygonClipping.ClipToBounds(corners, (int[])null!, Unit));
         }
 
         private static void AssertNoDuplicateConsecutiveCorners(float2[] corners)

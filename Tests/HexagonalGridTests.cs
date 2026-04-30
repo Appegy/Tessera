@@ -257,19 +257,6 @@ namespace Appegy.Tessera.Tests
         }
 
         [Test]
-        public void Cell_ForwardsToGrid([ValueSource(nameof(AllTypes))] HexagonalGridType type)
-        {
-            var grid = new HexagonalGrid(3, 3, 1f, type);
-            var cellId = grid.IdOf(1, 1);
-            var cell = grid.GetCell(cellId);
-            Assert.AreEqual(cellId, cell.Id);
-            var c = grid.GetCenter(cellId);
-            Assert.AreEqual(c.x, cell.Center.x);
-            Assert.AreEqual(c.y, cell.Center.y);
-            Assert.AreEqual(6, cell.CornersCount);
-        }
-
-        [Test]
         public void Constructor_RejectsBadArgs()
         {
             Assert.Throws<ArgumentOutOfRangeException>(() => new HexagonalGrid(0, 1, 1f, HexagonalGridType.PointyOdd));

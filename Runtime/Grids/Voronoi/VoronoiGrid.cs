@@ -8,7 +8,7 @@ namespace Appegy.Tessera
     ///     Irregular cell grid based on a centroidal Voronoi tessellation clipped to a rectangular bounds.
     ///     See <c>Documentation~/voronoi-grid-design.md</c>.
     /// </summary>
-    public sealed class VoronoiGrid : IGrid
+    public sealed class VoronoiGrid : ITessellation
     {
         private readonly Bounds2 _bounds;
         private readonly float2[] _centers;
@@ -34,7 +34,6 @@ namespace Appegy.Tessera
         public int CellCount => _centers.Length;
         public Bounds2 Bounds => _bounds;
 
-        public Cell GetCell(int id) => new Cell(this, id);
         public float2 GetCenter(int id) => _centers[id];
         public int GetCornersCount(int id) => _corners[id].Length;
 

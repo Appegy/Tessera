@@ -5,20 +5,20 @@ using System.Collections.Generic;
 namespace Appegy.Tessera
 {
     /// <summary>
-    ///     Per-cell data layer over an <see cref="IGrid" />. Stores one <typeparamref name="T" /> per cell,
-    ///     indexed by cell id (or <see cref="Cell" />). The grid itself is held by composition via <see cref="Grid" />.
+    ///     Per-cell data layer over an <see cref="ITessellation" />. Stores one <typeparamref name="T" /> per cell,
+    ///     indexed by cell id. The tessellation itself is held by composition via <see cref="Tessellation" />.
     /// </summary>
-    public sealed class PlaneGrid<T> : IReadOnlyCollection<T>
+    public sealed class CellMap<T> : IReadOnlyCollection<T>
     {
         private readonly T[] _data;
 
-        /// <summary>Underlying grid topology / geometry.</summary>
-        public IGrid Grid { get; }
+        /// <summary>Underlying tessellation topology / geometry.</summary>
+        public ITessellation Tessellation { get; }
 
-        /// <summary>Number of cells (== <c>Grid.CellCount</c>).</summary>
+        /// <summary>Number of cells (== <c>Tessellation.CellCount</c>).</summary>
         public int Count
         {
-            get { return Grid.CellCount; }
+            get { return Tessellation.CellCount; }
         }
 
         public T this[int id]
@@ -35,31 +35,25 @@ namespace Appegy.Tessera
             }
         }
 
-        public T this[Cell cell]
+        public CellMap(ITessellation tessellation)
         {
-            get => this[cell.Id];
-            set => this[cell.Id] = value;
+            Tessellation = tessellation ?? throw new ArgumentNullException(nameof(tessellation));
+            _data = new T[tessellation.CellCount];
         }
 
-        public PlaneGrid(IGrid grid)
-        {
-            Grid = grid ?? throw new ArgumentNullException(nameof(grid));
-            _data = new T[grid.CellCount];
-        }
-
-        public PlaneGrid(IGrid grid, T fill) : this(grid)
+        public CellMap(ITessellation tessellation, T fill) : this(tessellation)
         {
             Array.Fill(_data, fill);
         }
 
         /// <summary>
         ///     Creates a deep copy of <paramref name="source" />: per-cell data is duplicated, while the
-        ///     underlying <see cref="Grid" /> reference is shared (grids are immutable).
+        ///     underlying <see cref="Tessellation" /> reference is shared (tessellations are immutable).
         /// </summary>
-        public PlaneGrid(PlaneGrid<T> source)
+        public CellMap(CellMap<T> source)
         {
             if (source == null) throw new ArgumentNullException(nameof(source));
-            Grid = source.Grid;
+            Tessellation = source.Tessellation;
             _data = (T[])source._data.Clone();
         }
 

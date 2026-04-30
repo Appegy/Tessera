@@ -6,7 +6,7 @@ using UnityEditor;
 #endif
 
 /// <summary>
-///     Root debug component: holds settings, builds an <see cref="IGrid" />,
+///     Root debug component: holds settings, builds an <see cref="ITessellation" />,
 ///     and propagates changes to GridRenderer and CellHighlighter.
 /// </summary>
 [ExecuteAlways]
@@ -47,7 +47,7 @@ public class GridDebugView : MonoBehaviour
 
     private GridRenderer _gridRenderer;
 
-    public IGrid Grid { get; private set; }
+    public ITessellation Grid { get; private set; }
     public int Width => _width;
     public int Height => _height;
     public float LineWidth => _lineWidth;
@@ -162,7 +162,7 @@ public class GridDebugView : MonoBehaviour
         return go.AddComponent<T>();
     }
 
-    private IGrid CreateGrid()
+    private ITessellation CreateGrid()
     {
         switch (_kind)
         {

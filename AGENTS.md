@@ -22,17 +22,16 @@ Concrete grid types:
 
 Supporting types:
 
-- `Cell` — `readonly struct (IGrid grid, int id)`. Thin facade forwarding to `IGrid`. Constructed only by grid implementations (internal ctor).
 - `Bounds2` — value-type axis-aligned rectangle returned by `IGrid.Bounds`.
-- `PlaneGrid<T>` — per-cell data layer over an `IGrid`. Composition only — does **not** implement `IGrid`. Indexed by `int id` or `Cell`.
+- `CellMap<T>` — per-cell data layer over an `IGrid`. Composition only — does **not** implement `IGrid`. Indexed by `int id`.
 
 Geometry uses `Unity.Mathematics.float2` (package `com.unity.mathematics`).
 
 ## Module Parts
 
 ```
-Runtime/                  ← IGrid, PlaneGrid<T>
-Runtime/Types/            ← Cell, Bounds2
+Runtime/                  ← IGrid, CellMap<T>
+Runtime/Types/            ← Bounds2
 Runtime/Utilities/        ← GridExtensions
 Runtime/Grids/Square/     ← SquareGrid
 Runtime/Grids/Hexagonal/  ← HexagonalGrid, HexagonalGridType
@@ -121,9 +120,8 @@ Tests live as flat `*.cs` files under `Tests/` (no subfolders). When adding beha
 
 1. Add the method signature to `Runtime/IGrid.cs`.
 2. Implement in every concrete grid class: `SquareGrid`, `HexagonalGrid`, `VoronoiGrid`.
-3. Optionally add a forwarding accessor on `Cell` if it makes sense per-cell.
-4. Add tests for every grid configuration: `SquareGrid` + 4 hex layouts. Use `[ValueSource(nameof(AllTypes))]` parameterization (see `HexagonalGridTests.cs`).
-5. Refresh Unity (`force` mode for new files), run tests.
+3. Add tests for every grid configuration: `SquareGrid` + 4 hex layouts. Use `[ValueSource(nameof(AllTypes))]` parameterization (see `HexagonalGridTests.cs`).
+4. Refresh Unity (`force` mode for new files), run tests.
 
 ## How to Add a New Module Part
 

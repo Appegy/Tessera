@@ -8,7 +8,7 @@ using UnityEditor;
 #endif
 
 /// <summary>
-///     Mouse hover highlight for an <see cref="IGrid" />: paints the hovered cell + its neighbours.
+///     Mouse hover highlight for an <see cref="ITessellation" />: paints the hovered cell + its neighbours.
 ///     Owned by GridDebugView. Works in Play and Edit modes.
 /// </summary>
 [ExecuteAlways]
@@ -16,7 +16,7 @@ using UnityEditor;
 public class CellHighlighter : MonoBehaviour
 {
     private BoxCollider2D _collider;
-    private IGrid _grid;
+    private ITessellation _grid;
     private Vector2 _gridCenter;
     private int _lastHovered = -1;
     private Mesh _mesh;

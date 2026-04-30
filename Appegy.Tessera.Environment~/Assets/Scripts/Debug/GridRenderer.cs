@@ -3,7 +3,7 @@ using Appegy.Tessera;
 using UnityEngine;
 
 /// <summary>
-///     Builds the grid edge mesh from an <see cref="IGrid" />.
+///     Builds the grid edge mesh from an <see cref="ITessellation" />.
 ///     Owned by GridDebugView.
 /// </summary>
 [ExecuteAlways]
@@ -88,7 +88,7 @@ public class GridRenderer : MonoBehaviour
         }
     }
 
-    private static HashSet<(Vector2, Vector2)> CollectEdges(IGrid grid)
+    private static HashSet<(Vector2, Vector2)> CollectEdges(ITessellation grid)
     {
         var edges = new HashSet<(Vector2, Vector2)>();
         for (var id = 0; id < grid.CellCount; id++)
