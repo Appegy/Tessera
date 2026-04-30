@@ -40,6 +40,44 @@ namespace Appegy.Tessera.Tests
         }
 
         [Test]
+        public void Construct_FromCopy_SharesGridReference()
+        {
+            var source = new PlaneGrid<int>(_square);
+            var copy = new PlaneGrid<int>(source);
+            Assert.AreSame(source.Grid, copy.Grid);
+            Assert.AreEqual(source.Count, copy.Count);
+        }
+
+        [Test]
+        public void Construct_FromCopy_DuplicatesData()
+        {
+            var source = new PlaneGrid<int>(_square);
+            for (var id = 0; id < source.Count; id++) source[id] = id * 10;
+
+            var copy = new PlaneGrid<int>(source);
+            for (var id = 0; id < source.Count; id++) Assert.AreEqual(id * 10, copy[id]);
+        }
+
+        [Test]
+        public void Construct_FromCopy_IsIndependent()
+        {
+            var source = new PlaneGrid<int>(_square, 1);
+            var copy = new PlaneGrid<int>(source);
+
+            source[0] = 99;
+            copy[1] = 42;
+
+            Assert.AreEqual(1, copy[0]);
+            Assert.AreEqual(1, source[1]);
+        }
+
+        [Test]
+        public void Construct_FromCopy_NullSource_Throws()
+        {
+            Assert.Throws<ArgumentNullException>(() => _ = new PlaneGrid<int>((PlaneGrid<int>)null!));
+        }
+
+        [Test]
         public void Indexer_GetSet_ById()
         {
             var data = new PlaneGrid<int>(_square);

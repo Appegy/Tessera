@@ -52,6 +52,17 @@ namespace Appegy.Tessera
             Array.Fill(_data, fill);
         }
 
+        /// <summary>
+        ///     Creates a deep copy of <paramref name="source" />: per-cell data is duplicated, while the
+        ///     underlying <see cref="Grid" /> reference is shared (grids are immutable).
+        /// </summary>
+        public PlaneGrid(PlaneGrid<T> source)
+        {
+            if (source == null) throw new ArgumentNullException(nameof(source));
+            Grid = source.Grid;
+            _data = (T[])source._data.Clone();
+        }
+
         public IEnumerator<T> GetEnumerator()
         {
             for (var i = 0; i < _data.Length; i++)
