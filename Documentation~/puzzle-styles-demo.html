@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>PuzzleGrid Styles — Visual Reference</title>
+<style>
+  :root { color-scheme: dark; }
+  body { font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif; background:#1a1a1a; color:#ddd; max-width:1280px; margin:0 auto; padding:24px; line-height:1.5; }
+  h1 { color:#fff; margin:0 0 6px; font-size:22px; }
+  .intro { color:#aaa; margin-bottom:24px; }
+  .styles { display:grid; grid-template-columns:repeat(auto-fit, minmax(440px, 1fr)); gap:20px; }
+  .global-controls { background:#1c1c1c; border:1px solid #333; border-radius:6px; padding:12px 16px; display:flex; flex-wrap:wrap; gap:10px 24px; align-items:center; margin-bottom:20px; font-size:12.5px; font-family:ui-monospace,SFMono-Regular,monospace; color:#bbb; position:sticky; top:0; z-index:10; }
+  .global-controls .group { display:flex; align-items:center; gap:8px; }
+  .global-controls .group input[type=range] { width:160px; accent-color:#7aa8ff; }
+  .global-controls .group .val { color:#eee; min-width:32px; text-align:right; }
+  .global-controls .lbl { color:#bbb; }
+  .global-controls button { background:#2a2a2a; border:1px solid #3a3a3a; color:#ccc; padding:5px 12px; font:inherit; cursor:pointer; border-radius:3px; }
+  .global-controls button:hover { background:#333; color:#fff; }
+  .card { background:#222; border:1px solid #333; border-radius:8px; padding:16px; }
+  .card h2 { margin:0 0 4px; color:#fff; font-size:17px; }
+  .subtitle { color:#888; font-size:12px; font-family:ui-monospace,SFMono-Regular,monospace; margin-bottom:12px; }
+  svg { background:#2a2a2a; border-radius:4px; display:block; width:100%; height:auto; }
+  .desc { color:#bbb; font-size:13px; margin-top:12px; }
+  .desc strong { color:#eee; }
+  code { background:#333; padding:1px 5px; border-radius:3px; font-size:11.5px; font-family:ui-monospace,SFMono-Regular,monospace; color:#ddd; }
+  .controls { display:grid; grid-template-columns:auto 1fr auto; gap:6px 10px; align-items:center; margin:10px 0; font-size:11.5px; font-family:ui-monospace,SFMono-Regular,monospace; color:#bbb; background:#1c1c1c; padding:8px 10px; border-radius:4px; }
+  .controls .lbl { white-space:nowrap; }
+  .controls input[type=range] { width:100%; accent-color:#7aa8ff; }
+  .controls .val { color:#eee; min-width:40px; text-align:right; }
+  .controls .seg { display:flex; gap:0; grid-column:2 / 4; }
+  .controls .seg button { flex:1; background:#2a2a2a; border:1px solid #3a3a3a; color:#bbb; padding:3px 6px; font:inherit; cursor:pointer; }
+  .controls .seg button:hover { background:#333; color:#eee; }
+  .controls .seg button.on { background:#3a5680; border-color:#557ab3; color:#fff; }
+  .controls .seg button:first-child { border-radius:3px 0 0 3px; }
+  .controls .seg button:last-child { border-radius:0 3px 3px 0; }
+  .controls .reroll { grid-column:1 / 4; background:#2a2a2a; border:1px solid #3a3a3a; color:#ccc; padding:4px 8px; font:inherit; cursor:pointer; border-radius:3px; margin-top:2px; }
+  .controls .reroll:hover { background:#333; color:#fff; }
+</style>
+</head>
+<body>
+<h1>PuzzleGrid Styles — Visual Reference</h1>
+<p class="intro">
+Every card shows a 4×3 puzzle at the same seed, cell size 80, light-grey lines are the cuts, dark-grey rectangle is the outer frame (always straight). Two adjacent middle pieces are highlighted (<span style="color:#7ab8ff">blue</span> and <span style="color:#ff7ab8">magenta</span>) so you can see piece shapes and the shared boundary between them.
+</p>
+
+<div class="styles"></div>
+
+<script>
+'use strict';
+
+// ===== Constants =====
+const CELL = 80, GW = 4, GH = 3, PAD = 20;
+const W = CELL*GW + PAD*2;
+const H = CELL*GH + PAD*2;
+
+const HIGHLIGHT = [
+  { cx:1, cy:1, color:'rgba(80,160,255,0.32)' },
+  { cx:2, cy:1, color:'rgba(255,90,180,0.32)' },
+];
+
+// ===== Deterministic RNG (mulberry32) =====
+function rng(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const uni = (r, a, b) => a + r() * (b - a);
+
+// Per-edge seed: PCG-style mix of (seed, orientation, x, y)
+function edgeSeed(seed, orient, x, y) {
+  let h = seed >>> 0;
+  h = Math.imul(h ^ (orient * 2654435761), 0x85ebca6b);
+  h = (h ^ (h >>> 13)) >>> 0;
+  h = Math.imul(h ^ (x * 374761393), 0xc2b2ae35);
+  h = (h ^ (h >>> 16)) >>> 0;
+  h = Math.imul(h ^ (y * 668265263), 0x27d4eb2f);
+  return ((h ^ (h >>> 15)) >>> 0) || 1;
+}
+
+// ===== Vector math =====
+const v = (x, y) => ({x, y});
+const add = (a, b) => v(a.x+b.x, a.y+b.y);
+const sub = (a, b) => v(a.x-b.x, a.y-b.y);
+const scale = (a, s) => v(a.x*s, a.y*s);
+const dist = a => Math.sqrt(a.x*a.x + a.y*a.y);
+
+function frame(p0, p1) {
+  const d = sub(p1, p0);
+  const L = dist(d);
+  return { p0, p1, L, tx:d.x/L, ty:d.y/L, nx:-d.y/L, ny:d.x/L };
+}
+function lw(f, l, w) {
+  return v(
+    f.p0.x + l*f.L*f.tx + w*f.L*f.nx,
+    f.p0.y + l*f.L*f.ty + w*f.L*f.ny
+  );
+}
+function cubic(p0, p1, p2, p3, N) {
+  const out = [];
+  for (let i = 0; i <= N; i++) {
+    const t = i/N, u = 1-t;
+    out.push(v(
+      u*u*u*p0.x + 3*u*u*t*p1.x + 3*u*t*t*p2.x + t*t*t*p3.x,
+      u*u*u*p0.y + 3*u*u*t*p1.y + 3*u*t*t*p2.y + t*t*t*p3.y
+    ));
+  }
+  return out;
+}
+
+function pathFromPts(pts) {
+  return 'M ' + pts.map(p => p.x.toFixed(2)+','+p.y.toFixed(2)).join(' L ');
+}
+// Smooth Catmull-Rom→Bezier rendering: same control points (polyline visits them all),
+// but consecutive samples are connected by cubic Beziers that match neighbour tangents,
+// giving C¹ continuity end-to-end.
+function smoothPathFromPts(pts) {
+  if (pts.length < 2) return '';
+  let s = 'M ' + pts[0].x.toFixed(2) + ',' + pts[0].y.toFixed(2);
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[Math.min(pts.length - 1, i + 2)];
+    const c1x = p1.x + (p2.x - p0.x) / 6;
+    const c1y = p1.y + (p2.y - p0.y) / 6;
+    const c2x = p2.x - (p3.x - p1.x) / 6;
+    const c2y = p2.y - (p3.y - p1.y) / 6;
+    s += ' C ' + c1x.toFixed(2) + ',' + c1y.toFixed(2)
+      + ' ' + c2x.toFixed(2) + ',' + c2y.toFixed(2)
+      + ' ' + p2.x.toFixed(2) + ',' + p2.y.toFixed(2);
+  }
+  return s;
+}
+
+// ===== Edge generators =====
+// Each takes (p0, p1, r) → array of points (polyline including both endpoints).
+
+// Classic Draradech: 3 cubic Beziers, 10 control points, tab=10%, jitter=4%
+function genClassic(p0, p1, r, params) {
+  const t = params?.t ?? 0.10;
+  const j = params?.j ?? 0.04;
+  const f = frame(p0, p1);
+  const a = uni(r,-j,j), b = uni(r,-j,j), c = uni(r,-j,j), d = uni(r,-j,j), e = uni(r,-j,j);
+  const s = r() > 0.5 ? 1 : -1;
+  const P = [
+    lw(f, 0, 0),
+    lw(f, 0.2, s*a),
+    lw(f, 0.5 + b + d, s*(-t + c)),
+    lw(f, 0.5 - t + b, s*(t + c)),
+    lw(f, 0.5 - 2*t + b - d, s*(3*t + c)),
+    lw(f, 0.5 + 2*t + b - d, s*(3*t + c)),
+    lw(f, 0.5 + t + b, s*(t + c)),
+    lw(f, 0.5 + b + d, s*(-t + c)),
+    lw(f, 0.8, s*e),
+    lw(f, 1, 0),
+  ];
+  return [
+    ...cubic(P[0], P[1], P[2], P[3], 8),
+    ...cubic(P[3], P[4], P[5], P[6], 8).slice(1),
+    ...cubic(P[6], P[7], P[8], P[9], 8).slice(1),
+  ];
+}
+
+// Whimsy: same algorithm, tab size randomised per edge.
+// Constraint: head footprint must stay inside the edge so neighbouring tabs
+// don't collide at shared corners. Head x extends to 0.5 ± (2t + |b| + |d|);
+// we bound this by shrinking b/d as t grows: |b|+|d|+2t ≤ headMax.
+function genWhimsy(p0, p1, r, params) {
+  const tMin = params?.tMin ?? 0.09;
+  const tMax = params?.tMax ?? 0.13;
+  const headMax = params?.headMax ?? 0.40;
+  const f = frame(p0, p1);
+  const t = uni(r, tMin, tMax);
+  const j = Math.max(0.02, (headMax - 2*t) / 2);
+  const a = uni(r,-j,j), b = uni(r,-j,j), c = uni(r,-j,j), d = uni(r,-j,j), e = uni(r,-j,j);
+  const s = r() > 0.5 ? 1 : -1;
+  const P = [
+    lw(f, 0, 0),
+    lw(f, 0.2, s*a),
+    lw(f, 0.5 + b + d, s*(-t + c)),
+    lw(f, 0.5 - t + b, s*(t + c)),
+    lw(f, 0.5 - 2*t + b - d, s*(3*t + c)),
+    lw(f, 0.5 + 2*t + b - d, s*(3*t + c)),
+    lw(f, 0.5 + t + b, s*(t + c)),
+    lw(f, 0.5 + b + d, s*(-t + c)),
+    lw(f, 0.8, s*e),
+    lw(f, 1, 0),
+  ];
+  return [
+    ...cubic(P[0], P[1], P[2], P[3], 10),
+    ...cubic(P[3], P[4], P[5], P[6], 10).slice(1),
+    ...cubic(P[6], P[7], P[8], P[9], 10).slice(1),
+  ];
+}
+
+// Geometric: polygonal locking tab with overhang, no curves at all.
+//
+// Constraints enforced at runtime so polygon stays valid for ANY slider combo:
+//   1. inset > depth + margin  (head doesn't poke into neighbour edge's domain)
+//   2. inset + neckHalf < 0.45 (head is wider than neck → dovetail locks)
+//
+// Per-edge jitter on `a` (inset) and `neckHalf` makes tabs visually varied
+// across the field while keeping the dovetail mechanic and exact stitching
+// (jitter is deterministic per edge-id, so neighbours see the same values).
+function genGeometric(p0, p1, r, params) {
+  const h = params?.h ?? 0.15;
+  const aBase = params?.a ?? 0.25;
+  const nhBase = params?.neckHalf ?? 0.12;
+  const aJ = params?.aJitter ?? 0.0;
+  const nhJ = params?.neckJitter ?? 0.0;
+  const f = frame(p0, p1);
+  const s = r() > 0.5 ? 1 : -1;
+  // Clamp jittered inset so head still clears neighbour edges (a > h + 0.03).
+  let a = aBase + uni(r, -aJ, aJ);
+  a = Math.max(h + 0.04, Math.min(0.40, a));
+  // Clamp jittered neck so head stays wider than neck (a + neckHalf < 0.45).
+  const nhCeil = Math.min(0.20, 0.45 - a);
+  let neckHalf = nhBase + uni(r, -nhJ, nhJ);
+  neckHalf = Math.max(0.04, Math.min(nhCeil, neckHalf));
+  return [
+    lw(f, 0, 0),
+    lw(f, 0.5 - neckHalf, 0),
+    lw(f, 0.5 - neckHalf, s*h*0.55),
+    lw(f, a, s*h*0.55),
+    lw(f, a, s*h),
+    lw(f, 1 - a, s*h),
+    lw(f, 1 - a, s*h*0.55),
+    lw(f, 0.5 + neckHalf, s*h*0.55),
+    lw(f, 0.5 + neckHalf, 0),
+    lw(f, 1, 0),
+  ];
+}
+
+// Multi-tab: N classic-shaped tabs along the edge, shared sign (earlet
+// convention). Each tab is a self-contained Draradech curve inside a fixed
+// "footprint" (a mini-edge ~30 % of the full edge length), so ALL tabs have
+// identical absolute size and shape regardless of N. The edge fills the
+// remaining length with straight baseline segments between tabs. Per-tab
+// positional jitter shifts each tab within its allotted gap.
+//
+// params.nMin, params.nMax: integer range for per-edge N. If nMin === nMax,
+// every edge has exactly that many tabs; otherwise N is drawn uniformly from
+// the integer range per edge.
+function genMultiTab(p0, p1, r, params) {
+  const nMinRaw = params?.nMin ?? 2;
+  const nMaxRaw = params?.nMax ?? 2;
+  const nMin = Math.max(1, Math.min(nMinRaw, nMaxRaw));
+  const nMax = Math.max(1, Math.max(nMinRaw, nMaxRaw));
+  const footprintCap = params?.footprintCap ?? 0.30;
+  const tIn = params?.tIn ?? 0.13;
+  const jIn = params?.jIn ?? 0.04;
+  const N = nMin === nMax ? nMin : (nMin + Math.floor(r() * (nMax - nMin + 1)));
+  const f = frame(p0, p1);
+  const footprint = Math.min(footprintCap, 0.85 / N);
+  const gap = (1 - N * footprint) / (N + 1);
+  const jPosMax = gap * 0.3;
+  const s = r() > 0.5 ? 1 : -1;
+
+  const pts = [lw(f, 0, 0)];
+  for (let i = 0; i < N; i++) {
+    const tabStartDefault = (i + 1) * gap + i * footprint;
+    const posJ = uni(r, -jPosMax, jPosMax);
+    const sStart = tabStartDefault + posJ;
+    pts.push(lw(f, sStart, 0));
+
+    const a = uni(r,-jIn,jIn), b = uni(r,-jIn,jIn), c = uni(r,-jIn,jIn), d = uni(r,-jIn,jIn), e = uni(r,-jIn,jIn);
+    const L = (m) => sStart + m * footprint;
+    const W = (m) => m * footprint;
+    const P0 = lw(f, L(0), 0);
+    const P1 = lw(f, L(0.2), s*W(a));
+    const P2 = lw(f, L(0.5 + b + d), s*W(-tIn + c));
+    const P3 = lw(f, L(0.5 - tIn + b), s*W(tIn + c));
+    const P4 = lw(f, L(0.5 - 2*tIn + b - d), s*W(3*tIn + c));
+    const P5 = lw(f, L(0.5 + 2*tIn + b - d), s*W(3*tIn + c));
+    const P6 = lw(f, L(0.5 + tIn + b), s*W(tIn + c));
+    const P7 = lw(f, L(0.5 + b + d), s*W(-tIn + c));
+    const P8 = lw(f, L(0.8), s*W(e));
+    const P9 = lw(f, L(1), 0);
+    pts.push(...cubic(P0, P1, P2, P3, 10).slice(1));
+    pts.push(...cubic(P3, P4, P5, P6, 10).slice(1));
+    pts.push(...cubic(P6, P7, P8, P9, 10).slice(1));
+  }
+  pts.push(lw(f, 1, 0));
+  return pts;
+}
+
+// Wavy / Organic: single perpendicular displacement function w(t) over the
+// STRAIGHT baseline. w(t) is the sum of two smooth components:
+//   1. tab silhouette — smoothstep top-hat (no undercut, single-valued).
+//   2. wave overlay — sum-of-sines with Hann window so endpoints stay at w=0.
+// Both terms are C∞ smooth, so the sampled polyline has no kinks regardless
+// of how dense we sample. No local-normal trickery, no risk of self-overlap.
+function genWavy(p0, p1, r, params) {
+  const tabDepthBase = params?.tabDepth ?? 0.22;
+  const waveA = params?.waveA ?? 0.06;
+  const f = frame(p0, p1);
+  const N = 80;
+  const s = r() > 0.5 ? 1 : -1;
+
+  const tabHalfBase = 0.20 + uni(r, -0.02, 0.02);
+  const tabRise = 0.07;
+  const tabDepth = tabDepthBase + uni(r, -0.025, 0.025);
+  const tabCenter = 0.5 + uni(r, -0.04, 0.04);
+
+  const smoothstep = (e0, e1, x) => {
+    const u = Math.max(0, Math.min(1, (x - e0) / (e1 - e0)));
+    return u * u * (3 - 2 * u);
+  };
+  const tabShape = (t) =>
+    smoothstep(tabCenter - tabHalfBase - tabRise, tabCenter - tabHalfBase + tabRise, t)
+    * (1 - smoothstep(tabCenter + tabHalfBase - tabRise, tabCenter + tabHalfBase + tabRise, t));
+
+  const phs = [uni(r, 0, 2*Math.PI), uni(r, 0, 2*Math.PI), uni(r, 0, 2*Math.PI)];
+  const freqs = [3.0, 4.85, 7.85];
+  const amps = [1, 0.55, 0.30];
+  const wave = (t) => {
+    let v_ = 0;
+    for (let k = 0; k < freqs.length; k++) v_ += amps[k] * Math.sin(2*Math.PI*freqs[k]*t + phs[k]);
+    return v_;
+  };
+  const hann = (t) => Math.sin(Math.PI * t) ** 2;
+
+  const pts = [];
+  for (let i = 0; i <= N; i++) {
+    const t = i / N;
+    const w = s * (tabDepth * tabShape(t) + waveA * wave(t) * hann(t));
+    pts.push(lw(f, t, w));
+  }
+  return pts;
+}
+
+// Whimsy / Catmull-Rom: M random landmarks along the edge, centripetal spline through them
+function genCatmull(p0, p1, r, params) {
+  const M = params?.M ?? 7;
+  const widthScale = params?.widthScale ?? 1.0;
+  const f = frame(p0, p1);
+  const s = r() > 0.5 ? 1 : -1;
+  const ctrl = [lw(f, 0, 0)];
+  for (let i = 1; i <= M; i++) {
+    const tt = i / (M + 1);
+    const ll = tt + uni(r, -0.03, 0.03);
+    // Bell-shaped width distribution along edge, scaled by widthScale
+    let ww;
+    if (tt < 0.20) ww = uni(r, 0, 0.07);
+    else if (tt < 0.40) ww = uni(r, 0.08, 0.18);
+    else if (tt < 0.60) ww = uni(r, 0.18, 0.28);
+    else if (tt < 0.80) ww = uni(r, 0.08, 0.18);
+    else ww = uni(r, 0, 0.07);
+    ctrl.push(lw(f, ll, s * ww * widthScale));
+  }
+  ctrl.push(lw(f, 1, 0));
+
+  // Centripetal Catmull-Rom through ctrl with phantom endpoints
+  const phStart = sub(scale(ctrl[0], 2), ctrl[1]);
+  const phEnd = sub(scale(ctrl[ctrl.length-1], 2), ctrl[ctrl.length-2]);
+  const P = [phStart, ...ctrl, phEnd];
+  const out = [ctrl[0]];
+  const STEPS = 12;
+  function tnext(t, p, q) { return t + Math.pow(dist(sub(q, p)), 0.5); }
+  for (let i = 1; i < P.length - 2; i++) {
+    const p0c = P[i-1], p1c = P[i], p2c = P[i+1], p3c = P[i+2];
+    const t0 = 0;
+    const t1 = tnext(t0, p0c, p1c);
+    const t2 = tnext(t1, p1c, p2c);
+    const t3 = tnext(t2, p2c, p3c);
+    for (let k = 1; k <= STEPS; k++) {
+      const tt = t1 + (t2 - t1) * (k / STEPS);
+      const A1 = add(scale(p0c, (t1 - tt)/(t1 - t0)), scale(p1c, (tt - t0)/(t1 - t0)));
+      const A2 = add(scale(p1c, (t2 - tt)/(t2 - t1)), scale(p2c, (tt - t1)/(t2 - t1)));
+      const A3 = add(scale(p2c, (t3 - tt)/(t3 - t2)), scale(p3c, (tt - t2)/(t3 - t2)));
+      const B1 = add(scale(A1, (t2 - tt)/(t2 - t0)), scale(A2, (tt - t0)/(t2 - t0)));
+      const B2 = add(scale(A2, (t3 - tt)/(t3 - t1)), scale(A3, (tt - t1)/(t3 - t1)));
+      out.push(add(scale(B1, (t2 - tt)/(t2 - t1)), scale(B2, (tt - t1)/(t2 - t1))));
+    }
+  }
+  return out;
+}
+
+// === Organic puzzle (cellular automaton port of CustomShapeJigsawJs) ===
+//
+// Algorithm (verbatim from proceduraljigsaw/CustomShapeJigsawJs):
+//   1. Allocate gw×gh integer grid (0 = empty, k>0 = owned by cell k).
+//   2. Place seed pixels at jittered-grid lattice points.
+//   3. Bounded-radius CA growth: outer loop increments radius by 1 each step.
+//      Each live pixel tries to grow into its 8-neighborhood, claiming an empty
+//      neighbour iff Euclidean distance from that neighbour to the seed pixel
+//      is < radius. Newly-grown pixels are flagged via negation so they don't
+//      grow further in the same step. Anti-diagonal rule: skip growth where the
+//      only candidates are pure-diagonal.
+//   4. Find corners: a grid point (cx, cy) is a corner iff the 2×2 block of
+//      pixels around it contains ≥3 distinct cell IDs (counting out-of-bounds
+//      as 0).
+//   5. Walk each corner's right- and down-pointing edges along the pixel
+//      boundary until hitting another corner. Record only endpoints.
+//   6. Each edge becomes a Draradech tab (if long enough) or a straight line.
+//
+// The "organic" look isn't smoothing — it's the high density of short corner-
+// to-corner segments produced by pixel-quantization plus the disk-growth rule.
+
+const ORG_HEAD_DEPTH_PX = 12.0;
+const ORG_MIN_EDGE_FOR_TAB = 20.0;
+
+function strHash(s) {
+  let h = 0x9e3779b9;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x85ebca77);
+  }
+  return ((h ^ (h >>> 16)) >>> 0) || 1;
+}
+
+// Draradech tab with absolute-sized head depth (constant pixels, not edge-relative).
+function genClassicTab(p0, p1, r) {
+  const f = frame(p0, p1);
+  if (f.L < ORG_MIN_EDGE_FOR_TAB) {
+    return [v(p0.x, p0.y), v(p1.x, p1.y)];
+  }
+  const t = Math.min(0.15, ORG_HEAD_DEPTH_PX / (3 * f.L));
+  const j = 0.04;
+  const a = uni(r,-j,j), b = uni(r,-j,j), c = uni(r,-j,j), d = uni(r,-j,j), e = uni(r,-j,j);
+  const s = r() > 0.5 ? 1 : -1;
+  const P = [
+    lw(f, 0, 0),
+    lw(f, 0.2, s*a),
+    lw(f, 0.5 + b + d, s*(-t + c)),
+    lw(f, 0.5 - t + b, s*(t + c)),
+    lw(f, 0.5 - 2*t + b - d, s*(3*t + c)),
+    lw(f, 0.5 + 2*t + b - d, s*(3*t + c)),
+    lw(f, 0.5 + t + b, s*(t + c)),
+    lw(f, 0.5 + b + d, s*(-t + c)),
+    lw(f, 0.8, s*e),
+    lw(f, 1, 0),
+  ];
+  return [
+    ...cubic(P[0], P[1], P[2], P[3], 8),
+    ...cubic(P[3], P[4], P[5], P[6], 8).slice(1),
+    ...cubic(P[6], P[7], P[8], P[9], 8).slice(1),
+  ];
+}
+
+function buildOrganicPuzzle(seed, params) {
+  const r = rng(seed);
+
+  // Pixel grid: cover the puzzle area at 4 SVG units per grid pixel.
+  // gsize=20 → ~3×4=12 pieces (matches the 4×3 visual). gsize down → more,
+  // smaller pieces; gnoise → seed-position jitter strength.
+  const PX_SCALE = 4;
+  const gridW = params?.gw ?? GW;
+  const gridH = params?.gh ?? GH;
+  const PUZZLE_W = CELL * gridW, PUZZLE_H = CELL * gridH;
+  const gw = Math.round(PUZZLE_W / PX_SCALE);
+  const gh = Math.round(PUZZLE_H / PX_SCALE);
+  const gsize = params?.gsize ?? 20;
+  const gnoise = params?.gnoise ?? 0.35;
+
+  const grid = new Int32Array(gw * gh);
+  const get = (gx, gy) => (gx < 0 || gx >= gw || gy < 0 || gy >= gh) ? 0 : grid[gy * gw + gx];
+
+  // 1. Place jittered-grid seeds
+  const seeds = [];
+  for (let sy = Math.floor(gsize / 2); sy < gh; sy += gsize) {
+    for (let sx = Math.floor(gsize / 2); sx < gw; sx += gsize) {
+      const jit = (gsize / 2) * gnoise;
+      const px = Math.max(0, Math.min(gw - 1, Math.round(sx + uni(r, -jit, jit))));
+      const py = Math.max(0, Math.min(gh - 1, Math.round(sy + uni(r, -jit, jit))));
+      if (grid[py * gw + px] !== 0) continue;
+      const val = seeds.length + 1;
+      grid[py * gw + px] = val;
+      seeds.push({ gx: px, gy: py, val });
+    }
+  }
+
+  // 2. Bounded-radius cellular automaton growth
+  let totalEmpty = gw * gh - seeds.length;
+  let radius = 1.5;
+  let stale = 0;
+  while (totalEmpty > 0 && stale < 10 && radius < gw + gh) {
+    let grown = 0;
+    for (let py = 0; py < gh; py++) {
+      for (let px = 0; px < gw; px++) {
+        const val = grid[py * gw + px];
+        if (val <= 0) continue;
+        const sIdx = val - 1;
+        const seed = seeds[sIdx];
+        const candidates = [];
+        let hasOrtho = false;
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            if (dx === 0 && dy === 0) continue;
+            const nx = px + dx, ny = py + dy;
+            if (nx < 0 || nx >= gw || ny < 0 || ny >= gh) continue;
+            if (grid[ny * gw + nx] !== 0) continue;
+            const dsq = (nx - seed.gx) ** 2 + (ny - seed.gy) ** 2;
+            if (dsq >= radius * radius) continue;
+            candidates.push(ny * gw + nx);
+            if (dx === 0 || dy === 0) hasOrtho = true;
+          }
+        }
+        if (candidates.length === 0 || !hasOrtho) continue;
+        for (const idx of candidates) grid[idx] = -val;
+        grown += candidates.length;
+      }
+    }
+    // Un-negate
+    for (let i = 0; i < grid.length; i++) {
+      if (grid[i] < 0) grid[i] = -grid[i];
+    }
+    totalEmpty -= grown;
+    radius += 1;
+    stale = grown === 0 ? stale + 1 : 0;
+  }
+
+  // 3. Find corners. A pixel-corner (cx, cy) is a "corner" iff the surrounding
+  // 2×2 of pixel IDs has ≥3 distinct values, OR it is an X-junction (a==d,
+  // b==c, a!=b — four cells meeting in a saddle). The 4 rect corners are added
+  // explicitly so boundary walks terminate.
+  const corners = [];
+  const cornerMap = new Map();
+  function addCorner(cx, cy) {
+    const key = cx + ',' + cy;
+    let idx = cornerMap.get(key);
+    if (idx !== undefined) return idx;
+    idx = corners.length;
+    cornerMap.set(key, idx);
+    corners.push({ gx: cx, gy: cy, x: PAD + cx * PX_SCALE, y: PAD + cy * PX_SCALE });
+    return idx;
+  }
+  for (let cy = 0; cy <= gh; cy++) {
+    for (let cx = 0; cx <= gw; cx++) {
+      const a = get(cx - 1, cy - 1);
+      const b = get(cx,     cy - 1);
+      const c = get(cx - 1, cy);
+      const d = get(cx,     cy);
+      const set = new Set([a, b, c, d]);
+      if (set.size >= 3) addCorner(cx, cy);
+      else if (a === d && b === c && a !== b) addCorner(cx, cy);
+    }
+  }
+  addCorner(0, 0); addCorner(gw, 0); addCorner(0, gh); addCorner(gw, gh);
+
+  // 4. Walk the boundary graph (pixel-edge graph). From each corner we try each
+  // of 4 outgoing directions; if it's a boundary, we follow the boundary path
+  // (turning at every non-corner kink) until reaching another corner, then add
+  // the edge. Dedup by sorted endpoint pair.
+  //
+  // Pixel-edges around corner (cx, cy):
+  //   E: separates pixel (cx, cy-1) from pixel (cx, cy)
+  //   W: separates pixel (cx-1, cy-1) from pixel (cx-1, cy)
+  //   S: separates pixel (cx-1, cy) from pixel (cx, cy)
+  //   N: separates pixel (cx-1, cy-1) from pixel (cx, cy-1)
+  function bE(cx, cy) { return cx < gw && get(cx, cy - 1) !== get(cx, cy); }
+  function bW(cx, cy) { return cx > 0  && get(cx - 1, cy - 1) !== get(cx - 1, cy); }
+  function bS(cx, cy) { return cy < gh && get(cx - 1, cy) !== get(cx, cy); }
+  function bN(cx, cy) { return cy > 0  && get(cx - 1, cy - 1) !== get(cx, cy - 1); }
+  function isBoundaryDir(cx, cy, d) {
+    if (d === 'E') return bE(cx, cy);
+    if (d === 'W') return bW(cx, cy);
+    if (d === 'S') return bS(cx, cy);
+    if (d === 'N') return bN(cx, cy);
+    return false;
+  }
+  function leftRightAt(cx, cy, d) {
+    // Looking forward along direction d, return [leftCell, rightCell].
+    if (d === 'E') return [get(cx, cy - 1), get(cx, cy)];
+    if (d === 'W') return [get(cx - 1, cy), get(cx - 1, cy - 1)];
+    if (d === 'S') return [get(cx, cy), get(cx - 1, cy)];
+    if (d === 'N') return [get(cx - 1, cy - 1), get(cx, cy - 1)];
+  }
+  function moveDir(cx, cy, d) {
+    if (d === 'E') return [cx + 1, cy];
+    if (d === 'W') return [cx - 1, cy];
+    if (d === 'S') return [cx, cy + 1];
+    if (d === 'N') return [cx, cy - 1];
+  }
+  const OPP = { E: 'W', W: 'E', N: 'S', S: 'N' };
+
+  const edges = [];
+  const edgeSet = new Set();
+  function walk(startIdx, startDir) {
+    const start = corners[startIdx];
+    if (!isBoundaryDir(start.gx, start.gy, startDir)) return;
+    const [leftId, rightId] = leftRightAt(start.gx, start.gy, startDir);
+    let [cx, cy] = moveDir(start.gx, start.gy, startDir);
+    let cameFrom = OPP[startDir];
+    const maxSteps = 4 * (gw + gh + 2);
+    for (let step = 0; step < maxSteps; step++) {
+      const idx = cornerMap.get(cx + ',' + cy);
+      if (idx !== undefined) {
+        if (idx === startIdx) return;
+        const a = Math.min(startIdx, idx), b = Math.max(startIdx, idx);
+        const key = a + '|' + b;
+        if (edgeSet.has(key)) return;
+        edgeSet.add(key);
+        edges.push({ a: startIdx, b: idx, leftId, rightId });
+        return;
+      }
+      let next = null;
+      for (const d of ['E', 'S', 'W', 'N']) {
+        if (d === cameFrom) continue;
+        if (isBoundaryDir(cx, cy, d)) { next = d; break; }
+      }
+      if (next === null) return;
+      [cx, cy] = moveDir(cx, cy, next);
+      cameFrom = OPP[next];
+    }
+  }
+  for (let i = 0; i < corners.length; i++) {
+    for (const d of ['E', 'S', 'W', 'N']) walk(i, d);
+  }
+
+  // 5. For each edge, generate the curve. Boundary edges (one side = 0) stay
+  // straight: the explicit <rect> draws the frame in its own colour.
+  const edgeCurves = edges.map((e, eIdx) => {
+    const p0 = v(corners[e.a].x, corners[e.a].y);
+    const p1 = v(corners[e.b].x, corners[e.b].y);
+    if (e.leftId === 0 || e.rightId === 0) return [p0, p1];
+    return genClassicTab(p0, p1, rng(strHash(eIdx + '|' + seed)));
+  });
+
+  // 6. Build cell→edges map for boundary walking (highlighting)
+  const cellEdges = new Map();
+  edges.forEach((e, eIdx) => {
+    for (const id of [e.leftId, e.rightId]) {
+      if (id <= 0) continue;
+      if (!cellEdges.has(id)) cellEdges.set(id, []);
+      cellEdges.get(id).push(eIdx);
+    }
+  });
+
+  // Walk a cell's boundary: from any edge, follow connected edges by shared corners.
+  function buildCellBoundary(cellId) {
+    const myEdges = cellEdges.get(cellId);
+    if (!myEdges || myEdges.length === 0) return [];
+    const cornerToEdges = new Map();
+    for (const eIdx of myEdges) {
+      const e = edges[eIdx];
+      if (!cornerToEdges.has(e.a)) cornerToEdges.set(e.a, []);
+      if (!cornerToEdges.has(e.b)) cornerToEdges.set(e.b, []);
+      cornerToEdges.get(e.a).push(eIdx);
+      cornerToEdges.get(e.b).push(eIdx);
+    }
+    const visited = new Set();
+    let currentEdge = myEdges[0];
+    let currentCorner = edges[currentEdge].a;
+    const out = [];
+    let safety = myEdges.length * 4;
+    while (!visited.has(currentEdge) && safety-- > 0) {
+      visited.add(currentEdge);
+      const e = edges[currentEdge];
+      const fromC = currentCorner;
+      const toC = (fromC === e.a) ? e.b : e.a;
+      let curve = edgeCurves[currentEdge];
+      if (fromC !== e.a) curve = curve.slice().reverse();
+      if (out.length === 0) {
+        for (const p of curve) out.push(p);
+      } else {
+        for (let k = 1; k < curve.length; k++) out.push(curve[k]);
+      }
+      const nexts = cornerToEdges.get(toC) || [];
+      let next = null;
+      for (const ne of nexts) {
+        if (ne !== currentEdge && !visited.has(ne)) { next = ne; break; }
+      }
+      if (next === null) break;
+      currentEdge = next;
+      currentCorner = toC;
+    }
+    return out;
+  }
+
+  // Find centre cell + an interior neighbour for highlighting
+  const cx0 = PAD + PUZZLE_W / 2, cy0 = PAD + PUZZLE_H / 2;
+  let centreCellId = seeds[0].val;
+  let bestD = Infinity;
+  for (const s of seeds) {
+    const sx = PAD + s.gx * PX_SCALE;
+    const sy = PAD + s.gy * PX_SCALE;
+    const d = (sx - cx0) ** 2 + (sy - cy0) ** 2;
+    if (d < bestD) { bestD = d; centreCellId = s.val; }
+  }
+  let nbrCellId = -1;
+  for (const eIdx of (cellEdges.get(centreCellId) || [])) {
+    const e = edges[eIdx];
+    const other = e.leftId === centreCellId ? e.rightId : e.leftId;
+    if (other > 0) { nbrCellId = other; break; }
+  }
+
+  return {
+    seeds, edges, edgeCurves, cellEdges,
+    centreCellId, nbrCellId,
+    buildCellBoundary,
+  };
+}
+
+function renderVoronoi(seed, smooth, params) {
+  const data = buildOrganicPuzzle(seed, params);
+  const gridW = params?.gw ?? GW;
+  const gridH = params?.gh ?? GH;
+  const w = CELL*gridW + PAD*2;
+  const h = CELL*gridH + PAD*2;
+  const toPath = smooth ? smoothPathFromPts : pathFromPts;
+  const highlights = [{ id: data.centreCellId, color: 'rgba(80,160,255,0.32)' }];
+  if (data.nbrCellId > 0) highlights.push({ id: data.nbrCellId, color: 'rgba(255,90,180,0.32)' });
+
+  let s = '<svg viewBox="0 0 ' + w + ' ' + h + '" xmlns="http://www.w3.org/2000/svg">';
+  for (const hl of highlights) {
+    const boundary = data.buildCellBoundary(hl.id);
+    if (boundary.length < 3) continue;
+    s += '<path d="' + toPath(boundary) + ' Z" fill="' + hl.color + '" stroke="none"/>';
+  }
+  s += '<rect x="' + PAD + '" y="' + PAD + '" width="' + (CELL*gridW) + '" height="' + (CELL*gridH) + '" fill="none" stroke="#5a5a5a" stroke-width="1.5"/>';
+  let cutsD = '';
+  for (let i = 0; i < data.edgeCurves.length; i++) {
+    const e = data.edges[i];
+    if (e.leftId === 0 || e.rightId === 0) continue; // <rect> draws the frame
+    cutsD += toPath(data.edgeCurves[i]) + ' ';
+  }
+  s += '<path d="' + cutsD + '" fill="none" stroke="#d0d0d0" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round"/>';
+  s += '</svg>';
+  return s;
+}
+
+// ===== Renderer =====
+function renderStyle(gen, seed, smooth, params) {
+  const gw = params?.gw ?? GW;
+  const gh = params?.gh ?? GH;
+  const w = CELL*gw + PAD*2;
+  const h = CELL*gh + PAD*2;
+  const toPath = smooth ? smoothPathFromPts : pathFromPts;
+  // Build all interior edges
+  const horiz = []; // horiz[y][x] for y in 0..gh-2
+  for (let y = 0; y < gh - 1; y++) {
+    horiz.push([]);
+    for (let x = 0; x < gw; x++) {
+      const p0 = v(PAD + x*CELL, PAD + (y+1)*CELL);
+      const p1 = v(PAD + (x+1)*CELL, PAD + (y+1)*CELL);
+      horiz[y].push(gen(p0, p1, rng(edgeSeed(seed, 0, x, y)), params));
+    }
+  }
+  const vert = []; // vert[y][x] for x in 0..gw-2
+  for (let y = 0; y < gh; y++) {
+    vert.push([]);
+    for (let x = 0; x < gw - 1; x++) {
+      const p0 = v(PAD + (x+1)*CELL, PAD + y*CELL);
+      const p1 = v(PAD + (x+1)*CELL, PAD + (y+1)*CELL);
+      vert[y].push(gen(p0, p1, rng(edgeSeed(seed, 1, x, y)), params));
+    }
+  }
+  // Highlight two middle pieces (clamped to actual grid)
+  const hl0 = { cx: Math.max(0, Math.floor(gw/2) - 1), cy: Math.floor((gh-1)/2), color:'rgba(80,160,255,0.32)' };
+  const hl1 = { cx: Math.min(gw-1, hl0.cx + 1), cy: hl0.cy, color:'rgba(255,90,180,0.32)' };
+  const highlights = hl0.cx === hl1.cx ? [hl0] : [hl0, hl1];
+
+  function reverse(pts) { return pts.slice().reverse(); }
+
+  // Closed boundary for piece (cx, cy)
+  function pieceBoundary(cx, cy) {
+    const TL = v(PAD + cx*CELL, PAD + cy*CELL);
+    const TR = v(PAD + (cx+1)*CELL, PAD + cy*CELL);
+    const BR = v(PAD + (cx+1)*CELL, PAD + (cy+1)*CELL);
+    const BL = v(PAD + cx*CELL, PAD + (cy+1)*CELL);
+    let out = [TL];
+    if (cy === 0) out.push(TR);
+    else out.push(...horiz[cy-1][cx].slice(1));
+    if (cx === gw - 1) out.push(BR);
+    else out.push(...vert[cy][cx].slice(1));
+    if (cy === gh - 1) out.push(BL);
+    else out.push(...reverse(horiz[cy][cx]).slice(1));
+    if (cx === 0) out.push(TL);
+    else out.push(...reverse(vert[cy][cx-1]).slice(1));
+    return out;
+  }
+
+  // Compose SVG
+  let s = '<svg viewBox="0 0 ' + w + ' ' + h + '" xmlns="http://www.w3.org/2000/svg">';
+  for (const hl of highlights) {
+    const d = toPath(pieceBoundary(hl.cx, hl.cy)) + ' Z';
+    s += '<path d="' + d + '" fill="' + hl.color + '" stroke="none"/>';
+  }
+  s += '<rect x="' + PAD + '" y="' + PAD + '" width="' + (CELL*gw) + '" height="' + (CELL*gh) + '" fill="none" stroke="#5a5a5a" stroke-width="1.5"/>';
+  let cutsD = '';
+  for (let y = 0; y < gh - 1; y++) for (let x = 0; x < gw; x++) cutsD += toPath(horiz[y][x]) + ' ';
+  for (let y = 0; y < gh; y++) for (let x = 0; x < gw - 1; x++) cutsD += toPath(vert[y][x]) + ' ';
+  s += '<path d="' + cutsD + '" fill="none" stroke="#d0d0d0" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round"/>';
+  s += '</svg>';
+  return s;
+}
+
+// ===== Cards =====
+// Each style declares its `params` (current values) plus `controls` describing
+// the UI widgets that drive those params. Controls are either `range` (slider)
+// or `select` (segmented button group, used for discrete options like N).
+//
+// `seed` is conceptually a param, but it's surfaced as a slider + a "Reroll"
+// button in every card, so it's listed in `controls` for consistency.
+// Slider bounds are chosen so that the worst-case combination still produces
+// a valid (non-self-intersecting) tab — no need to hand-tune to avoid overlap.
+// Per-card params hold only style-specific knobs; seed/gw/gh come from the
+// global controls (visible at the top of the page).
+const styles = [
+  { name:'Classic (Draradech)', subtitle:'3 cubic Beziers per edge', gen:genClassic,
+    // Worst case head x = 0.5 + 2t + 2j ≤ 0.5 + 2·0.13 + 2·0.05 = 0.86 → safe.
+    params:{ t:0.10, j:0.04 },
+    controls:[
+      { key:'t', label:'Tab size', type:'range', min:0.05, max:0.13, step:0.005, fmt:3 },
+      { key:'j', label:'Jitter', type:'range', min:0, max:0.05, step:0.002, fmt:3 },
+    ],
+    desc:'Каноничный jigsaw silhouette. Pieces похожи между собой, мелкие рандомные сдвиги. <strong>Это та форма с твоего первого скриншота</strong>. Из неё мы можем уйти в любую сторону. Для более крупных табов и сильного jitter\'а — карточка Whimsy с авто-сжатием jitter\'а.' },
+
+  { name:'Whimsy (heavy jitter)', subtitle:'Same algorithm, randomised tab size per edge', gen:genWhimsy,
+    params:{ tMin:0.09, tMax:0.13, headMax:0.40 },
+    controls:[
+      { key:'tMin', label:'Tab min', type:'range', min:0.05, max:0.13, step:0.005, fmt:3 },
+      { key:'tMax', label:'Tab max', type:'range', min:0.08, max:0.16, step:0.005, fmt:3 },
+      { key:'headMax', label:'Head x-span', type:'range', min:0.28, max:0.48, step:0.01, fmt:2 },
+    ],
+    desc:'Тот же алгоритм, что Classic, но каждое ребро тянет свой случайный размер таба. Jitter сжимается с ростом таба, чтобы голова всегда оставалась в <code>[0.5 - headMax/2, 0.5 + headMax/2]</code> ребра — соседние табы не пересекаются у углов.' },
+
+  { name:'Geometric (polygonal)', subtitle:'10-vertex polyline, dovetail head, per-edge variation', gen:genGeometric,
+    // Per-edge jitter on inset & neck; runtime clamps keep dovetail valid.
+    params:{ h:0.13, a:0.26, neckHalf:0.12, aJitter:0.03, neckJitter:0.02 },
+    controls:[
+      { key:'h', label:'Head depth', type:'range', min:0.06, max:0.18, step:0.005, fmt:3 },
+      { key:'a', label:'Head inset', type:'range', min:0.20, max:0.34, step:0.005, fmt:3 },
+      { key:'neckHalf', label:'Neck half', type:'range', min:0.05, max:0.16, step:0.005, fmt:3 },
+      { key:'aJitter', label:'Inset jitter', type:'range', min:0, max:0.05, step:0.002, fmt:3 },
+      { key:'neckJitter', label:'Neck jitter', type:'range', min:0, max:0.04, step:0.002, fmt:3 },
+    ],
+    desc:'Кривых нет вообще. Голова шире шейки → пьесы реально замыкаются. Низкое количество corner\'ов, идеально для mesh-gen и «низкополигонального» арт-направления. <strong>Per-edge jitter</strong> на inset и neck делает табы визуально разнообразными (но детерминированно — соседи стыкуются точно).' },
+
+  { name:'Multi-tab', subtitle:'N classic tabs per side, same sign, scaled-down', gen:genMultiTab,
+    params:{ nMin:2, nMax:2, tIn:0.13, jIn:0.04 },
+    controls:[
+      { key:'nMin', label:'N min', type:'range', min:1, max:3, step:1 },
+      { key:'nMax', label:'N max', type:'range', min:1, max:3, step:1 },
+      { key:'tIn', label:'Tab size', type:'range', min:0.08, max:0.16, step:0.005, fmt:3 },
+      { key:'jIn', label:'Jitter', type:'range', min:0, max:0.05, step:0.002, fmt:3 },
+    ],
+    desc:'<strong>N tabs на ребре, одинакового знака</strong> (артизанский earlet). При <code>N min = N max</code> — фиксированное количество; иначе количество выбирается равномерно в диапазоне на каждое ребро (детерминированно по edge-id, соседи видят одно и то же значение для общего ребра).' },
+
+  { name:'Organic (CSJ-style CA growth)', subtitle:'Pixel CA + Draradech tabs on long edges', renderFn:renderVoronoi, smooth:false,
+    params:{ gsize:20, gnoise:0.35 },
+    controls:[
+      { key:'gsize', label:'Cell spacing', type:'range', min:12, max:36, step:2 },
+      { key:'gnoise', label:'Seed jitter', type:'range', min:0, max:0.6, step:0.02, fmt:2 },
+    ],
+    desc:'Порт алгоритма CustomShapeJigsawJs. Растровый клеточный автомат: каждая клетка растёт диском вокруг своего сида, бой за пиксели идёт от ближайшего сида в Euclidean-метрике. Углы — точки где сходятся ≥3 клеток на 2×2 пиксельном блоке. Между соседними углами либо Draradech-таб (если ребро длинное), либо прямой отрезок. <strong>Это НЕ Voronoi</strong> — это растровая аппроксимация Voronoi, и именно пиксельная квантизация порождает много коротких сегментов и характерный «органический» staircase-вид.' },
+
+  { name:'Wavy / Organic (FBM overlay)', subtitle:'Classic base + sum-of-sines perp. displacement', gen:genWavy, smooth:true,
+    params:{ tabDepth:0.22, waveA:0.06 },
+    controls:[
+      { key:'tabDepth', label:'Tab depth', type:'range', min:0.10, max:0.32, step:0.01, fmt:2 },
+      { key:'waveA', label:'Wave amp.', type:'range', min:0, max:0.12, step:0.005, fmt:3 },
+    ],
+    desc:'Поверх классической формы накладываются волны (3 синусоиды с golden-ratio частотами). Hann-window держит эндпоинты на месте — соседи стыкуются. «Hand-drawn» feel.' },
+
+  { name:'Catmull-Rom Whimsy', subtitle:'M random landmarks + centripetal Catmull-Rom', gen:genCatmull,
+    params:{ M:7, widthScale:1.0 },
+    controls:[
+      { key:'M', label:'Landmarks', type:'range', min:3, max:14, step:1 },
+      { key:'widthScale', label:'Width scale', type:'range', min:0, max:1.5, step:0.05, fmt:2 },
+    ],
+    desc:'Никакого «таба» как такового. Bezier выкинут, вместо него — гладкий spline через случайные точки. Это самый «modern mobile puzzle» вид. <strong>Каждое ребро уникально</strong>. Не имеет механического зацепления — пьесы держатся «по позиции», а не геометрически.' },
+];
+
+// ===== Global controls (seed + grid dimensions, shared across all cards) =====
+const globalState = { seed: 42, gw: 4, gh: 3 };
+const cardRerenderers = [];
+function rerenderAll() { for (const fn of cardRerenderers) fn(); }
+
+function buildGlobalControls() {
+  const bar = document.createElement('div');
+  bar.className = 'global-controls';
+  const cfgs = [
+    { key: 'gw', label: 'Columns', min: 2, max: 8, step: 1 },
+    { key: 'gh', label: 'Rows', min: 2, max: 8, step: 1 },
+    { key: 'seed', label: 'Seed', min: 0, max: 999, step: 1 },
+  ];
+  const inputNodes = {}, valNodes = {};
+  for (const c of cfgs) {
+    const group = document.createElement('div'); group.className = 'group';
+    const lbl = document.createElement('span'); lbl.className = 'lbl'; lbl.textContent = c.label;
+    const inp = document.createElement('input');
+    inp.type = 'range'; inp.min = c.min; inp.max = c.max; inp.step = c.step; inp.value = globalState[c.key];
+    const val = document.createElement('span'); val.className = 'val'; val.textContent = String(globalState[c.key]);
+    inputNodes[c.key] = inp; valNodes[c.key] = val;
+    inp.addEventListener('input', () => {
+      globalState[c.key] = Number(inp.value);
+      val.textContent = String(globalState[c.key]);
+      rerenderAll();
+    });
+    group.appendChild(lbl); group.appendChild(inp); group.appendChild(val);
+    bar.appendChild(group);
+  }
+  const reroll = document.createElement('button');
+  reroll.textContent = '⟳ Reroll seed';
+  reroll.addEventListener('click', () => {
+    globalState.seed = Math.floor(Math.random() * 1000);
+    inputNodes.seed.value = globalState.seed;
+    valNodes.seed.textContent = String(globalState.seed);
+    rerenderAll();
+  });
+  bar.appendChild(reroll);
+  return bar;
+}
+
+// ===== Card builder with live controls =====
+function formatVal(c, val) {
+  if (c.type === 'select') {
+    const opt = c.options.find(o => o.val === val);
+    return opt ? opt.label : String(val);
+  }
+  if (c.fmt != null) return Number(val).toFixed(c.fmt);
+  return String(val);
+}
+
+function renderSvg(style, params) {
+  // Merge per-card params with global seed/gw/gh. Globals win — per-card params
+  // shouldn't contain gw/gh/seed in the first place.
+  const merged = { ...params, gw: globalState.gw, gh: globalState.gh };
+  const seed = globalState.seed;
+  if (style.renderFn) return style.renderFn(seed, !!style.smooth, merged);
+  return renderStyle(style.gen, seed, !!style.smooth, merged);
+}
+
+function buildCard(style) {
+  const card = document.createElement('div');
+  card.className = 'card';
+
+  const params = { ...style.params };
+
+  const h2 = document.createElement('h2'); h2.textContent = style.name; card.appendChild(h2);
+  const sub = document.createElement('div'); sub.className = 'subtitle'; sub.textContent = style.subtitle; card.appendChild(sub);
+
+  const ctrlBox = document.createElement('div'); ctrlBox.className = 'controls';
+  for (const c of style.controls) {
+    const lbl = document.createElement('div'); lbl.className = 'lbl'; lbl.textContent = c.label; ctrlBox.appendChild(lbl);
+    if (c.type === 'select') {
+      const seg = document.createElement('div'); seg.className = 'seg';
+      for (const opt of c.options) {
+        const btn = document.createElement('button');
+        btn.textContent = opt.label;
+        if (params[c.key] === opt.val) btn.classList.add('on');
+        btn.addEventListener('click', () => {
+          params[c.key] = opt.val;
+          for (const sib of seg.children) sib.classList.remove('on');
+          btn.classList.add('on');
+          rerender();
+        });
+        seg.appendChild(btn);
+      }
+      ctrlBox.appendChild(seg);
+    } else {
+      const inp = document.createElement('input');
+      inp.type = 'range'; inp.min = c.min; inp.max = c.max; inp.step = c.step;
+      inp.value = params[c.key];
+      const val = document.createElement('div'); val.className = 'val'; val.textContent = formatVal(c, params[c.key]);
+      inp.addEventListener('input', () => {
+        const v = Number(inp.value);
+        params[c.key] = (c.step >= 1) ? Math.round(v) : v;
+        val.textContent = formatVal(c, params[c.key]);
+        rerender();
+      });
+      ctrlBox.appendChild(inp);
+      ctrlBox.appendChild(val);
+    }
+  }
+  // No card-level controls box if the style has no per-card knobs (none today,
+  // but cheap to support).
+  if (style.controls.length > 0) card.appendChild(ctrlBox);
+
+  const svgBox = document.createElement('div');
+  card.appendChild(svgBox);
+
+  const desc = document.createElement('div'); desc.className = 'desc'; desc.innerHTML = style.desc; card.appendChild(desc);
+
+  function rerender() { svgBox.innerHTML = renderSvg(style, params); }
+  rerender();
+  cardRerenderers.push(rerender);
+
+  return card;
+}
+
+const container = document.querySelector('.styles');
+container.parentNode.insertBefore(buildGlobalControls(), container);
+for (const s of styles) container.appendChild(buildCard(s));
+</script>
+</body>
+</html>
