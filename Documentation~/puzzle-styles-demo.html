@@ -151,21 +151,17 @@ function smoothPathFromPts(pts) {
 
 // Classic Draradech: 3 cubic Beziers, 10 control points, tab=10%, jitter=4%
 // Canonical jigsaw: 10-control-point cubic-Bezier triplet (Draradech). Tab
-// size `t` is drawn per edge from [tMin, tMax]; jitter `j` is derived from `t`
-// so the head footprint stays inside the edge:
+// size `t` is fixed per puzzle; per-edge variation comes from the jitter `j`
+// (drives a/b/c/d/e wobble of the Bezier control points). Head footprint stays
+// inside the edge:
 //   head x ∈ 0.5 ± (2t + |b| + |d|);  bound (2t + 2j) ≤ headMax  ⇒  j = (headMax - 2t)/2.
-// `t` is clamped against headMax so the slider's promise holds for any combo
-// (previously a j-floor of 0.02 silently violated headMax at small headMax).
-// Setting tMin = tMax gives uniform "Classic" look; spreading them gives the
-// "Whimsy" look with per-piece variation.
+// `t` is clamped against headMax so the slider's promise holds for any combo.
 function genJigsaw(p0, p1, r, params) {
-  const tMin = params?.tMin ?? 0.09;
-  const tMax = params?.tMax ?? 0.13;
+  const tBase = params?.t ?? 0.10;
   const headMax = params?.headMax ?? 0.40;
   const f = frame(p0, p1);
-  let t = uni(r, tMin, tMax);
   // Clamp t against headMax so head footprint = 2t + 2j ≤ headMax holds always.
-  t = Math.min(t, (headMax - 0.04) / 2);
+  const t = Math.min(tBase, (headMax - 0.04) / 2);
   const j = Math.max(0.02, (headMax - 2*t) / 2);
   const a = uni(r,-j,j), b = uni(r,-j,j), c = uni(r,-j,j), d = uni(r,-j,j), e = uni(r,-j,j);
   const s = r() > 0.5 ? 1 : -1;
@@ -282,9 +278,8 @@ function genGeometric(p0, p1, r, params) {
 // Per-edge values (deterministic per edge-id, so neighbours agree exactly):
 //   - N        — drawn uniformly from [nMin, nMax]
 //   - baseSign — coin flip; shared by all tabs on this edge per `signPattern`
-//   - tabSize  — ONE value drawn from [tabSizeMin, tabSizeMax], applied to all
-//                tabs on this edge (per-edge variation, NOT per-tab — per-tab
-//                size variation reads as messy, not artistic)
+//   - tabSize  — fixed per puzzle (one slider value); applied to all tabs on
+//                this edge. Per-edge variation lives elsewhere (jitter / N).
 // Per-tab values (still independent): shape jitter, positional jitter.
 //
 // signPattern: 'alternating' (default, +-+-…) | 'allSame' | 'mirrored' (++... mirrored around centre, e.g. +-+ or +--+).
@@ -294,8 +289,7 @@ function genMultiTab(p0, p1, r, params) {
   const nMin = Math.max(1, Math.min(nMinRaw, nMaxRaw));
   const nMax = Math.max(1, Math.max(nMinRaw, nMaxRaw));
   const footprintCap = params?.footprintCap ?? 0.45;
-  const tabSizeMin = params?.tabSizeMin ?? 0.12;
-  const tabSizeMax = params?.tabSizeMax ?? 0.16;
+  const tabSize = params?.tabSize ?? 0.14;
   const jIn = params?.jIn ?? 0.04;
   const signPattern = params?.signPattern ?? 'alternating';
   const N = nMin === nMax ? nMin : (nMin + Math.floor(r() * (nMax - nMin + 1)));
@@ -305,9 +299,6 @@ function genMultiTab(p0, p1, r, params) {
   const jPosMax = gap * 0.3;
   const tInSafeMax = Math.max(0.05, 0.225 - jIn);
 
-  // Single per-edge tab size + sign seed. Per-tab variation now only in shape
-  // jitter and positional jitter.
-  const tabSize = uni(r, Math.min(tabSizeMin, tabSizeMax), Math.max(tabSizeMin, tabSizeMax));
   const tIn = Math.min(tInSafeMax, tabSize / (3 * footprint));
   const baseSign = r() > 0.5 ? 1 : -1;
   function signAt(i) {
@@ -785,14 +776,13 @@ function renderStyle(gen, seed, smooth, params) {
 // Per-card params hold only style-specific knobs; seed/gw/gh come from the
 // global controls (visible at the top of the page).
 const styles = [
-  { name:'Classic / Whimsy (Draradech)', subtitle:'3 cubic Beziers per edge — uniform when Tab min = Tab max, whimsical when spread', gen:genJigsaw,
-    // tMin = tMax, headMax = 2T + 2J reproduces canonical Classic with (T, J).
-    params:{ tMin:0.10, tMax:0.10, headMax:0.28 },
+  { name:'Classic (Draradech)', subtitle:'3 cubic Beziers per edge, per-edge jitter on control points', gen:genJigsaw,
+    params:{ t:0.10, headMax:0.28 },
     controls:[
-      { keyLo:'tMin', keyHi:'tMax', label:'Tab size', type:'range2', min:0.05, max:0.16, step:0.005, fmt:3 },
+      { key:'t', label:'Tab size', type:'range', min:0.05, max:0.16, step:0.005, fmt:3 },
       { key:'headMax', label:'Head range', type:'range', min:0.20, max:0.48, step:0.01, fmt:2 },
     ],
-    desc:'Canonical jigsaw silhouette: 10 control points, 3 cubic Beziers per edge. Tab size <code>t</code> is drawn per edge from <code>[Tab min, Tab max]</code>; jitter is derived as <code>(Head range − 2t)/2</code> so the head always fits inside the <code>Head range</code> window around the edge midpoint. <strong>Collapse the slider (Tab min = Tab max) for a uniform Classic look</strong>; spread it apart for whimsical per-piece variation.' },
+    desc:'Canonical jigsaw silhouette: 10 control points, 3 cubic Beziers per edge. Tab size <code>t</code> is fixed per puzzle; jitter is derived as <code>(Head range − 2t)/2</code> so the head always fits inside the <code>Head range</code> window around the edge midpoint. Widen <code>Head range</code> to get more per-piece shape variation; narrow it for a uniform look.' },
 
   { name:'Wavy / Organic (FBM overlay)', subtitle:'Smoothstep tab + sum-of-sines perpendicular displacement', gen:genWavy, smooth:true,
     params:{ tabDepth:0.22, waveA:0.06 },
@@ -826,21 +816,20 @@ const styles = [
 // next release — kept here so the playground records what was explored.
 const futureStyles = [
   { name:'Multi-tab', subtitle:'N tabs per edge, per-edge sign pattern (alternating / mirrored / all-same)', gen:genMultiTab,
-    params:{ nMin:2, nMax:2, tabSizeMin:0.13, tabSizeMax:0.16, jIn:0.04, signPattern:'alternating' },
+    params:{ nMin:2, nMax:2, tabSize:0.14, jIn:0.04, signPattern:'alternating' },
     controls:[
       { key:'nMin', label:'N min', type:'range', min:1, max:3, step:1 },
       { key:'nMax', label:'N max', type:'range', min:1, max:3, step:1 },
-      { keyLo:'tabSizeMin', keyHi:'tabSizeMax', label:'Tab size', type:'range2',
-        min:0.05, max:0.24, step:0.005, fmt:3,
-        // Bound by the *worst-case* footprint along [nMin, nMax]; pick the
-        // larger N for safety.
+      { key:'tabSize', label:'Tab size', type:'range', min:0.05, max:0.24, step:0.005, fmt:3,
+        // Bound by the worst-case footprint along [nMin, nMax]; pick the
+        // larger N for safety so the slider can't run past what physics allows.
         dynamicMax: (p) => Math.min(0.24, 3 * 0.185 * Math.min(0.45, 0.85 / Math.max(1, Math.max(p.nMin, p.nMax)))) },
       { key:'jIn', label:'Jitter', type:'range', min:0, max:0.05, step:0.002, fmt:3 },
       { key:'signPattern', label:'Sign pattern', type:'select', options:[
         { val:'alternating', label:'altern.' }, { val:'mirrored', label:'mirror' }, { val:'allSame', label:'same' }
       ]},
     ],
-    desc:'<strong>N tabs per edge, one tab size and one sign pattern per edge.</strong> Tab size is drawn uniformly from <code>[Tab min, Tab max]</code> and applied to every tab on that edge (per-edge variation, not per-tab — per-tab variation reads as messy). Sign pattern: <code>alternating</code> +−+−, <code>mirrored</code> ++.. mirrored across the centre, <code>allSame</code> all in the same direction. The Tab size slider\'s upper bound shrinks as <code>N max</code> grows (less footprint per tab). Deterministic per edge-id — neighbours always agree.<br><br><em>Not in scope for the next package release — kept as a record of the design direction.</em>' },
+    desc:'<strong>N tabs per edge, one tab size and one sign pattern per edge.</strong> Tab size is the absolute bump depth as a fraction of edge length. Sign pattern: <code>alternating</code> +−+−, <code>mirrored</code> ++.. mirrored across the centre, <code>allSame</code> all in the same direction. The Tab size slider\'s upper bound shrinks as <code>N max</code> grows (less footprint per tab). Deterministic per edge-id — neighbours always agree.<br><br><em>Not in scope for the next package release — kept as a record of the design direction.</em>' },
 ];
 
 // ===== Global controls (seed + grid dimensions, shared across all cards) =====
@@ -991,6 +980,13 @@ function buildCard(style) {
       });
       ctrlBox.appendChild(inp);
       ctrlBox.appendChild(val);
+      if (c.dynamicMax) {
+        dynamicUpdaters.push(() => {
+          const newMax = c.dynamicMax(params);
+          inp.max = newMax;
+          if (params[c.key] > newMax) { params[c.key] = newMax; inp.value = newMax; val.textContent = formatVal(c, newMax); }
+        });
+      }
     }
   }
   if (style.controls.length > 0) card.appendChild(ctrlBox);
