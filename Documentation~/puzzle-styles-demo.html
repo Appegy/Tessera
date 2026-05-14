@@ -153,14 +153,21 @@ function smoothPathFromPts(pts) {
 // size `t` is drawn per edge from [tMin, tMax]; jitter `j` is derived from `t`
 // so the head footprint stays inside the edge:
 //   head x ∈ 0.5 ± (2t + |b| + |d|);  bound (2t + 2j) ≤ headMax  ⇒  j = (headMax - 2t)/2.
+// `t` is clamped against headMax so the slider's promise holds for any combo
+// (previously a j-floor of 0.02 silently violated headMax at small headMax).
 // Setting tMin = tMax gives uniform "Classic" look; spreading them gives the
-// "Whimsy" look with per-piece variation.
+// "Whimsy" look with per-piece variation. `waveAmp > 0` overlays a Hann-windowed
+// sum-of-sines perpendicular displacement on top of the Bezier silhouette
+// (replaces the old standalone Wavy generator).
 function genJigsaw(p0, p1, r, params) {
   const tMin = params?.tMin ?? 0.09;
   const tMax = params?.tMax ?? 0.13;
   const headMax = params?.headMax ?? 0.40;
+  const waveAmp = params?.waveAmp ?? 0;
   const f = frame(p0, p1);
-  const t = uni(r, tMin, tMax);
+  let t = uni(r, tMin, tMax);
+  // Clamp t against headMax so head footprint = 2t + 2j ≤ headMax holds always.
+  t = Math.min(t, (headMax - 0.04) / 2);
   const j = Math.max(0.02, (headMax - 2*t) / 2);
   const a = uni(r,-j,j), b = uni(r,-j,j), c = uni(r,-j,j), d = uni(r,-j,j), e = uni(r,-j,j);
   const s = r() > 0.5 ? 1 : -1;
@@ -176,11 +183,32 @@ function genJigsaw(p0, p1, r, params) {
     lw(f, 0.8, s*e),
     lw(f, 1, 0),
   ];
-  return [
-    ...cubic(P[0], P[1], P[2], P[3], 10),
-    ...cubic(P[3], P[4], P[5], P[6], 10).slice(1),
-    ...cubic(P[6], P[7], P[8], P[9], 10).slice(1),
+  // Sample more densely when wave overlay is active so the wave isn't polygonal.
+  const N = waveAmp > 0 ? 20 : 10;
+  const ptsRaw = [
+    ...cubic(P[0], P[1], P[2], P[3], N),
+    ...cubic(P[3], P[4], P[5], P[6], N).slice(1),
+    ...cubic(P[6], P[7], P[8], P[9], N).slice(1),
   ];
+  if (waveAmp <= 0) return ptsRaw;
+
+  // Hann-windowed sum-of-sines, golden-ratio-ish frequencies. Endpoints stay
+  // pinned (hann(0)=hann(1)=0) so neighbours still stitch exactly.
+  const phs = [uni(r, 0, 2*Math.PI), uni(r, 0, 2*Math.PI), uni(r, 0, 2*Math.PI)];
+  const freqs = [3.0, 4.85, 7.85];
+  const ampsW = [1, 0.55, 0.30];
+  const pts = [];
+  for (const p of ptsRaw) {
+    // Project sample onto edge frame: (l, w) in [0..1] × [-inf..inf].
+    const dx = p.x - f.p0.x, dy = p.y - f.p0.y;
+    const l = (dx * f.tx + dy * f.ty) / f.L;
+    const w = (dx * f.nx + dy * f.ny) / f.L;
+    const hann = Math.sin(Math.PI * l) ** 2;
+    let wave = 0;
+    for (let k = 0; k < freqs.length; k++) wave += ampsW[k] * Math.sin(2*Math.PI*freqs[k]*l + phs[k]);
+    pts.push(lw(f, l, w + waveAmp * wave * hann));
+  }
+  return pts;
 }
 
 // Geometric: polygonal locking tab with overhang, no curves at all.
@@ -226,32 +254,49 @@ function genGeometric(p0, p1, r, params) {
 // (clamped at footprintCap) so more tabs → smaller per-tab footprint → smaller
 // max bump. Edge fills remaining length with straight baseline between tabs.
 //
-// User-facing tab size is the ABSOLUTE bump depth as fraction of edge length
-// (so the same slider value at different N produces a visually different size:
-// at low N tabs CAN be bigger because the footprint is bigger). Internal
-// Draradech parameter t = tabSize / (3 * footprint) and is clamped to keep
-// the tab inside its footprint (head x within footprint ≤ 0.95).
+// User-facing tab size is the ABSOLUTE bump depth as fraction of edge length.
 //
-// Per-tab independent values (all deterministic per edge-id, so neighbours
-// agree exactly): bump depth ∈ [tabSizeMin, tabSizeMax], sign ∈ {+1, -1},
-// shape jitter, positional jitter within the allotted gap.
+// Per-edge values (deterministic per edge-id, so neighbours agree exactly):
+//   - N        — drawn uniformly from [nMin, nMax]
+//   - baseSign — coin flip; shared by all tabs on this edge per `signPattern`
+//   - tabSize  — ONE value drawn from [tabSizeMin, tabSizeMax], applied to all
+//                tabs on this edge (per-edge variation, NOT per-tab — per-tab
+//                size variation reads as messy, not artistic)
+// Per-tab values (still independent): shape jitter, positional jitter.
 //
-// params.nMin, params.nMax: integer range for per-edge N (uniform pick).
+// signPattern: 'alternating' (default, +-+-…) | 'allSame' | 'mirrored' (++... mirrored around centre, e.g. +-+ or +--+).
 function genMultiTab(p0, p1, r, params) {
   const nMinRaw = params?.nMin ?? 2;
   const nMaxRaw = params?.nMax ?? 2;
   const nMin = Math.max(1, Math.min(nMinRaw, nMaxRaw));
   const nMax = Math.max(1, Math.max(nMinRaw, nMaxRaw));
   const footprintCap = params?.footprintCap ?? 0.45;
-  const tabSizeMin = params?.tabSizeMin ?? 0.10;
-  const tabSizeMax = params?.tabSizeMax ?? 0.18;
+  const tabSizeMin = params?.tabSizeMin ?? 0.12;
+  const tabSizeMax = params?.tabSizeMax ?? 0.16;
   const jIn = params?.jIn ?? 0.04;
+  const signPattern = params?.signPattern ?? 'alternating';
   const N = nMin === nMax ? nMin : (nMin + Math.floor(r() * (nMax - nMin + 1)));
   const f = frame(p0, p1);
   const footprint = Math.min(footprintCap, 0.85 / N);
   const gap = (1 - N * footprint) / (N + 1);
   const jPosMax = gap * 0.3;
-  const tInSafeMax = Math.max(0.05, 0.225 - jIn); // tab fits in footprint when 2t + 2j ≤ 0.45
+  const tInSafeMax = Math.max(0.05, 0.225 - jIn);
+
+  // Single per-edge tab size + sign seed. Per-tab variation now only in shape
+  // jitter and positional jitter.
+  const tabSize = uni(r, Math.min(tabSizeMin, tabSizeMax), Math.max(tabSizeMin, tabSizeMax));
+  const tIn = Math.min(tInSafeMax, tabSize / (3 * footprint));
+  const baseSign = r() > 0.5 ? 1 : -1;
+  function signAt(i) {
+    if (signPattern === 'allSame') return baseSign;
+    if (signPattern === 'mirrored') {
+      // ++.. mirrored across centre. For N=2: ++, for N=3: +−+, for N=4: ++−−
+      const half = N / 2;
+      return (i < half ? 1 : -1) * baseSign;
+    }
+    // alternating: +-+-…
+    return (i % 2 === 0 ? 1 : -1) * baseSign;
+  }
 
   const pts = [lw(f, 0, 0)];
   for (let i = 0; i < N; i++) {
@@ -260,10 +305,7 @@ function genMultiTab(p0, p1, r, params) {
     const sStart = tabStartDefault + posJ;
     pts.push(lw(f, sStart, 0));
 
-    // Per-tab independent sign and absolute bump depth → local Draradech t.
-    const tabSize = uni(r, Math.min(tabSizeMin, tabSizeMax), Math.max(tabSizeMin, tabSizeMax));
-    const tIn = Math.min(tInSafeMax, tabSize / (3 * footprint));
-    const s = r() > 0.5 ? 1 : -1;
+    const s = signAt(i);
     const a = uni(r,-jIn,jIn), b = uni(r,-jIn,jIn), c = uni(r,-jIn,jIn), d = uni(r,-jIn,jIn), e = uni(r,-jIn,jIn);
     const L = (m) => sStart + m * footprint;
     const W = (m) => m * footprint;
@@ -283,98 +325,6 @@ function genMultiTab(p0, p1, r, params) {
   }
   pts.push(lw(f, 1, 0));
   return pts;
-}
-
-// Wavy / Organic: single perpendicular displacement function w(t) over the
-// STRAIGHT baseline. w(t) is the sum of two smooth components:
-//   1. tab silhouette — smoothstep top-hat (no undercut, single-valued).
-//   2. wave overlay — sum-of-sines with Hann window so endpoints stay at w=0.
-// Both terms are C∞ smooth, so the sampled polyline has no kinks regardless
-// of how dense we sample. No local-normal trickery, no risk of self-overlap.
-function genWavy(p0, p1, r, params) {
-  const tabDepthBase = params?.tabDepth ?? 0.22;
-  const waveA = params?.waveA ?? 0.06;
-  const f = frame(p0, p1);
-  const N = 80;
-  const s = r() > 0.5 ? 1 : -1;
-
-  const tabHalfBase = 0.20 + uni(r, -0.02, 0.02);
-  const tabRise = 0.07;
-  const tabDepth = tabDepthBase + uni(r, -0.025, 0.025);
-  const tabCenter = 0.5 + uni(r, -0.04, 0.04);
-
-  const smoothstep = (e0, e1, x) => {
-    const u = Math.max(0, Math.min(1, (x - e0) / (e1 - e0)));
-    return u * u * (3 - 2 * u);
-  };
-  const tabShape = (t) =>
-    smoothstep(tabCenter - tabHalfBase - tabRise, tabCenter - tabHalfBase + tabRise, t)
-    * (1 - smoothstep(tabCenter + tabHalfBase - tabRise, tabCenter + tabHalfBase + tabRise, t));
-
-  const phs = [uni(r, 0, 2*Math.PI), uni(r, 0, 2*Math.PI), uni(r, 0, 2*Math.PI)];
-  const freqs = [3.0, 4.85, 7.85];
-  const amps = [1, 0.55, 0.30];
-  const wave = (t) => {
-    let v_ = 0;
-    for (let k = 0; k < freqs.length; k++) v_ += amps[k] * Math.sin(2*Math.PI*freqs[k]*t + phs[k]);
-    return v_;
-  };
-  const hann = (t) => Math.sin(Math.PI * t) ** 2;
-
-  const pts = [];
-  for (let i = 0; i <= N; i++) {
-    const t = i / N;
-    const w = s * (tabDepth * tabShape(t) + waveA * wave(t) * hann(t));
-    pts.push(lw(f, t, w));
-  }
-  return pts;
-}
-
-// Whimsy / Catmull-Rom: M random landmarks along the edge, centripetal spline through them
-function genCatmull(p0, p1, r, params) {
-  const M = params?.M ?? 7;
-  const widthScale = params?.widthScale ?? 1.0;
-  const f = frame(p0, p1);
-  const s = r() > 0.5 ? 1 : -1;
-  const ctrl = [lw(f, 0, 0)];
-  for (let i = 1; i <= M; i++) {
-    const tt = i / (M + 1);
-    const ll = tt + uni(r, -0.03, 0.03);
-    // Bell-shaped width distribution along edge, scaled by widthScale
-    let ww;
-    if (tt < 0.20) ww = uni(r, 0, 0.07);
-    else if (tt < 0.40) ww = uni(r, 0.08, 0.18);
-    else if (tt < 0.60) ww = uni(r, 0.18, 0.28);
-    else if (tt < 0.80) ww = uni(r, 0.08, 0.18);
-    else ww = uni(r, 0, 0.07);
-    ctrl.push(lw(f, ll, s * ww * widthScale));
-  }
-  ctrl.push(lw(f, 1, 0));
-
-  // Centripetal Catmull-Rom through ctrl with phantom endpoints
-  const phStart = sub(scale(ctrl[0], 2), ctrl[1]);
-  const phEnd = sub(scale(ctrl[ctrl.length-1], 2), ctrl[ctrl.length-2]);
-  const P = [phStart, ...ctrl, phEnd];
-  const out = [ctrl[0]];
-  const STEPS = 12;
-  function tnext(t, p, q) { return t + Math.pow(dist(sub(q, p)), 0.5); }
-  for (let i = 1; i < P.length - 2; i++) {
-    const p0c = P[i-1], p1c = P[i], p2c = P[i+1], p3c = P[i+2];
-    const t0 = 0;
-    const t1 = tnext(t0, p0c, p1c);
-    const t2 = tnext(t1, p1c, p2c);
-    const t3 = tnext(t2, p2c, p3c);
-    for (let k = 1; k <= STEPS; k++) {
-      const tt = t1 + (t2 - t1) * (k / STEPS);
-      const A1 = add(scale(p0c, (t1 - tt)/(t1 - t0)), scale(p1c, (tt - t0)/(t1 - t0)));
-      const A2 = add(scale(p1c, (t2 - tt)/(t2 - t1)), scale(p2c, (tt - t1)/(t2 - t1)));
-      const A3 = add(scale(p2c, (t3 - tt)/(t3 - t2)), scale(p3c, (tt - t2)/(t3 - t2)));
-      const B1 = add(scale(A1, (t2 - tt)/(t2 - t0)), scale(A2, (tt - t0)/(t2 - t0)));
-      const B2 = add(scale(A2, (t3 - tt)/(t3 - t1)), scale(A3, (tt - t1)/(t3 - t1)));
-      out.push(add(scale(B1, (t2 - tt)/(t2 - t1)), scale(B2, (tt - t1)/(t2 - t1))));
-    }
-  }
-  return out;
 }
 
 // === Organic puzzle (cellular automaton port of CustomShapeJigsawJs) ===
@@ -588,13 +538,21 @@ function buildOrganicPuzzle(seed, params) {
     const [leftId, rightId] = leftRightAt(start.gx, start.gy, startDir);
     let [cx, cy] = moveDir(start.gx, start.gy, startDir);
     let cameFrom = OPP[startDir];
-    const maxSteps = 4 * (gw + gh + 2);
+    // A single boundary segment can wind through up to all pixel-edges of the
+    // grid; bound conservatively. (Previously 4*(gw+gh+2) which silently
+    // truncated long boundaries on large grids.)
+    const maxSteps = gw * gh + 4;
     for (let step = 0; step < maxSteps; step++) {
       const idx = cornerMap.get(cx + ',' + cy);
       if (idx !== undefined) {
         if (idx === startIdx) return;
+        // Dedup key includes the cell-pair on either side of the edge: at
+        // saddle X-junctions, two distinct edges can run between the same pair
+        // of corner indices but separate different cell pairs. Sorting by
+        // endpoint alone would drop the second one.
         const a = Math.min(startIdx, idx), b = Math.max(startIdx, idx);
-        const key = a + '|' + b;
+        const lr = Math.min(leftId, rightId) + ',' + Math.max(leftId, rightId);
+        const key = a + '|' + b + '|' + lr;
         if (edgeSet.has(key)) return;
         edgeSet.add(key);
         edges.push({ a: startIdx, b: idx, leftId, rightId });
@@ -804,17 +762,18 @@ function renderStyle(gen, seed, smooth, params) {
 // Per-card params hold only style-specific knobs; seed/gw/gh come from the
 // global controls (visible at the top of the page).
 const styles = [
-  { name:'Classic / Whimsy (Draradech)', subtitle:'3 cubic Beziers per edge — uniform when Tab min = Tab max, whimsical when spread', gen:genJigsaw,
-    // Tab size per edge is drawn from [tMin, tMax]; jitter is derived from t
-    // so head footprint ≤ headMax. tMin = tMax = T, headMax = 2T + 2J reproduces
-    // the original "Classic" generator with (T, J).
-    params:{ tMin:0.10, tMax:0.10, headMax:0.28 },
+  { name:'Classic / Whimsy (Draradech)', subtitle:'3 cubic Beziers per edge — uniform, whimsical, or wavy', gen:genJigsaw,
+    // tMin = tMax, headMax = 2T + 2J reproduces canonical Classic with (T, J).
+    // waveAmp > 0 overlays a Hann-windowed sum-of-sines on top — replaces the
+    // previous standalone "Wavy" card.
+    params:{ tMin:0.10, tMax:0.10, headMax:0.28, waveAmp:0 },
     controls:[
-      { key:'tMin', label:'Tab min', type:'range', min:0.05, max:0.13, step:0.005, fmt:3 },
-      { key:'tMax', label:'Tab max', type:'range', min:0.05, max:0.16, step:0.005, fmt:3 },
+      { key:'tMin', label:'Tab min', type:'range', min:0.0, max:0.13, step:0.005, fmt:3 },
+      { key:'tMax', label:'Tab max', type:'range', min:0.0, max:0.16, step:0.005, fmt:3 },
       { key:'headMax', label:'Head x-span', type:'range', min:0.20, max:0.48, step:0.01, fmt:2 },
+      { key:'waveAmp', label:'Wave amp.', type:'range', min:0, max:0.10, step:0.005, fmt:3 },
     ],
-    desc:'Каноничный jigsaw silhouette: 10 контрольных точек, 3 cubic Bezier\'а на ребро. Размер таба <code>t</code> для каждого ребра берётся равномерно из <code>[tMin, tMax]</code>; jitter выводится из <code>t</code> как <code>(headMax − 2t)/2</code>, чтобы голова всегда помещалась в <code>headMax</code>-окно у середины ребра. <strong>tMin = tMax → uniform Classic-вид</strong>; раздвинь — получишь whimsical вариацию между пьесами.' },
+    desc:'Каноничный jigsaw silhouette: 10 контрольных точек, 3 cubic Bezier\'а на ребро. Размер таба <code>t</code> для каждого ребра берётся из <code>[tMin, tMax]</code>; jitter выводится из <code>t</code> как <code>(headMax − 2t)/2</code>, чтобы голова всегда помещалась в <code>headMax</code>-окно у середины ребра. <strong>tMin = tMax → uniform Classic-вид</strong>; раздвинь — получишь whimsical вариацию между пьесами. <strong><code>Wave amp.</code> > 0</strong> накладывает Hann-windowed sum-of-sines поверх — «hand-drawn» feel, эндпоинты остаются пришпиленными.' },
 
   { name:'Geometric (polygonal)', subtitle:'10-vertex polyline, dovetail head, per-edge variation', gen:genGeometric,
     // Per-edge jitter on inset & neck; runtime clamps keep dovetail valid.
@@ -828,45 +787,33 @@ const styles = [
     ],
     desc:'Кривых нет вообще. Голова шире шейки → пьесы реально замыкаются. Низкое количество corner\'ов, идеально для mesh-gen и «низкополигонального» арт-направления. <strong>Per-edge jitter</strong> на inset и neck делает табы визуально разнообразными (но детерминированно — соседи стыкуются точно).' },
 
-  { name:'Multi-tab', subtitle:'N tabs per side, per-tab random sign and size (fraction of edge)', gen:genMultiTab,
-    // Tab size is absolute bump depth as fraction of edge length. Slider's
-    // effective max shrinks at high N (less footprint available).
-    params:{ nMin:2, nMax:2, tabSizeMin:0.10, tabSizeMax:0.18, jIn:0.04 },
-    controls:[
-      { key:'nMin', label:'N min', type:'range', min:1, max:3, step:1 },
-      { key:'nMax', label:'N max', type:'range', min:1, max:3, step:1 },
-      { keyLo:'tabSizeMin', keyHi:'tabSizeMax', label:'Tab size', type:'range2',
-        min:0.05, max:0.24, step:0.005, fmt:3,
-        // Max achievable bump = 3 · tInSafeMax · footprint(nMax). With
-        // tInSafeMax ≈ 0.185 and footprint = min(0.45, 0.85/nMax):
-        //   nMax=1 → ~0.250, nMax=2 → ~0.236, nMax=3 → ~0.157.
-        dynamicMax: (p) => Math.min(0.24, 3 * 0.185 * Math.min(0.45, 0.85 / Math.max(1, p.nMax))) },
-      { key:'jIn', label:'Jitter', type:'range', min:0, max:0.05, step:0.002, fmt:3 },
-    ],
-    desc:'<strong>N tabs на ребре, у каждого собственный знак и размер</strong>. Размер — это глубина бугра как доля длины ребра. Знак (внутрь/наружу) и размер бросаются независимо на каждом табе из диапазона <code>[Tab min, Tab max]</code>. Верхняя граница слайдера Tab size зависит от <code>N max</code>: чем больше табов, тем меньше места на каждый, и максимум сжимается автоматически. Всё детерминированно по edge-id — соседи видят то же значение для общего ребра.' },
-
   { name:'Organic (CSJ-style CA growth)', subtitle:'Pixel CA + Draradech tabs on long edges', renderFn:renderVoronoi, smooth:false,
     params:{ gnoise:0.35 },
     controls:[
       { key:'gnoise', label:'Seed jitter', type:'range', min:0, max:0.6, step:0.02, fmt:2 },
     ],
     desc:'Порт алгоритма CustomShapeJigsawJs. Растровый клеточный автомат: на каждую пьесу (Columns × Rows) ставится один seed-пиксель, jitter\'нутый внутри своей лоттереи; затем клетки растут диском от своих сидов, бой за пиксели идёт от ближайшего сида в Euclidean-метрике. Углы — точки где сходятся ≥3 клеток на 2×2 пиксельном блоке. Между соседними углами либо Draradech-таб (если ребро длинное), либо прямой отрезок. <strong>Это НЕ Voronoi</strong> — это растровая аппроксимация Voronoi, и именно пиксельная квантизация порождает много коротких сегментов и характерный «органический» staircase-вид.' },
+];
 
-  { name:'Wavy / Organic (FBM overlay)', subtitle:'Classic base + sum-of-sines perp. displacement', gen:genWavy, smooth:true,
-    params:{ tabDepth:0.22, waveA:0.06 },
+// Stylesheets parked for future iterations of the package. Not in scope for
+// the upcoming v1 — kept here so the playground records what was explored.
+const futureStyles = [
+  { name:'Multi-tab', subtitle:'N tabs per side, per-edge sign pattern (alternating / mirrored / all-same)', gen:genMultiTab,
+    params:{ nMin:2, nMax:2, tabSizeMin:0.13, tabSizeMax:0.16, jIn:0.04, signPattern:'alternating' },
     controls:[
-      { key:'tabDepth', label:'Tab depth', type:'range', min:0.10, max:0.32, step:0.01, fmt:2 },
-      { key:'waveA', label:'Wave amp.', type:'range', min:0, max:0.12, step:0.005, fmt:3 },
+      { key:'nMin', label:'N min', type:'range', min:1, max:3, step:1 },
+      { key:'nMax', label:'N max', type:'range', min:1, max:3, step:1 },
+      { keyLo:'tabSizeMin', keyHi:'tabSizeMax', label:'Tab size', type:'range2',
+        min:0.05, max:0.24, step:0.005, fmt:3,
+        // Bound by the *worst-case* footprint along [nMin, nMax]; pick the
+        // bigger nMax for safety.
+        dynamicMax: (p) => Math.min(0.24, 3 * 0.185 * Math.min(0.45, 0.85 / Math.max(1, Math.max(p.nMin, p.nMax)))) },
+      { key:'jIn', label:'Jitter', type:'range', min:0, max:0.05, step:0.002, fmt:3 },
+      { key:'signPattern', label:'Sign pattern', type:'select', options:[
+        { val:'alternating', label:'altern.' }, { val:'mirrored', label:'mirror' }, { val:'allSame', label:'same' }
+      ]},
     ],
-    desc:'Поверх классической формы накладываются волны (3 синусоиды с golden-ratio частотами). Hann-window держит эндпоинты на месте — соседи стыкуются. «Hand-drawn» feel.' },
-
-  { name:'Catmull-Rom Whimsy', subtitle:'M random landmarks + centripetal Catmull-Rom', gen:genCatmull,
-    params:{ M:7, widthScale:1.0 },
-    controls:[
-      { key:'M', label:'Landmarks', type:'range', min:3, max:14, step:1 },
-      { key:'widthScale', label:'Width scale', type:'range', min:0, max:1.5, step:0.05, fmt:2 },
-    ],
-    desc:'Никакого «таба» как такового. Bezier выкинут, вместо него — гладкий spline через случайные точки. Это самый «modern mobile puzzle» вид. <strong>Каждое ребро уникально</strong>. Не имеет механического зацепления — пьесы держатся «по позиции», а не геометрически.' },
+    desc:'<strong>N tabs на ребре, одна tab-size и один знаковый паттерн на ребро.</strong> Размер таба берётся равномерно из <code>[Tab min, Tab max]</code> и применяется ко всем табам этого ребра (per-edge variation, не per-tab — иначе читается messy). Sign pattern: <code>alternating</code> +−+−, <code>mirrored</code> ++... зеркалом, <code>allSame</code> все в одну сторону. Верхняя граница слайдера Tab size зависит от <code>N max</code>. Детерминированно по edge-id — соседи видят то же.<br><br><em>Не входит в ближайший релиз пакета — оставлен как фиксация дизайн-направления.</em>' },
 ];
 
 // ===== Global controls (seed + grid dimensions, shared across all cards) =====
@@ -1037,6 +984,22 @@ function buildCard(style) {
 const container = document.querySelector('.styles');
 container.parentNode.insertBefore(buildGlobalControls(), container);
 for (const s of styles) container.appendChild(buildCard(s));
+
+// Future ideas / not in scope for v1
+if (futureStyles.length > 0) {
+  const heading = document.createElement('h2');
+  heading.textContent = 'Future ideas — not in scope';
+  heading.style.cssText = 'margin:40px 0 8px;color:#888;font-size:18px;font-weight:600;border-top:1px solid #2a2a2a;padding-top:24px;';
+  container.parentNode.appendChild(heading);
+  const intro = document.createElement('p');
+  intro.textContent = 'Стили, исследованные в playground, но не входящие в ближайший релиз пакета. Оставлены как фиксация направления для будущих итераций.';
+  intro.style.cssText = 'color:#777;font-size:13px;margin:0 0 20px;';
+  container.parentNode.appendChild(intro);
+  const futureGrid = document.createElement('div');
+  futureGrid.className = 'styles';
+  container.parentNode.appendChild(futureGrid);
+  for (const s of futureStyles) futureGrid.appendChild(buildCard(s));
+}
 </script>
 </body>
 </html>
