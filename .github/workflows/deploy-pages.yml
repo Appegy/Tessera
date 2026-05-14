@@ -1,0 +1,52 @@
+# Publishes the playground HTML from Documentation~/ to GitHub Pages.
+# Uses the modern Pages flow (artifact + deploy-pages action) so we don't
+# touch any branch. Triggers only when the playground file changes.
+#
+# Prerequisite (one-time): GitHub repo → Settings → Pages → Source = "GitHub Actions".
+
+name: Deploy playground to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Documentation~/puzzle-styles-demo.html'
+      - '.github/workflows/deploy-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow one in-flight deployment at a time; let it finish rather than cancel.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Stage site
+        run: |
+          mkdir -p _site
+          cp 'Documentation~/puzzle-styles-demo.html' _site/index.html
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
