@@ -85,6 +85,18 @@ namespace Appegy.Tessera
             }
         }
 
+        public int GetNeighborCount(int id)
+        {
+            return 6;
+        }
+
+        // GetNeighborStartCorner(id, j) == j: edge j is the segment corner[j] -> corner[(j+1)%6].
+        // HexagonalGrid is polygonal, so corners and neighbour slots align one-to-one.
+        public int GetNeighborStartCorner(int id, int neighborIndex)
+        {
+            return (neighborIndex % 6 + 6) % 6;
+        }
+
         public int GetNeighbor(int id, int neighborIndex)
         {
             var (x, y) = XYOf(id);

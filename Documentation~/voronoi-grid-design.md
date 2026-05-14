@@ -106,7 +106,7 @@ All internal builders are `internal static` — no public surface beyond `Vorono
    - polygonal layout (VoronoiGrid-specific): `GetCornersCount(id) == GetNeighborCount(id)`, `GetNeighborStartCorner(id, j) == j`.
    - edge geometry: corner `k -> (k+1) % N` is the polyline shared with `GetNeighbor(id, k)` (or that slot is `-1` and the edge lies on `bounds`).
    - core edge partition (`GetNeighborStartCorner` strictly increasing, starts at 0, values in `[0, M)`).
-   - shared edge coherence: between neighbouring cells `a, b`, the segment endpoints match bit-identically in reverse order.
+   - shared edge coherence: between neighbouring cells `a, b`, the segment endpoints match in reverse order (Voronoi cells share vertex objects in the builder, so the match is exact; tested with tolerance for portability).
    - symmetry: `AreNeighbors(a, b) == AreNeighbors(b, a)`; `GetNeighborIndex` agrees both ways.
    - distance metric: `Distance(a, a) == 0`, `Distance(a, b) > 0` for `a != b`, symmetric.
    - centre round-trip: `GetCellAt(GetCenter(id)) == id`.

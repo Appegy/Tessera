@@ -161,6 +161,59 @@ namespace Appegy.Tessera.Tests
         }
 
         [Test]
+        public void GetNeighborCount_EqualsCornersCount()
+        {
+            for (var id = 0; id < _grid.CellCount; id++)
+                Assert.AreEqual(_grid.GetCornersCount(id), _grid.GetNeighborCount(id));
+        }
+
+        [Test]
+        public void GetNeighborStartCorner_IsIdentity()
+        {
+            var id = _grid.IdOf(1, 1);
+            for (var j = 0; j < _grid.GetNeighborCount(id); j++)
+                Assert.AreEqual(j, _grid.GetNeighborStartCorner(id, j));
+        }
+
+        [Test]
+        public void GetNeighborStartCorner_WrapsIndex()
+        {
+            var id = _grid.IdOf(1, 1);
+            Assert.AreEqual(_grid.GetNeighborStartCorner(id, 0), _grid.GetNeighborStartCorner(id, 4));
+            Assert.AreEqual(_grid.GetNeighborStartCorner(id, 1), _grid.GetNeighborStartCorner(id, -3));
+        }
+
+        [Test]
+        public void SharedEdgeCoherence_NeighboursAgreeOnEndpoints()
+        {
+            // For every adjacent (a, b), the corners a exposes for edge ja must coincide (reversed)
+            // with the corners b exposes for edge jb. Required for crack-free mesh stitching.
+            for (var a = 0; a < _grid.CellCount; a++)
+            {
+                var ka = _grid.GetNeighborCount(a);
+                for (var ja = 0; ja < ka; ja++)
+                {
+                    var b = _grid.GetNeighbor(a, ja);
+                    if (b == -1) continue;
+                    var jb = _grid.GetNeighborIndex(b, a);
+                    Assert.AreNotEqual(-1, jb, $"reverse neighbour missing: a={a} b={b}");
+
+                    var kb = _grid.GetNeighborCount(b);
+                    var aStart = _grid.GetCorner(a, _grid.GetNeighborStartCorner(a, ja));
+                    var aEnd = _grid.GetCorner(a, _grid.GetNeighborStartCorner(a, (ja + 1) % ka));
+                    var bStart = _grid.GetCorner(b, _grid.GetNeighborStartCorner(b, jb));
+                    var bEnd = _grid.GetCorner(b, _grid.GetNeighborStartCorner(b, (jb + 1) % kb));
+
+                    // Clockwise reverses: a's edge start == b's edge end, and vice versa.
+                    Assert.AreEqual(aStart.x, bEnd.x, 1e-5f, $"a={a} ja={ja} b={b} jb={jb}");
+                    Assert.AreEqual(aStart.y, bEnd.y, 1e-5f, $"a={a} ja={ja} b={b} jb={jb}");
+                    Assert.AreEqual(aEnd.x, bStart.x, 1e-5f, $"a={a} ja={ja} b={b} jb={jb}");
+                    Assert.AreEqual(aEnd.y, bStart.y, 1e-5f, $"a={a} ja={ja} b={b} jb={jb}");
+                }
+            }
+        }
+
+        [Test]
         public void AreNeighbors_OrthogonalAdjacent_True()
         {
             Assert.IsTrue(_grid.AreNeighbors(_grid.IdOf(0, 0), _grid.IdOf(1, 0)));

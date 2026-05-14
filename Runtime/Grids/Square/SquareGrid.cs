@@ -70,7 +70,19 @@ namespace Appegy.Tessera
             dest[3] = new float2(x0, y1); // TL
         }
 
-        // Edge i (corner i -> corner (i+1)%4) is shared with neighbor i.
+        public int GetNeighborCount(int id)
+        {
+            return 4;
+        }
+
+        // GetNeighborStartCorner(id, j) == j: edge j is the segment corner[j] -> corner[(j+1)%4].
+        // SquareGrid is polygonal, so corners and neighbour slots align one-to-one.
+        public int GetNeighborStartCorner(int id, int neighborIndex)
+        {
+            return (neighborIndex % 4 + 4) % 4;
+        }
+
+        // Edge j (corner j -> corner (j+1)%4) is shared with neighbor j.
         // Edge 0: TR -> BR -> right neighbor (x+1, y)
         // Edge 1: BR -> BL -> bottom neighbor (x, y-1)
         // Edge 2: BL -> TL -> left neighbor (x-1, y)

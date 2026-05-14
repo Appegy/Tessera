@@ -124,7 +124,7 @@ Tests live as flat `*.cs` files under `Tests/` (no subfolders). When adding beha
 - For square, single-grid tests are usually enough — `SquareGrid` is 4-connected only at the `IGrid` level (no diagonal mode).
 - Use `float2` for geometry assertions (matches the public API). Tolerance `1e-4f` to `1e-5f` is fine for hex math.
 - For polygonal grids (`SquareGrid`, `HexagonalGrid`, `VoronoiGrid`) the legacy alignment is still a useful per-grid test — `2 * edge_midpoint - cell_center == neighbour_center` and `GetNeighborStartCorner(c, j) == j`. It is a property of those implementations, not of the core contract. See `Alignment_NeighbourSitsAcrossCorrespondingEdge` in `SquareGridTests.cs` / `HexagonalGridTests.cs`.
-- Core contract worth testing for **every** new grid type: edge partition (`GetNeighborStartCorner` is `0` at `j=0`, strictly increasing, all values `< GetCornersCount`); shared edge coherence (the polyline neighbour `a` exposes for neighbour `b` is the reverse of what `b` exposes for `a`, endpoints bit-identical); symmetric neighbourhood; centre round-trip.
+- Core contract worth testing for **every** new grid type: edge partition (`GetNeighborStartCorner` is `0` at `j=0`, strictly increasing, all values `< GetCornersCount`); shared edge coherence (the polyline neighbour `a` exposes for neighbour `b` is the reverse of what `b` exposes for `a`, endpoints agree within FP tolerance — grids that need crack-free mesh stitching must match exactly by construction); symmetric neighbourhood; centre round-trip.
 
 ## How to Add a New IGrid Method
 

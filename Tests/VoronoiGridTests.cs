@@ -240,6 +240,47 @@ namespace Appegy.Tessera.Tests
                     if (g.GetNeighbor(id, k) == -1) { sawBoundary = true; break; }
             }
             Assert.IsTrue(sawBoundary, "no boundary slots found - expected at least one");
+
+            // Geometry / topology counts agree for VoronoiGrid (polygonal),
+            // and the bridge is the identity (legacy alignment).
+            for (var id = 0; id < g.CellCount; id++)
+            {
+                var m = g.GetCornersCount(id);
+                Assert.AreEqual(m, g.GetNeighborCount(id), $"cell {id} K != M");
+                for (var j = 0; j < m; j++)
+                    Assert.AreEqual(j, g.GetNeighborStartCorner(id, j), $"cell {id} bridge[{j}] not identity");
+            }
+        }
+
+        [TestCase(0, 64)] [TestCase(1, 64)] [TestCase(2, 256)] [TestCase(3, 256)]
+        public void SharedEdgeCoherence_NeighboursAgreeOnEndpoints(int seedValue, int cellCount)
+        {
+            // Voronoi vertices come from circumcenters shared across cells in the builder, so the
+            // endpoints should be bit-equal for interior corners and tolerance-equal after polygon
+            // clipping on boundary cells.
+            var g = new VoronoiGrid(Unit, cellCount, seedValue, 3);
+            for (var a = 0; a < g.CellCount; a++)
+            {
+                var ka = g.GetNeighborCount(a);
+                for (var ja = 0; ja < ka; ja++)
+                {
+                    var b = g.GetNeighbor(a, ja);
+                    if (b == -1) continue;
+                    var jb = g.GetNeighborIndex(b, a);
+                    Assert.AreNotEqual(-1, jb, $"seed={seedValue} a={a} b={b}");
+
+                    var kb = g.GetNeighborCount(b);
+                    var aStart = g.GetCorner(a, g.GetNeighborStartCorner(a, ja));
+                    var aEnd = g.GetCorner(a, g.GetNeighborStartCorner(a, (ja + 1) % ka));
+                    var bStart = g.GetCorner(b, g.GetNeighborStartCorner(b, jb));
+                    var bEnd = g.GetCorner(b, g.GetNeighborStartCorner(b, (jb + 1) % kb));
+
+                    Assert.AreEqual(aStart.x, bEnd.x, 1e-5f, $"seed={seedValue} a={a} ja={ja} b={b} jb={jb}");
+                    Assert.AreEqual(aStart.y, bEnd.y, 1e-5f, $"seed={seedValue} a={a} ja={ja} b={b} jb={jb}");
+                    Assert.AreEqual(aEnd.x, bStart.x, 1e-5f, $"seed={seedValue} a={a} ja={ja} b={b} jb={jb}");
+                    Assert.AreEqual(aEnd.y, bStart.y, 1e-5f, $"seed={seedValue} a={a} ja={ja} b={b} jb={jb}");
+                }
+            }
         }
     }
 }
