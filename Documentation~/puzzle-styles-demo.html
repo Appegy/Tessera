@@ -35,6 +35,14 @@
   .controls .seg button:last-child { border-radius:0 3px 3px 0; }
   .controls .reroll { grid-column:1 / 4; background:#2a2a2a; border:1px solid #3a3a3a; color:#ccc; padding:4px 8px; font:inherit; cursor:pointer; border-radius:3px; margin-top:2px; }
   .controls .reroll:hover { background:#333; color:#fff; }
+  .controls .range2 { position:relative; height:18px; }
+  .controls .range2 .bg { position:absolute; top:50%; left:0; right:0; height:3px; background:#3a3a3a; border-radius:2px; transform:translateY(-50%); }
+  .controls .range2 .fill { position:absolute; top:50%; height:3px; background:#7aa8ff; border-radius:2px; transform:translateY(-50%); }
+  .controls .range2 input[type=range] { position:absolute; top:0; left:0; width:100%; height:100%; background:transparent; appearance:none; -webkit-appearance:none; pointer-events:none; margin:0; }
+  .controls .range2 input[type=range]::-webkit-slider-runnable-track { background:transparent; height:100%; border:none; }
+  .controls .range2 input[type=range]::-moz-range-track { background:transparent; height:100%; border:none; }
+  .controls .range2 input[type=range]::-webkit-slider-thumb { pointer-events:auto; appearance:none; -webkit-appearance:none; width:12px; height:12px; background:#fff; border:1.5px solid #7aa8ff; border-radius:50%; cursor:pointer; margin-top:-4.5px; }
+  .controls .range2 input[type=range]::-moz-range-thumb { pointer-events:auto; width:12px; height:12px; background:#fff; border:1.5px solid #7aa8ff; border-radius:50%; cursor:pointer; }
 </style>
 </head>
 <body>
@@ -141,36 +149,13 @@ function smoothPathFromPts(pts) {
 // Each takes (p0, p1, r) → array of points (polyline including both endpoints).
 
 // Classic Draradech: 3 cubic Beziers, 10 control points, tab=10%, jitter=4%
-function genClassic(p0, p1, r, params) {
-  const t = params?.t ?? 0.10;
-  const j = params?.j ?? 0.04;
-  const f = frame(p0, p1);
-  const a = uni(r,-j,j), b = uni(r,-j,j), c = uni(r,-j,j), d = uni(r,-j,j), e = uni(r,-j,j);
-  const s = r() > 0.5 ? 1 : -1;
-  const P = [
-    lw(f, 0, 0),
-    lw(f, 0.2, s*a),
-    lw(f, 0.5 + b + d, s*(-t + c)),
-    lw(f, 0.5 - t + b, s*(t + c)),
-    lw(f, 0.5 - 2*t + b - d, s*(3*t + c)),
-    lw(f, 0.5 + 2*t + b - d, s*(3*t + c)),
-    lw(f, 0.5 + t + b, s*(t + c)),
-    lw(f, 0.5 + b + d, s*(-t + c)),
-    lw(f, 0.8, s*e),
-    lw(f, 1, 0),
-  ];
-  return [
-    ...cubic(P[0], P[1], P[2], P[3], 8),
-    ...cubic(P[3], P[4], P[5], P[6], 8).slice(1),
-    ...cubic(P[6], P[7], P[8], P[9], 8).slice(1),
-  ];
-}
-
-// Whimsy: same algorithm, tab size randomised per edge.
-// Constraint: head footprint must stay inside the edge so neighbouring tabs
-// don't collide at shared corners. Head x extends to 0.5 ± (2t + |b| + |d|);
-// we bound this by shrinking b/d as t grows: |b|+|d|+2t ≤ headMax.
-function genWhimsy(p0, p1, r, params) {
+// Canonical jigsaw: 10-control-point cubic-Bezier triplet (Draradech). Tab
+// size `t` is drawn per edge from [tMin, tMax]; jitter `j` is derived from `t`
+// so the head footprint stays inside the edge:
+//   head x ∈ 0.5 ± (2t + |b| + |d|);  bound (2t + 2j) ≤ headMax  ⇒  j = (headMax - 2t)/2.
+// Setting tMin = tMax gives uniform "Classic" look; spreading them gives the
+// "Whimsy" look with per-piece variation.
+function genJigsaw(p0, p1, r, params) {
   const tMin = params?.tMin ?? 0.09;
   const tMax = params?.tMax ?? 0.13;
   const headMax = params?.headMax ?? 0.40;
@@ -236,30 +221,37 @@ function genGeometric(p0, p1, r, params) {
   ];
 }
 
-// Multi-tab: N classic-shaped tabs along the edge, shared sign (earlet
-// convention). Each tab is a self-contained Draradech curve inside a fixed
-// "footprint" (a mini-edge ~30 % of the full edge length), so ALL tabs have
-// identical absolute size and shape regardless of N. The edge fills the
-// remaining length with straight baseline segments between tabs. Per-tab
-// positional jitter shifts each tab within its allotted gap.
+// Multi-tab: N classic-shaped tabs along the edge. Each tab is a self-contained
+// Draradech curve inside a "footprint" mini-edge. footprint scales as 0.85/N
+// (clamped at footprintCap) so more tabs → smaller per-tab footprint → smaller
+// max bump. Edge fills remaining length with straight baseline between tabs.
 //
-// params.nMin, params.nMax: integer range for per-edge N. If nMin === nMax,
-// every edge has exactly that many tabs; otherwise N is drawn uniformly from
-// the integer range per edge.
+// User-facing tab size is the ABSOLUTE bump depth as fraction of edge length
+// (so the same slider value at different N produces a visually different size:
+// at low N tabs CAN be bigger because the footprint is bigger). Internal
+// Draradech parameter t = tabSize / (3 * footprint) and is clamped to keep
+// the tab inside its footprint (head x within footprint ≤ 0.95).
+//
+// Per-tab independent values (all deterministic per edge-id, so neighbours
+// agree exactly): bump depth ∈ [tabSizeMin, tabSizeMax], sign ∈ {+1, -1},
+// shape jitter, positional jitter within the allotted gap.
+//
+// params.nMin, params.nMax: integer range for per-edge N (uniform pick).
 function genMultiTab(p0, p1, r, params) {
   const nMinRaw = params?.nMin ?? 2;
   const nMaxRaw = params?.nMax ?? 2;
   const nMin = Math.max(1, Math.min(nMinRaw, nMaxRaw));
   const nMax = Math.max(1, Math.max(nMinRaw, nMaxRaw));
-  const footprintCap = params?.footprintCap ?? 0.30;
-  const tIn = params?.tIn ?? 0.13;
+  const footprintCap = params?.footprintCap ?? 0.45;
+  const tabSizeMin = params?.tabSizeMin ?? 0.10;
+  const tabSizeMax = params?.tabSizeMax ?? 0.18;
   const jIn = params?.jIn ?? 0.04;
   const N = nMin === nMax ? nMin : (nMin + Math.floor(r() * (nMax - nMin + 1)));
   const f = frame(p0, p1);
   const footprint = Math.min(footprintCap, 0.85 / N);
   const gap = (1 - N * footprint) / (N + 1);
   const jPosMax = gap * 0.3;
-  const s = r() > 0.5 ? 1 : -1;
+  const tInSafeMax = Math.max(0.05, 0.225 - jIn); // tab fits in footprint when 2t + 2j ≤ 0.45
 
   const pts = [lw(f, 0, 0)];
   for (let i = 0; i < N; i++) {
@@ -268,6 +260,10 @@ function genMultiTab(p0, p1, r, params) {
     const sStart = tabStartDefault + posJ;
     pts.push(lw(f, sStart, 0));
 
+    // Per-tab independent sign and absolute bump depth → local Draradech t.
+    const tabSize = uni(r, Math.min(tabSizeMin, tabSizeMax), Math.max(tabSizeMin, tabSizeMax));
+    const tIn = Math.min(tInSafeMax, tabSize / (3 * footprint));
+    const s = r() > 0.5 ? 1 : -1;
     const a = uni(r,-jIn,jIn), b = uni(r,-jIn,jIn), c = uni(r,-jIn,jIn), d = uni(r,-jIn,jIn), e = uni(r,-jIn,jIn);
     const L = (m) => sStart + m * footprint;
     const W = (m) => m * footprint;
@@ -447,27 +443,32 @@ function buildOrganicPuzzle(seed, params) {
   const r = rng(seed);
 
   // Pixel grid: cover the puzzle area at 4 SVG units per grid pixel.
-  // gsize=20 → ~3×4=12 pieces (matches the 4×3 visual). gsize down → more,
-  // smaller pieces; gnoise → seed-position jitter strength.
+  // Seed count comes from global gw × gh directly — one seed per puzzle piece.
+  // gnoise jitters seed positions within their lattice cell so the resulting
+  // CA cells are irregular rather than perfectly grid-aligned.
   const PX_SCALE = 4;
   const gridW = params?.gw ?? GW;
   const gridH = params?.gh ?? GH;
   const PUZZLE_W = CELL * gridW, PUZZLE_H = CELL * gridH;
   const gw = Math.round(PUZZLE_W / PX_SCALE);
   const gh = Math.round(PUZZLE_H / PX_SCALE);
-  const gsize = params?.gsize ?? 20;
   const gnoise = params?.gnoise ?? 0.35;
 
   const grid = new Int32Array(gw * gh);
   const get = (gx, gy) => (gx < 0 || gx >= gw || gy < 0 || gy >= gh) ? 0 : grid[gy * gw + gx];
 
-  // 1. Place jittered-grid seeds
+  // 1. Place exactly gridW × gridH seeds at jittered lattice centres.
+  const cellPxW = gw / gridW;
+  const cellPxH = gh / gridH;
+  const jitX = cellPxW * 0.5 * gnoise;
+  const jitY = cellPxH * 0.5 * gnoise;
   const seeds = [];
-  for (let sy = Math.floor(gsize / 2); sy < gh; sy += gsize) {
-    for (let sx = Math.floor(gsize / 2); sx < gw; sx += gsize) {
-      const jit = (gsize / 2) * gnoise;
-      const px = Math.max(0, Math.min(gw - 1, Math.round(sx + uni(r, -jit, jit))));
-      const py = Math.max(0, Math.min(gh - 1, Math.round(sy + uni(r, -jit, jit))));
+  for (let sy = 0; sy < gridH; sy++) {
+    for (let sx = 0; sx < gridW; sx++) {
+      const baseX = (sx + 0.5) * cellPxW;
+      const baseY = (sy + 0.5) * cellPxH;
+      const px = Math.max(0, Math.min(gw - 1, Math.round(baseX + uni(r, -jitX, jitX))));
+      const py = Math.max(0, Math.min(gh - 1, Math.round(baseY + uni(r, -jitY, jitY))));
       if (grid[py * gw + px] !== 0) continue;
       const val = seeds.length + 1;
       grid[py * gw + px] = val;
@@ -803,23 +804,17 @@ function renderStyle(gen, seed, smooth, params) {
 // Per-card params hold only style-specific knobs; seed/gw/gh come from the
 // global controls (visible at the top of the page).
 const styles = [
-  { name:'Classic (Draradech)', subtitle:'3 cubic Beziers per edge', gen:genClassic,
-    // Worst case head x = 0.5 + 2t + 2j ≤ 0.5 + 2·0.13 + 2·0.05 = 0.86 → safe.
-    params:{ t:0.10, j:0.04 },
-    controls:[
-      { key:'t', label:'Tab size', type:'range', min:0.05, max:0.13, step:0.005, fmt:3 },
-      { key:'j', label:'Jitter', type:'range', min:0, max:0.05, step:0.002, fmt:3 },
-    ],
-    desc:'Каноничный jigsaw silhouette. Pieces похожи между собой, мелкие рандомные сдвиги. <strong>Это та форма с твоего первого скриншота</strong>. Из неё мы можем уйти в любую сторону. Для более крупных табов и сильного jitter\'а — карточка Whimsy с авто-сжатием jitter\'а.' },
-
-  { name:'Whimsy (heavy jitter)', subtitle:'Same algorithm, randomised tab size per edge', gen:genWhimsy,
-    params:{ tMin:0.09, tMax:0.13, headMax:0.40 },
+  { name:'Classic / Whimsy (Draradech)', subtitle:'3 cubic Beziers per edge — uniform when Tab min = Tab max, whimsical when spread', gen:genJigsaw,
+    // Tab size per edge is drawn from [tMin, tMax]; jitter is derived from t
+    // so head footprint ≤ headMax. tMin = tMax = T, headMax = 2T + 2J reproduces
+    // the original "Classic" generator with (T, J).
+    params:{ tMin:0.10, tMax:0.10, headMax:0.28 },
     controls:[
       { key:'tMin', label:'Tab min', type:'range', min:0.05, max:0.13, step:0.005, fmt:3 },
-      { key:'tMax', label:'Tab max', type:'range', min:0.08, max:0.16, step:0.005, fmt:3 },
-      { key:'headMax', label:'Head x-span', type:'range', min:0.28, max:0.48, step:0.01, fmt:2 },
+      { key:'tMax', label:'Tab max', type:'range', min:0.05, max:0.16, step:0.005, fmt:3 },
+      { key:'headMax', label:'Head x-span', type:'range', min:0.20, max:0.48, step:0.01, fmt:2 },
     ],
-    desc:'Тот же алгоритм, что Classic, но каждое ребро тянет свой случайный размер таба. Jitter сжимается с ростом таба, чтобы голова всегда оставалась в <code>[0.5 - headMax/2, 0.5 + headMax/2]</code> ребра — соседние табы не пересекаются у углов.' },
+    desc:'Каноничный jigsaw silhouette: 10 контрольных точек, 3 cubic Bezier\'а на ребро. Размер таба <code>t</code> для каждого ребра берётся равномерно из <code>[tMin, tMax]</code>; jitter выводится из <code>t</code> как <code>(headMax − 2t)/2</code>, чтобы голова всегда помещалась в <code>headMax</code>-окно у середины ребра. <strong>tMin = tMax → uniform Classic-вид</strong>; раздвинь — получишь whimsical вариацию между пьесами.' },
 
   { name:'Geometric (polygonal)', subtitle:'10-vertex polyline, dovetail head, per-edge variation', gen:genGeometric,
     // Per-edge jitter on inset & neck; runtime clamps keep dovetail valid.
@@ -833,23 +828,29 @@ const styles = [
     ],
     desc:'Кривых нет вообще. Голова шире шейки → пьесы реально замыкаются. Низкое количество corner\'ов, идеально для mesh-gen и «низкополигонального» арт-направления. <strong>Per-edge jitter</strong> на inset и neck делает табы визуально разнообразными (но детерминированно — соседи стыкуются точно).' },
 
-  { name:'Multi-tab', subtitle:'N classic tabs per side, same sign, scaled-down', gen:genMultiTab,
-    params:{ nMin:2, nMax:2, tIn:0.13, jIn:0.04 },
+  { name:'Multi-tab', subtitle:'N tabs per side, per-tab random sign and size (fraction of edge)', gen:genMultiTab,
+    // Tab size is absolute bump depth as fraction of edge length. Slider's
+    // effective max shrinks at high N (less footprint available).
+    params:{ nMin:2, nMax:2, tabSizeMin:0.10, tabSizeMax:0.18, jIn:0.04 },
     controls:[
       { key:'nMin', label:'N min', type:'range', min:1, max:3, step:1 },
       { key:'nMax', label:'N max', type:'range', min:1, max:3, step:1 },
-      { key:'tIn', label:'Tab size', type:'range', min:0.08, max:0.16, step:0.005, fmt:3 },
+      { keyLo:'tabSizeMin', keyHi:'tabSizeMax', label:'Tab size', type:'range2',
+        min:0.05, max:0.24, step:0.005, fmt:3,
+        // Max achievable bump = 3 · tInSafeMax · footprint(nMax). With
+        // tInSafeMax ≈ 0.185 and footprint = min(0.45, 0.85/nMax):
+        //   nMax=1 → ~0.250, nMax=2 → ~0.236, nMax=3 → ~0.157.
+        dynamicMax: (p) => Math.min(0.24, 3 * 0.185 * Math.min(0.45, 0.85 / Math.max(1, p.nMax))) },
       { key:'jIn', label:'Jitter', type:'range', min:0, max:0.05, step:0.002, fmt:3 },
     ],
-    desc:'<strong>N tabs на ребре, одинакового знака</strong> (артизанский earlet). При <code>N min = N max</code> — фиксированное количество; иначе количество выбирается равномерно в диапазоне на каждое ребро (детерминированно по edge-id, соседи видят одно и то же значение для общего ребра).' },
+    desc:'<strong>N tabs на ребре, у каждого собственный знак и размер</strong>. Размер — это глубина бугра как доля длины ребра. Знак (внутрь/наружу) и размер бросаются независимо на каждом табе из диапазона <code>[Tab min, Tab max]</code>. Верхняя граница слайдера Tab size зависит от <code>N max</code>: чем больше табов, тем меньше места на каждый, и максимум сжимается автоматически. Всё детерминированно по edge-id — соседи видят то же значение для общего ребра.' },
 
   { name:'Organic (CSJ-style CA growth)', subtitle:'Pixel CA + Draradech tabs on long edges', renderFn:renderVoronoi, smooth:false,
-    params:{ gsize:20, gnoise:0.35 },
+    params:{ gnoise:0.35 },
     controls:[
-      { key:'gsize', label:'Cell spacing', type:'range', min:12, max:36, step:2 },
       { key:'gnoise', label:'Seed jitter', type:'range', min:0, max:0.6, step:0.02, fmt:2 },
     ],
-    desc:'Порт алгоритма CustomShapeJigsawJs. Растровый клеточный автомат: каждая клетка растёт диском вокруг своего сида, бой за пиксели идёт от ближайшего сида в Euclidean-метрике. Углы — точки где сходятся ≥3 клеток на 2×2 пиксельном блоке. Между соседними углами либо Draradech-таб (если ребро длинное), либо прямой отрезок. <strong>Это НЕ Voronoi</strong> — это растровая аппроксимация Voronoi, и именно пиксельная квантизация порождает много коротких сегментов и характерный «органический» staircase-вид.' },
+    desc:'Порт алгоритма CustomShapeJigsawJs. Растровый клеточный автомат: на каждую пьесу (Columns × Rows) ставится один seed-пиксель, jitter\'нутый внутри своей лоттереи; затем клетки растут диском от своих сидов, бой за пиксели идёт от ближайшего сида в Euclidean-метрике. Углы — точки где сходятся ≥3 клеток на 2×2 пиксельном блоке. Между соседними углами либо Draradech-таб (если ребро длинное), либо прямой отрезок. <strong>Это НЕ Voronoi</strong> — это растровая аппроксимация Voronoi, и именно пиксельная квантизация порождает много коротких сегментов и характерный «органический» staircase-вид.' },
 
   { name:'Wavy / Organic (FBM overlay)', subtitle:'Classic base + sum-of-sines perp. displacement', gen:genWavy, smooth:true,
     params:{ tabDepth:0.22, waveA:0.06 },
@@ -933,6 +934,10 @@ function buildCard(style) {
   card.className = 'card';
 
   const params = { ...style.params };
+  // Controls with dynamicMax register a function that recomputes their slider
+  // bounds whenever any param changes (so e.g. Tab max shrinks when N max grows).
+  const dynamicUpdaters = [];
+  function applyDynamics() { for (const fn of dynamicUpdaters) fn(); }
 
   const h2 = document.createElement('h2'); h2.textContent = style.name; card.appendChild(h2);
   const sub = document.createElement('div'); sub.className = 'subtitle'; sub.textContent = style.subtitle; card.appendChild(sub);
@@ -950,11 +955,54 @@ function buildCard(style) {
           params[c.key] = opt.val;
           for (const sib of seg.children) sib.classList.remove('on');
           btn.classList.add('on');
+          applyDynamics();
           rerender();
         });
         seg.appendChild(btn);
       }
       ctrlBox.appendChild(seg);
+    } else if (c.type === 'range2') {
+      const wrap = document.createElement('div'); wrap.className = 'range2';
+      const bg = document.createElement('div'); bg.className = 'bg'; wrap.appendChild(bg);
+      const fill = document.createElement('div'); fill.className = 'fill'; wrap.appendChild(fill);
+      const lo = document.createElement('input'); lo.type = 'range';
+      lo.min = c.min; lo.max = c.max; lo.step = c.step; lo.value = params[c.keyLo];
+      const hi = document.createElement('input'); hi.type = 'range';
+      hi.min = c.min; hi.max = c.max; hi.step = c.step; hi.value = params[c.keyHi];
+      wrap.appendChild(lo); wrap.appendChild(hi);
+      const val = document.createElement('div'); val.className = 'val';
+      function fmtPair() { return formatVal(c, params[c.keyLo]) + '–' + formatVal(c, params[c.keyHi]); }
+      function updateFill() {
+        const cMin = Number(lo.min), cMax = Number(lo.max), span = cMax - cMin;
+        if (span <= 0) { fill.style.left = '0%'; fill.style.right = '100%'; return; }
+        fill.style.left = ((Number(lo.value) - cMin) / span * 100) + '%';
+        fill.style.right = (100 - (Number(hi.value) - cMin) / span * 100) + '%';
+      }
+      function syncVal() { val.textContent = fmtPair(); }
+      lo.addEventListener('input', () => {
+        let v = Number(lo.value);
+        if (v > Number(hi.value)) { lo.value = hi.value; v = Number(lo.value); }
+        params[c.keyLo] = v; updateFill(); syncVal(); rerender();
+      });
+      hi.addEventListener('input', () => {
+        let v = Number(hi.value);
+        if (v < Number(lo.value)) { hi.value = lo.value; v = Number(hi.value); }
+        params[c.keyHi] = v; updateFill(); syncVal(); rerender();
+      });
+      ctrlBox.appendChild(wrap);
+      ctrlBox.appendChild(val);
+      syncVal(); updateFill();
+      if (c.dynamicMax) {
+        dynamicUpdaters.push(() => {
+          const newMax = c.dynamicMax(params);
+          lo.max = newMax; hi.max = newMax;
+          // Clamp current values into the new range
+          if (params[c.keyHi] > newMax) { params[c.keyHi] = newMax; hi.value = newMax; }
+          if (params[c.keyLo] > newMax) { params[c.keyLo] = newMax; lo.value = newMax; }
+          if (params[c.keyLo] > params[c.keyHi]) { params[c.keyLo] = params[c.keyHi]; lo.value = params[c.keyLo]; }
+          updateFill(); syncVal();
+        });
+      }
     } else {
       const inp = document.createElement('input');
       inp.type = 'range'; inp.min = c.min; inp.max = c.max; inp.step = c.step;
@@ -964,14 +1012,13 @@ function buildCard(style) {
         const v = Number(inp.value);
         params[c.key] = (c.step >= 1) ? Math.round(v) : v;
         val.textContent = formatVal(c, params[c.key]);
+        applyDynamics();
         rerender();
       });
       ctrlBox.appendChild(inp);
       ctrlBox.appendChild(val);
     }
   }
-  // No card-level controls box if the style has no per-card knobs (none today,
-  // but cheap to support).
   if (style.controls.length > 0) card.appendChild(ctrlBox);
 
   const svgBox = document.createElement('div');
@@ -980,6 +1027,7 @@ function buildCard(style) {
   const desc = document.createElement('div'); desc.className = 'desc'; desc.innerHTML = style.desc; card.appendChild(desc);
 
   function rerender() { svgBox.innerHTML = renderSvg(style, params); }
+  applyDynamics(); // initial bound sync
   rerender();
   cardRerenderers.push(rerender);
 
