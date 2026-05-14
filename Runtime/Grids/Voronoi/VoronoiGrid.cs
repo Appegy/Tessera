@@ -55,6 +55,8 @@ namespace Appegy.Tessera
             for (var i = 0; i < arr.Length; i++) dest[i] = arr[i];
         }
 
+        public int GetNeighborCount(int id) => _neighbors[id].Length;
+
         public int GetNeighbor(int id, int neighborIndex)
         {
             var arr = _neighbors[id];

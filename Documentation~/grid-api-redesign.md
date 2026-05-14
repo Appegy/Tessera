@@ -2,6 +2,8 @@
 
 Status: design accepted 2026-04-27, implementation in progress.
 
+Update 2026-05-14: the original v2 locked **alignment** (corners count == neighbours count, edge `i` between corner `i` and corner `(i+1) % N` shared with neighbour `i`). That coupling blocks non-polygonal cells (jigsaw puzzles, curved-edge tilings, future tessellations whose visual outline is richer than the adjacency graph). The contract is **loosened**: `GetCornersCount` and `GetNeighborCount` are split into two independent counts. No positional mapping between them is fixed at the core level yet — the actual bridge accessor (e.g. an edge polyline / corner range query) will be added together with the first non-polygonal grid, when concrete consumers (mesh-gen, region tracing) make its shape obvious. For currently shipped grids all cells are simple polygons, so `M == K` and the legacy "edge `j` = corner[j] → corner[(j+1)%N]" convention continues to hold as a per-grid implementation property. Affected sections: `Locked decisions`, `Public API`, `Contracts`.
+
 ## Working note on flexibility
 
 This spec is a starting point, not a contract. While implementing, if any item below turns out to be unnecessary, redundant, awkward, or simply wrong, **do not force it through**. Skip it or change it. The only obligation is to **flag the deviation back to the user** in the same response: what was changed, why, and what the new shape is. The user decides whether to accept the change and update the spec.
@@ -17,12 +19,12 @@ Generalise Tessera from "regular tessellations only (square / hex)" to "any 2D g
 - **Identity = `int` id**, dense `[0, CellCount)`. Coordinates (X/Y, axial, ...) are concrete-grid extras, not part of `IGrid`.
 - **`IGrid` is an interface, not a Union.** Each implementation decides whether to cache or compute.
 - **No precomputed caches for square / hex.** Their geometry is closed-form; computing on demand is cheap. Voronoi caches because it has no formula.
-- **Edge-connected only.** Each grid is a planar graph where one polygon edge = one neighbour relation. Square is 4-connected (no diagonals). Hexagon is 6-connected (no Even/Odd partial modes). Voronoi: each cell connects to all cells sharing an edge in the diagram.
-- **Variable corner / neighbour count per cell.** Voronoi has 5-7 corners depending on the cell; square = 4, hex = 6 fixed. The core API treats variability as the norm.
-- **Corners count == neighbours count.** Each polygon edge has exactly one neighbour slot. A boundary edge stores `-1` in that slot; the corners are still present.
-- **Alignment contract.** For any cell `c` with `N = GetCornersCount(c)`, the edge from `GetCorner(c, i)` to `GetCorner(c, (i+1) % N)` is shared with `GetNeighbor(c, i)`. Implementations MUST satisfy this.
+- **Edge-connected only.** Each grid is a planar graph where one topological edge = one neighbour relation. Square is 4-connected (no diagonals). Hexagon is 6-connected (no Even/Odd partial modes). Voronoi: each cell connects to all cells sharing an edge in the diagram.
+- **Geometry and topology counts are independent.** Per cell, `GetCornersCount(id)` (the corner-polyline length, geometry) and `GetNeighborCount(id)` (the adjacency-graph degree, topology) are separate methods on the core interface. For currently shipped grids they always return the same value because every cell is a simple polygon; non-polygonal grids (future) will set `GetCornersCount > GetNeighborCount`. No positional mapping between corner index and neighbour index is mandated by the core — the bridge accessor lands together with the first non-polygonal grid, when consumer requirements are concrete.
+- **Variable corner / neighbour count per cell.** Voronoi has 5-7 corners (and the same number of neighbours) depending on the cell; square = 4, hex = 6 fixed. Both counts are queried per id.
 - **Neighbour index is ordinal, not directional.** "North", "east", ... are concepts of `SquareGrid` / `HexagonalGrid`, not of the core. Voronoi neighbours are stably ordered but carry no semantic direction.
-- **Corner / neighbour ordering** is stable and clockwise. The starting corner of `SquareGrid` / `HexagonalGrid` is preserved from current `ITessellation` (top-right). Neighbour indices are *forced by the alignment contract*: edge 0 is `corner[0] -> corner[1]`, so neighbour 0 sits on that edge. For square 4-dir this means `neighbour 0 = right neighbour` (not "top" as in the old `ITessellation`). For hex it shifts accordingly. For `VoronoiGrid` the starting corner is implementation-defined; only the clockwise direction is guaranteed.
+- **Corner ordering** is stable and clockwise around the cell. The starting corner of `SquareGrid` / `HexagonalGrid` is preserved from the legacy `ITessellation` (top-right). For `VoronoiGrid` the starting corner is implementation-defined; only the clockwise direction is guaranteed.
+- **Neighbour ordering** is stable and per-grid. For currently shipped grids (polygonal, `M == K`) the convention is "edge `j` runs from corner `j` to corner `(j+1) % N`, shared with neighbour `j`". `SquareGrid` keeps neighbour 0 = right (corner 0 = TR, edge corner 0 → corner 1 is the right edge). `HexagonalGrid` keeps the analogous start (see `AGENTS.md`). `VoronoiGrid` starts neighbour 0 at corner 0. This is a per-grid implementation property, not a core contract.
 - **Boundary marker = `-1`** for `GetNeighbor` (no neighbour on that side) and `GetCellAt` (point outside grid).
 - **Geometry type = `Unity.Mathematics.float2`** (`com.unity.mathematics` 1.3.2, already added to `package.json` and `Appegy.Tessera.asmdef`).
 - **`Distance` is a graph metric.** Square / hex use closed form. Voronoi falls back to BFS — O(N) per query. No precomputed pairwise matrix. Caller is responsible for batch-caching if needed.
@@ -39,19 +41,18 @@ public interface IGrid
     int CellCount { get; }
     Bounds2 Bounds { get; }
 
-    // Geometry
+    // Geometry — visual shape of the cell (clockwise corner polyline)
     float2 GetCenter(int id);
     int GetCornersCount(int id);
     float2 GetCorner(int id, int cornerIndex);
     void CopyCorners(int id, Span<float2> dest);
-
-    // Neighbourhood
-    int GetNeighbor(int id, int neighborIndex);       // -1 = boundary
-    bool AreNeighbors(int a, int b);
-    int GetNeighborIndex(int cell, int neighbor);     // -1 if not a neighbour
-
-    // Spatial / metric
     int GetCellAt(float2 point);                       // -1 if outside grid
+
+    // Topology — adjacency graph
+    int GetNeighborCount(int id);
+    int GetNeighbor(int id, int neighborIndex);        // -1 = boundary slot
+    bool AreNeighbors(int a, int b);
+    int GetNeighborIndex(int cell, int neighbor);      // -1 if not a neighbour
     int Distance(int a, int b);                        // graph distance
 }
 
@@ -128,12 +129,17 @@ public sealed class VoronoiGrid : IGrid
 
 ## Contracts (must hold for any IGrid implementation)
 
-1. **Alignment.** Edge `GetCorner(c, i) -> GetCorner(c, (i+1) % N)` is shared with `GetNeighbor(c, i)`. Always.
-2. **Counts match.** `GetCornersCount(c)` = number of edges = number of neighbour slots.
+1. **Corner ordering.** Stable, clockwise around the cell. Square / hex start from top-right (matches the legacy `ITessellation` corner ordering). For Voronoi the starting corner is implementation-defined.
+2. **Counts.** `GetCornersCount(id) >= 1` and `GetNeighborCount(id) >= 1`. Their relationship is not constrained by the core; concrete grids document their own (currently all shipped grids are polygonal with `GetCornersCount == GetNeighborCount`).
 3. **Symmetric neighbourhood.** `AreNeighbors(a, b) == AreNeighbors(b, a)`. If `GetNeighborIndex(a, b) >= 0`, then `GetNeighborIndex(b, a) >= 0`.
 4. **Distance metric.** `Distance(a, a) == 0`. `Distance(a, b) > 0` for `a != b`. `Distance(a, b) == Distance(b, a)`.
 5. **Centre round-trip.** `GetCellAt(GetCenter(id)) == id` for any valid `id`. Reverse round-trip is not guaranteed exactly because of float rounding at cell boundaries.
-6. **Corner ordering.** Stable, clockwise. Square / hex start from top-right (matches current `ITessellation` corner ordering). Neighbour ordering follows the alignment contract: neighbour 0 sits on edge 0 (corner 0 -> corner 1), so for square 4-dir `neighbour 0 = right`. For Voronoi the starting corner is implementation-defined.
+
+Polygonal grids (current `SquareGrid` / `HexagonalGrid` / `VoronoiGrid`) additionally satisfy, as a per-grid implementation property:
+
+- `GetCornersCount(id) == GetNeighborCount(id)`.
+- Edge `j` is the segment from `GetCorner(c, j)` to `GetCorner(c, (j+1) % N)`, and `GetNeighbor(c, j)` is the cell across it (boundary stores `-1`; corners are still present).
+- Shared corners between neighbouring cells coincide up to float tolerance (`SquareGrid` / `VoronoiGrid` match exactly; `HexagonalGrid` matches up to trig FP noise).
 
 ## Migration plan
 

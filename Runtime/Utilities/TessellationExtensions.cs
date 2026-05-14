@@ -11,7 +11,7 @@ namespace Appegy.Tessera
         /// <summary>Yields all valid neighbours of <paramref name="id" />, skipping boundary slots (the <c>-1</c>s).</summary>
         public static IEnumerable<int> Neighbors(this ITessellation tessellation, int id)
         {
-            var n = tessellation.GetCornersCount(id);
+            var n = tessellation.GetNeighborCount(id);
             for (var i = 0; i < n; i++)
             {
                 var nb = tessellation.GetNeighbor(id, i);

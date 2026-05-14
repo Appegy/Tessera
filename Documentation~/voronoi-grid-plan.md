@@ -12,6 +12,8 @@
 
 `Documentation~/voronoi-grid-design.md` (commit `297a2b9`). Read it first. Hard contracts (alignment, symmetry, distance metric, centre round-trip, CW corner ordering) come from `Documentation~/grid-api-redesign.md`.
 
+> Update 2026-05-14: the geometry/topology decoupling (`grid-api-redesign.md`) downgraded the "alignment" requirement to an implementation property of polygonal grids. VoronoiGrid is polygonal, so the plan's assumption that `corner[k] -> corner[(k+1) % N]` is shared with `neighbour[k]` still holds **inside VoronoiGrid**, but it is no longer a core `IGrid` contract.
+
 ## Conventions and Unity quirks
 
 - Each new `.cs` file under `Runtime/` or `Tests/` needs a `.cs.meta` file. After creating files, run `mcp__oc__unityMCP_refresh_unity` to let Unity generate them, then `git add -A` to stage both. Folder `.meta` files are also auto-generated.
