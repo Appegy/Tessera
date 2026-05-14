@@ -86,7 +86,7 @@ namespace Appegy.Tessera.Tests
             var g = new VoronoiGrid(Unit, 32, 0, 2);
             for (var id = 0; id < g.CellCount; id++)
             {
-                for (var k = 0; k < g.GetCornersCount(id); k++)
+                for (var k = 0; k < g.GetNeighborCount(id); k++)
                 {
                     var n = g.GetNeighbor(id, k);
                     if (n == -1) continue;
@@ -122,7 +122,7 @@ namespace Appegy.Tessera.Tests
         public void GetNeighbor_ModWrapsNegativeAndOversizedIndex()
         {
             var g = new VoronoiGrid(Unit, 16, 0, 2);
-            var n = g.GetCornersCount(0);
+            var n = g.GetNeighborCount(0);
             Assert.AreEqual(g.GetNeighbor(0, 0), g.GetNeighbor(0, n));
             Assert.AreEqual(g.GetNeighbor(0, 0), g.GetNeighbor(0, -n));
             Assert.AreEqual(g.GetNeighbor(0, 1), g.GetNeighbor(0, n + 1));
@@ -181,20 +181,21 @@ namespace Appegy.Tessera.Tests
         {
             var g = new VoronoiGrid(Unit, cellCount, seedValue, 3);
 
-            // Counts match.
+            // Accessors don't throw for any valid index, corner count >= 3.
             for (var id = 0; id < g.CellCount; id++)
             {
-                var n = g.GetCornersCount(id);
-                Assert.GreaterOrEqual(n, 3);
-                for (var k = 0; k < n; k++) g.GetCorner(id, k); // shouldn't throw
-                for (var k = 0; k < n; k++) g.GetNeighbor(id, k);
+                var m = g.GetCornersCount(id);
+                Assert.GreaterOrEqual(m, 3);
+                for (var k = 0; k < m; k++) g.GetCorner(id, k);
+                var kCount = g.GetNeighborCount(id);
+                for (var k = 0; k < kCount; k++) g.GetNeighbor(id, k);
             }
 
             // Symmetry of neighbour relation.
             for (var a = 0; a < g.CellCount; a++)
             {
-                var n = g.GetCornersCount(a);
-                for (var k = 0; k < n; k++)
+                var ka = g.GetNeighborCount(a);
+                for (var k = 0; k < ka; k++)
                 {
                     var b = g.GetNeighbor(a, k);
                     if (b == -1) continue;
@@ -235,11 +236,46 @@ namespace Appegy.Tessera.Tests
             var sawBoundary = false;
             for (var id = 0; id < g.CellCount && !sawBoundary; id++)
             {
-                var n = g.GetCornersCount(id);
-                for (var k = 0; k < n; k++)
-                    if (g.GetNeighbor(id, k) == -1) { sawBoundary = true; break; }
+                var k = g.GetNeighborCount(id);
+                for (var i = 0; i < k; i++)
+                    if (g.GetNeighbor(id, i) == -1) { sawBoundary = true; break; }
             }
             Assert.IsTrue(sawBoundary, "no boundary slots found - expected at least one");
+
+            // Geometry / topology counts agree for VoronoiGrid (polygonal).
+            for (var id = 0; id < g.CellCount; id++)
+                Assert.AreEqual(g.GetCornersCount(id), g.GetNeighborCount(id), $"cell {id} K != M");
+        }
+
+        [TestCase(0, 64)] [TestCase(1, 64)] [TestCase(2, 256)] [TestCase(3, 256)]
+        public void SharedEdgeCoherence_NeighboursAgreeOnEndpoints(int seedValue, int cellCount)
+        {
+            // Per-grid property (VoronoiGrid is polygonal): edge ja runs corner[ja] -> corner[(ja+1)%N].
+            // Voronoi vertices come from circumcenters shared across cells in the builder, so endpoints
+            // should match exactly; tested with tolerance for portability.
+            var g = new VoronoiGrid(Unit, cellCount, seedValue, 3);
+            for (var a = 0; a < g.CellCount; a++)
+            {
+                var ka = g.GetNeighborCount(a);
+                for (var ja = 0; ja < ka; ja++)
+                {
+                    var b = g.GetNeighbor(a, ja);
+                    if (b == -1) continue;
+                    var jb = g.GetNeighborIndex(b, a);
+                    Assert.AreNotEqual(-1, jb, $"seed={seedValue} a={a} b={b}");
+
+                    var kb = g.GetNeighborCount(b);
+                    var aStart = g.GetCorner(a, ja);
+                    var aEnd = g.GetCorner(a, (ja + 1) % ka);
+                    var bStart = g.GetCorner(b, jb);
+                    var bEnd = g.GetCorner(b, (jb + 1) % kb);
+
+                    Assert.AreEqual(aStart.x, bEnd.x, 1e-5f, $"seed={seedValue} a={a} ja={ja} b={b} jb={jb}");
+                    Assert.AreEqual(aStart.y, bEnd.y, 1e-5f, $"seed={seedValue} a={a} ja={ja} b={b} jb={jb}");
+                    Assert.AreEqual(aEnd.x, bStart.x, 1e-5f, $"seed={seedValue} a={a} ja={ja} b={b} jb={jb}");
+                    Assert.AreEqual(aEnd.y, bStart.y, 1e-5f, $"seed={seedValue} a={a} ja={ja} b={b} jb={jb}");
+                }
+            }
         }
     }
 }

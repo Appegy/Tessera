@@ -85,6 +85,11 @@ namespace Appegy.Tessera
             }
         }
 
+        public int GetNeighborCount(int id)
+        {
+            return 6;
+        }
+
         public int GetNeighbor(int id, int neighborIndex)
         {
             var (x, y) = XYOf(id);

@@ -112,6 +112,45 @@ namespace Appegy.Tessera.Tests
         }
 
         [Test]
+        public void GetNeighborCount_EqualsCornersCount([ValueSource(nameof(AllTypes))] HexagonalGridType type)
+        {
+            var grid = new HexagonalGrid(4, 3, 1f, type);
+            for (var id = 0; id < grid.CellCount; id++)
+                Assert.AreEqual(grid.GetCornersCount(id), grid.GetNeighborCount(id));
+        }
+
+        [Test]
+        public void SharedEdgeCoherence_NeighboursAgreeOnEndpoints([ValueSource(nameof(AllTypes))] HexagonalGridType type)
+        {
+            // Per-grid property (HexagonalGrid is polygonal): edge ja runs corner[ja] -> corner[(ja+1)%N].
+            // Hex corners come from cos/sin of different angles in each cell, so endpoints match up to
+            // trig FP noise. Tolerance 1e-4 covers all four layouts at unit radius.
+            var grid = new HexagonalGrid(5, 5, 1f, type);
+            for (var a = 0; a < grid.CellCount; a++)
+            {
+                var ka = grid.GetNeighborCount(a);
+                for (var ja = 0; ja < ka; ja++)
+                {
+                    var b = grid.GetNeighbor(a, ja);
+                    if (b == -1) continue;
+                    var jb = grid.GetNeighborIndex(b, a);
+                    Assert.AreNotEqual(-1, jb, $"type={type} a={a} b={b}");
+
+                    var kb = grid.GetNeighborCount(b);
+                    var aStart = grid.GetCorner(a, ja);
+                    var aEnd = grid.GetCorner(a, (ja + 1) % ka);
+                    var bStart = grid.GetCorner(b, jb);
+                    var bEnd = grid.GetCorner(b, (jb + 1) % kb);
+
+                    Assert.AreEqual(aStart.x, bEnd.x, 1e-4f, $"type={type} a={a} ja={ja} b={b} jb={jb}");
+                    Assert.AreEqual(aStart.y, bEnd.y, 1e-4f, $"type={type} a={a} ja={ja} b={b} jb={jb}");
+                    Assert.AreEqual(aEnd.x, bStart.x, 1e-4f, $"type={type} a={a} ja={ja} b={b} jb={jb}");
+                    Assert.AreEqual(aEnd.y, bStart.y, 1e-4f, $"type={type} a={a} ja={ja} b={b} jb={jb}");
+                }
+            }
+        }
+
+        [Test]
         public void GetNeighbor_BoundaryReturnsMinusOne([ValueSource(nameof(AllTypes))] HexagonalGridType type)
         {
             var grid = new HexagonalGrid(2, 2, 1f, type);
