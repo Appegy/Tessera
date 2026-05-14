@@ -2,7 +2,8 @@
 # Uses the modern Pages flow (artifact + deploy-pages action) so we don't
 # touch any branch. Triggers only when the playground file changes.
 #
-# Prerequisite (one-time): GitHub repo → Settings → Pages → Source = "GitHub Actions".
+# Pages is auto-enabled on first run (configure-pages.enablement = true), so
+# no manual Settings toggle is required.
 
 name: Deploy playground to GitHub Pages
 
@@ -36,6 +37,10 @@ jobs:
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
+        with:
+          # Auto-enable Pages on first run so the repo owner doesn't need to
+          # flip the Settings toggle manually.
+          enablement: true
 
       - name: Stage site
         run: |
