@@ -10,7 +10,7 @@ The full design rationale is in `Documentation~/grid-api-redesign.md`. Read it b
 
 ## Architecture
 
-`IGrid` is the unified interface (11 methods). It models a finite, immutable 2D grid as a connected planar graph of cells with a per-cell clockwise corner polyline as the visual outline. Cells are identified by dense `int` ids in `[0, CellCount)`. Geometry (`GetCornersCount`) and topology (`GetNeighborCount`) are exposed as separate counts so non-polygonal cells (e.g. future jigsaw pieces) can fit; for currently shipped grids the two are equal. See `Documentation~/grid-api-redesign.md` for full rationale.
+`IGrid` is the unified interface (12 members: 2 properties + 10 methods). It models a finite, immutable 2D grid as a connected planar graph of cells with a per-cell clockwise corner polyline as the visual outline. Cells are identified by dense `int` ids in `[0, CellCount)`. Geometry (`GetCornersCount`) and topology (`GetNeighborCount`) are exposed as separate counts so non-polygonal cells (e.g. future jigsaw pieces) can fit; for currently shipped grids the two are equal. See `Documentation~/grid-api-redesign.md` for full rationale.
 
 Concrete grid types:
 

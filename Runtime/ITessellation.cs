@@ -34,10 +34,13 @@ namespace Appegy.Tessera
         /// </summary>
         void CopyCorners(int id, Span<float2> dest);
 
+        /// <summary>Returns the id of the cell containing <paramref name="point" />, or <c>-1</c> if outside the tessellation.</summary>
+        int GetCellAt(float2 point);
+
         /// <summary>
         ///     Number of topological adjacency slots (one slot per shared boundary, including boundary slots
-        ///     marked with <c>-1</c>). Always &lt;= <see cref="GetCornersCount" />. For polygonal grids
-        ///     (square, hex, Voronoi) it equals the corner count.
+        ///     marked with <c>-1</c>). For currently shipped grids it equals <see cref="GetCornersCount" />
+        ///     because every cell is a simple polygon; the core does not constrain the relationship.
         /// </summary>
         int GetNeighborCount(int id);
 
@@ -55,9 +58,6 @@ namespace Appegy.Tessera
         ///     Returns <c>-1</c> if the cells are not neighbours.
         /// </summary>
         int GetNeighborIndex(int cell, int neighbor);
-
-        /// <summary>Returns the id of the cell containing <paramref name="point" />, or <c>-1</c> if outside the tessellation.</summary>
-        int GetCellAt(float2 point);
 
         /// <summary>Minimum number of cell-to-cell hops between <paramref name="a" /> and <paramref name="b" />.</summary>
         int Distance(int a, int b);
