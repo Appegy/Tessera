@@ -2,7 +2,7 @@
 
 Status: design accepted 2026-04-28, implementation pending.
 
-Builds on `grid-api-redesign.md`. This document covers only the Voronoi-specific decisions; everything in the v2 redesign (`IGrid`, `Bounds2`, `PlaneGrid<T>`, contracts, alignment rule, boundary marker `-1`) applies as-is.
+Builds on `grid-api-redesign.md`. This document covers only the Voronoi-specific decisions; everything in the v2 redesign (`IGrid`, `Bounds2`, `PlaneGrid<T>`, contracts including the geometry/topology split and the `GetNeighborStartCorner` bridge, boundary marker `-1`) applies as-is. VoronoiGrid is polygonal, so internally `GetCornersCount == GetNeighborCount` and `GetNeighborStartCorner(id, j) == j` — the bridge is effectively the identity for this grid.
 
 ## Working note on flexibility
 
@@ -18,7 +18,7 @@ Implement the third concrete `IGrid`: an irregular cell grid based on a centroid
 - **Algorithm**: naive Bowyer-Watson incremental Delaunay → derive Voronoi from triangle circumcenters → Sutherland-Hodgman clip to `Bounds2`. No internal strategy interface; if a faster algorithm appears later it replaces or shadows this one.
 - **Sampling**: `System.Random(seed)` uniform inside `bounds`. No `IPointSampler` injection.
 - **Relaxation**: Lloyd. `relaxationIterations` rounds. Each round computes a clipped diagram and replaces every seed with the centroid of its clipped polygon. After relaxation, one extra clean Delaunay → Voronoi → clip pass produces the cached topology.
-- **Robustness policy**: trust-and-throw. If construction violates an internal invariant (degenerate triangle, broken alignment, asymmetric neighbour graph), the constructor raises `InvalidOperationException` naming the failing invariant and the seed. The caller picks another seed. Auto-jitter / robust predicates are deferred.
+- **Robustness policy**: trust-and-throw. If construction violates an internal invariant (degenerate triangle, mismatched `_corners`/`_neighbors` lengths, asymmetric neighbour graph), the constructor raises `InvalidOperationException` naming the failing invariant and the seed. The caller picks another seed. Auto-jitter / robust predicates are deferred.
 - **Determinism**: identical `(bounds, cellCount, seed, relaxationIterations)` produces an identical grid (same id ordering, same geometry, same neighbour graph). `System.Random` is the only randomness source. No wall-clock or environment dependence.
 - **Boundary**: cells whose natural Voronoi region escapes `bounds` are clipped. Clipped edges that lie on `bounds` carry `GetNeighbor = -1`. The cell's corner count reflects the post-clip polygon (typically 4-7 for boundary cells, 5-7 for interior cells).
 - **Storage**: jagged `float2[][]` for corners and jagged `int[][]` for neighbours, both aligned per cell. Single `float2[]` for centers. CSR is an open internal upgrade if profiling demands it.
@@ -103,8 +103,10 @@ All internal builders are `internal static` — no public surface beyond `Vorono
 1. **Construction validation.** Each invalid-argument case from "Public API addition" throws the documented exception type.
 2. **Determinism.** Same `(bounds, cellCount, seed, iters)` → identical centers / corners / neighbours arrays.
 3. **Contracts**, parametrised over multiple seeds (e.g. 0..9) and cell counts (e.g. 64, 256):
-   - alignment: edge `corner[k] -> corner[(k+1) % N]` is shared with `neighbour[k]` (or that neighbour slot is `-1` and the edge lies on `bounds`).
-   - counts match: `GetCornersCount(id) == neighbour count`.
+   - polygonal layout (VoronoiGrid-specific): `GetCornersCount(id) == GetNeighborCount(id)`, `GetNeighborStartCorner(id, j) == j`.
+   - edge geometry: corner `k -> (k+1) % N` is the polyline shared with `GetNeighbor(id, k)` (or that slot is `-1` and the edge lies on `bounds`).
+   - core edge partition (`GetNeighborStartCorner` strictly increasing, starts at 0, values in `[0, M)`).
+   - shared edge coherence: between neighbouring cells `a, b`, the segment endpoints match bit-identically in reverse order.
    - symmetry: `AreNeighbors(a, b) == AreNeighbors(b, a)`; `GetNeighborIndex` agrees both ways.
    - distance metric: `Distance(a, a) == 0`, `Distance(a, b) > 0` for `a != b`, symmetric.
    - centre round-trip: `GetCellAt(GetCenter(id)) == id`.
