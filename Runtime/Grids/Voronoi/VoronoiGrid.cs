@@ -57,13 +57,6 @@ namespace Appegy.Tessera
 
         public int GetNeighborCount(int id) => _neighbors[id].Length;
 
-        // GetNeighborStartCorner(id, j) == j: VoronoiGrid is polygonal, so corners and neighbour slots align.
-        public int GetNeighborStartCorner(int id, int neighborIndex)
-        {
-            var n = _neighbors[id].Length;
-            return (neighborIndex % n + n) % n;
-        }
-
         public int GetNeighbor(int id, int neighborIndex)
         {
             var arr = _neighbors[id];

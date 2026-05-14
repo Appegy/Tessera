@@ -10,7 +10,7 @@ The full design rationale is in `Documentation~/grid-api-redesign.md`. Read it b
 
 ## Architecture
 
-`IGrid` is the unified interface (12 methods). It models a finite, immutable 2D grid as a connected planar graph of cells with a separate per-cell polygonal (or polyline) outline. Cells are identified by dense `int` ids in `[0, CellCount)`. Geometry (corner polyline) and topology (neighbour list) are decoupled: a topological edge can span more than one corner segment, which lets non-polygonal cells (jigsaw pieces, curved tiles) fit the same interface. See `Documentation~/grid-api-redesign.md` for full rationale.
+`IGrid` is the unified interface (11 methods). It models a finite, immutable 2D grid as a connected planar graph of cells with a per-cell clockwise corner polyline as the visual outline. Cells are identified by dense `int` ids in `[0, CellCount)`. Geometry (`GetCornersCount`) and topology (`GetNeighborCount`) are exposed as separate counts so non-polygonal cells (e.g. future jigsaw pieces) can fit; for currently shipped grids the two are equal. See `Documentation~/grid-api-redesign.md` for full rationale.
 
 Concrete grid types:
 
@@ -45,22 +45,20 @@ Debug visualization scripts live in `Appegy.Tessera.Environment~/Assets/Scripts/
 
 ## Geometry / Topology Contract (mandatory for every IGrid implementation)
 
-A cell has two independent counts:
+A cell has two counts:
 
 - `M = GetCornersCount(c)` — length of the clockwise corner polyline that draws the cell's outline.
-- `K = GetNeighborCount(c)` — number of topological edges (adjacency slots). Always `K <= M` and `K >= 1`.
+- `K = GetNeighborCount(c)` — number of topological adjacency slots (neighbours, including `-1` boundary slots).
 
-Each topological edge `j` (`0 <= j < K`) covers a contiguous clockwise corner range:
+Both `>= 1`. The core does not mandate any positional mapping between corner index and neighbour index.
 
-- `s = GetNeighborStartCorner(c, j)` — first corner of the shared boundary with `GetNeighbor(c, j)`.
-- `e = GetNeighborStartCorner(c, (j+1) % K)` — first corner of the *next* edge. This corner is also the last corner of the current edge (joint corners are shared between two consecutive edges).
-- The boundary polyline contains corners `s, s+1, ..., e` (clockwise, modulo `M`), endpoints inclusive on both sides. It has at least one segment (`e != s`).
-- `GetNeighbor(c, j)` is the cell on the other side, or `-1` if this edge is on the grid boundary. The corners themselves are still present.
-- `GetNeighborStartCorner(c, 0) == 0` always; the values are strictly increasing in `j`.
+Currently shipped grids (`SquareGrid`, `HexagonalGrid`, `VoronoiGrid`) are all polygonal — every cell is a simple polygon — and as a per-grid property satisfy:
 
-For polygonal grids (`SquareGrid`, `HexagonalGrid`, `VoronoiGrid`) `M == K` and `GetNeighborStartCorner(c, j) == j`, so each edge is one segment between two consecutive corners — the legacy "alignment" layout, now an implementation property of those grids rather than a global contract.
+- `M == K`.
+- Edge `j` is the segment from `GetCorner(c, j)` to `GetCorner(c, (j+1) % N)`.
+- `GetNeighbor(c, j)` is the cell across edge `j`, or `-1` if that edge is on the grid boundary.
 
-Mesh-gen, edge-walking, and per-edge styling read `GetNeighborStartCorner` to know which polyline segments share an edge with which neighbour. Pure graph traversal (BFS, distance, neighbours iteration) uses only `GetNeighbor` / `GetNeighborCount` and does not touch geometry.
+When non-polygonal grids land (e.g. jigsaw pieces with polyline edges), the explicit bridge accessor between corner ranges and neighbour slots will be added to the interface — but with a concrete consumer (mesh-gen, region tracing) on hand to pin down its shape. Pure graph traversal (BFS, distance, neighbours iteration) uses only `GetNeighbor` / `GetNeighborCount` and does not touch geometry, so it is unaffected.
 
 ## Hex Layout (HexagonalGridType)
 
@@ -75,7 +73,7 @@ The enum picks the offset coordinate convention. All four are 6-connected; there
 
 ## Index Ordering (clockwise)
 
-Corners start at the top-right corner and walk clockwise. The core does not force a particular neighbour-0 position any more, but the polygonal concrete grids preserve the legacy layout (their `GetNeighborStartCorner(c, j) == j`):
+Corners start at the top-right corner and walk clockwise. The core does not force a particular neighbour-0 position, but the polygonal concrete grids preserve the legacy layout (neighbour `j` is the cell across edge from corner `j` to corner `(j+1) % N`):
 
 ```
 SquareGrid (4-conn):     neighbour 0=right, 1=bottom, 2=left, 3=top
@@ -123,8 +121,9 @@ Tests live as flat `*.cs` files under `Tests/` (no subfolders). When adding beha
 - For hex-related changes, parameterise the test over all four `HexagonalGridType` values (`PointyOdd`, `PointyEven`, `FlatOdd`, `FlatEven`). See `HexagonalGridTests.cs` for the `[ValueSource(nameof(AllTypes))]` pattern.
 - For square, single-grid tests are usually enough — `SquareGrid` is 4-connected only at the `IGrid` level (no diagonal mode).
 - Use `float2` for geometry assertions (matches the public API). Tolerance `1e-4f` to `1e-5f` is fine for hex math.
-- For polygonal grids (`SquareGrid`, `HexagonalGrid`, `VoronoiGrid`) the legacy alignment is still a useful per-grid test — `2 * edge_midpoint - cell_center == neighbour_center` and `GetNeighborStartCorner(c, j) == j`. It is a property of those implementations, not of the core contract. See `Alignment_NeighbourSitsAcrossCorrespondingEdge` in `SquareGridTests.cs` / `HexagonalGridTests.cs`.
-- Core contract worth testing for **every** new grid type: edge partition (`GetNeighborStartCorner` is `0` at `j=0`, strictly increasing, all values `< GetCornersCount`); shared edge coherence (the polyline neighbour `a` exposes for neighbour `b` is the reverse of what `b` exposes for `a`, endpoints agree within FP tolerance — grids that need crack-free mesh stitching must match exactly by construction); symmetric neighbourhood; centre round-trip.
+- For polygonal grids (`SquareGrid`, `HexagonalGrid`, `VoronoiGrid`) the legacy alignment is a useful per-grid test — `2 * edge_midpoint - cell_center == neighbour_center` and `GetCornersCount == GetNeighborCount`. It is a property of those implementations, not of the core contract. See `Alignment_NeighbourSitsAcrossCorrespondingEdge` in `SquareGridTests.cs` / `HexagonalGridTests.cs`.
+- Core contract worth testing for **every** grid type: symmetric neighbourhood; `GetNeighbor` and `GetNeighborIndex` agree both ways; distance metric (`Distance(a,a)==0`, positive for distinct, symmetric); centre round-trip (`GetCellAt(GetCenter(id)) == id`).
+- Shared edge coherence (adjacent cells expose the same corners for their shared boundary) is a per-grid behavioural test today; it will move toward a core contract once a non-polygonal grid lands together with its bridge accessor.
 
 ## How to Add a New IGrid Method
 

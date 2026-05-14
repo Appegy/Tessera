@@ -7,9 +7,9 @@ namespace Appegy.Tessera
     ///     A finite, immutable tessellation of the plane: a collection of cells whose adjacency forms
     ///     a connected planar graph. Cells are identified by dense integer ids in the range
     ///     <c>[0, CellCount)</c>. Geometry (the clockwise corner polyline of each cell) and topology
-    ///     (the neighbour graph) are independent: <see cref="GetCornersCount" /> may exceed
-    ///     <see cref="GetNeighborCount" /> for cells whose visual edges are polylines rather than
-    ///     single segments. <see cref="GetNeighborStartCorner" /> bridges the two.
+    ///     (the neighbour graph) are kept conceptually separate: <see cref="GetCornersCount" /> and
+    ///     <see cref="GetNeighborCount" /> are independent counts. For currently shipped grids they
+    ///     happen to be equal because every cell is a simple polygon.
     /// </summary>
     public interface ITessellation
     {
@@ -55,16 +55,6 @@ namespace Appegy.Tessera
         ///     Returns <c>-1</c> if the cells are not neighbours.
         /// </summary>
         int GetNeighborIndex(int cell, int neighbor);
-
-        /// <summary>
-        ///     Corner index at which the boundary shared with neighbour <paramref name="neighborIndex" />
-        ///     starts. The shared polyline runs clockwise (with wrap, modulo <see cref="GetCornersCount" />)
-        ///     up to and including <c>GetNeighborStartCorner(id, (neighborIndex + 1) % GetNeighborCount(id))</c>,
-        ///     which is also the start corner of the next edge — joint corners are shared between two
-        ///     consecutive edges. For polygonal grids this returns <paramref name="neighborIndex" /> itself.
-        ///     Wraps via modulo on input.
-        /// </summary>
-        int GetNeighborStartCorner(int id, int neighborIndex);
 
         /// <summary>Returns the id of the cell containing <paramref name="point" />, or <c>-1</c> if outside the tessellation.</summary>
         int GetCellAt(float2 point);

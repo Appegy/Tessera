@@ -2,7 +2,7 @@
 
 Status: design accepted 2026-04-28, implementation pending.
 
-Builds on `grid-api-redesign.md`. This document covers only the Voronoi-specific decisions; everything in the v2 redesign (`IGrid`, `Bounds2`, `PlaneGrid<T>`, contracts including the geometry/topology split and the `GetNeighborStartCorner` bridge, boundary marker `-1`) applies as-is. VoronoiGrid is polygonal, so internally `GetCornersCount == GetNeighborCount` and `GetNeighborStartCorner(id, j) == j` — the bridge is effectively the identity for this grid.
+Builds on `grid-api-redesign.md`. This document covers only the Voronoi-specific decisions; everything in the v2 redesign (`IGrid`, `Bounds2`, `PlaneGrid<T>`, contracts including the `GetCornersCount` / `GetNeighborCount` split, boundary marker `-1`) applies as-is. VoronoiGrid is polygonal, so internally `GetCornersCount == GetNeighborCount` and edge `j` is the segment between corners `j` and `(j+1) % N` — this is a per-grid property, not a core contract.
 
 ## Working note on flexibility
 
@@ -103,9 +103,8 @@ All internal builders are `internal static` — no public surface beyond `Vorono
 1. **Construction validation.** Each invalid-argument case from "Public API addition" throws the documented exception type.
 2. **Determinism.** Same `(bounds, cellCount, seed, iters)` → identical centers / corners / neighbours arrays.
 3. **Contracts**, parametrised over multiple seeds (e.g. 0..9) and cell counts (e.g. 64, 256):
-   - polygonal layout (VoronoiGrid-specific): `GetCornersCount(id) == GetNeighborCount(id)`, `GetNeighborStartCorner(id, j) == j`.
+   - polygonal layout (VoronoiGrid-specific): `GetCornersCount(id) == GetNeighborCount(id)`.
    - edge geometry: corner `k -> (k+1) % N` is the polyline shared with `GetNeighbor(id, k)` (or that slot is `-1` and the edge lies on `bounds`).
-   - core edge partition (`GetNeighborStartCorner` strictly increasing, starts at 0, values in `[0, M)`).
    - shared edge coherence: between neighbouring cells `a, b`, the segment endpoints match in reverse order (Voronoi cells share vertex objects in the builder, so the match is exact; tested with tolerance for portability).
    - symmetry: `AreNeighbors(a, b) == AreNeighbors(b, a)`; `GetNeighborIndex` agrees both ways.
    - distance metric: `Distance(a, a) == 0`, `Distance(a, b) > 0` for `a != b`, symmetric.
