@@ -231,18 +231,22 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ce01b75bf32e02946a10e187970af101, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Appegy.Tessera.Debug::TessellationDebugView
-  _kind: 5
+  _kind: 6
   _inscribedRadius: 0.5
   _width: 19
   _height: 10
   _cellCount: 335
   _voronoiSeed: 25
   _relaxationIterations: 3
+  _puzzleSeed: 0
+  _puzzleTabSize: 1
+  _puzzleVariation: 0.404
+  _puzzleSmoothness: 1
   _lineWidth: 0.02
   _lineColor: {r: 1, g: 1, b: 1, a: 1}
   _enableHighlighter: 1
-  _hoveredColor: {r: 0.91, g: 0.4, b: 0.35, a: 0.25}
-  _neighborColor: {r: 0.91, g: 0.66, b: 0.24, a: 0.19}
+  _hoveredColor: {r: 0.91, g: 0.4, b: 0.35, a: 0.7}
+  _neighborColor: {r: 0.91, g: 0.66, b: 0.24, a: 0.55}
 --- !u!4 &678040010
 Transform:
   m_ObjectHideFlags: 0

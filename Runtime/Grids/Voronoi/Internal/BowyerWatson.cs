@@ -12,7 +12,6 @@ namespace Appegy.Tessera
         {
             if (points.Length < 3) throw new InvalidOperationException("Need at least 3 points to triangulate.");
 
-            // Bounding box
             float minX = points[0].x, minY = points[0].y;
             float maxX = minX, maxY = minY;
             for (var i = 1; i < points.Length; i++)
@@ -30,14 +29,12 @@ namespace Appegy.Tessera
             var midx = (minX + maxX) * 0.5f;
             var midy = (minY + maxY) * 0.5f;
 
-            // Super triangle, vertices at indices points.Length, +1, +2 in the extended array.
             var ext = new float2[points.Length + 3];
             points.CopyTo(ext);
             ext[points.Length] = new float2(midx - 20f * dmax, midy - dmax);
             ext[points.Length + 1] = new float2(midx, midy + 20f * dmax);
             ext[points.Length + 2] = new float2(midx + 20f * dmax, midy - dmax);
 
-            // Triangle list, 3 ints per triangle.
             var tris = new List<int>(points.Length * 6)
             {
                 points.Length,
@@ -45,13 +42,12 @@ namespace Appegy.Tessera
                 points.Length + 2
             };
 
-            var edges = new List<int>(); // pairs (a, b)
+            var edges = new List<int>();
 
             for (var pi = 0; pi < points.Length; pi++)
             {
                 edges.Clear();
 
-                // Find bad triangles whose circumcircle contains the new point.
                 for (var ti = tris.Count - 3; ti >= 0; ti -= 3)
                 {
                     var a = tris[ti];
@@ -71,8 +67,7 @@ namespace Appegy.Tessera
                     }
                 }
 
-                // Mark duplicate edges (shared between two bad triangles) for removal.
-                // O(e^2) dedup is acceptable for v1 point sets (<= 500 sites).
+                // O(e^2) dedup: edges shared between two bad triangles cancel out. Fine for <= 500 sites.
                 for (var i = 0; i < edges.Count; i += 2)
                 {
                     if (edges[i] == -1) continue;
@@ -91,7 +86,6 @@ namespace Appegy.Tessera
                     }
                 }
 
-                // Connect remaining edges to the new point.
                 for (var i = 0; i < edges.Count; i += 2)
                 {
                     if (edges[i] == -1) continue;
@@ -101,7 +95,6 @@ namespace Appegy.Tessera
                 }
             }
 
-            // Drop triangles touching the super-triangle vertices.
             var result = new List<int>(tris.Count);
             for (var ti = 0; ti < tris.Count; ti += 3)
             {
@@ -157,10 +150,7 @@ namespace Appegy.Tessera
                 {
                     for (var k = j + 1; k < points.Length; k++)
                     {
-                        if (!IsDegenerateTriangle(points[i], points[j], points[k]))
-                        {
-                            return;
-                        }
+                        if (!IsDegenerateTriangle(points[i], points[j], points[k])) return;
                     }
                 }
             }
@@ -170,7 +160,6 @@ namespace Appegy.Tessera
 
         private static bool InCircumcircle(float2 a, float2 b, float2 c, float2 p)
         {
-            // Sign-aware in-circle test independent of winding.
             var orient = Orientation(a, b, c);
             if (math.abs(orient) <= OrientationTolerance(a, b, c))
             {
