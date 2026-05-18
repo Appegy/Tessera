@@ -4,12 +4,10 @@ using Unity.Mathematics;
 namespace Appegy.Tessera
 {
     /// <summary>
-    ///     A finite, immutable tessellation of the plane: a collection of cells whose adjacency forms
-    ///     a connected planar graph. Cells are identified by dense integer ids in the range
-    ///     <c>[0, CellCount)</c>. Geometry (the clockwise corner polyline of each cell) and topology
-    ///     (the neighbour graph) are kept conceptually separate: <see cref="GetCornersCount" /> and
-    ///     <see cref="GetNeighborCount" /> are independent counts. For currently shipped grids they
-    ///     happen to be equal because every cell is a simple polygon.
+    /// A finite, immutable tessellation of the plane. Cells are identified by dense integer ids
+    /// in <c>[0, CellCount)</c>. Geometry (<see cref="GetCornersCount"/>) and topology
+    /// (<see cref="GetNeighborCount"/>) are independent counts; for currently shipped grids
+    /// they happen to be equal because every cell is a simple polygon.
     /// </summary>
     public interface ITessellation
     {

@@ -14,6 +14,10 @@ public class GridRenderer : MonoBehaviour
     private MeshFilter _meshFilter;
     private MeshRenderer _meshRenderer;
 
+    private readonly List<Vector3> _verticesBuf = new();
+    private readonly List<int> _indicesBuf = new();
+    private readonly List<Color> _colorsBuf = new();
+
     private void OnDestroy()
     {
         if (_mesh != null)
@@ -29,39 +33,20 @@ public class GridRenderer : MonoBehaviour
 
         var grid = view.Grid;
         var center = view.GridCenter;
-        var edges = CollectEdges(grid);
-
         var halfWidth = view.LineWidth * 0.5f;
-        var vertices = new List<Vector3>(edges.Count * 4);
-        var indices = new List<int>(edges.Count * 6);
-        var colors = new List<Color>(edges.Count * 4);
         var lineColor = view.LineColor;
 
-        foreach (var (a, b) in edges)
+        _verticesBuf.Clear();
+        _indicesBuf.Clear();
+        _colorsBuf.Clear();
+
+        // Each cell's closed outline becomes its own mitered triangle strip. Adjacent
+        // cells overdraw their shared edge once each (line color is opaque, the result
+        // is identical to a deduped single pass), but consecutive segments share
+        // vertices at every polyline corner so the strip has no gaps at bends.
+        for (var id = 0; id < grid.CellCount; id++)
         {
-            var p0 = new Vector2(a.x - center.x, a.y - center.y);
-            var p1 = new Vector2(b.x - center.x, b.y - center.y);
-
-            var dir = (p1 - p0).normalized;
-            var perp = new Vector2(-dir.y, dir.x) * halfWidth;
-
-            var idx = vertices.Count;
-            vertices.Add(new Vector3(p0.x + perp.x, p0.y + perp.y, 0));
-            vertices.Add(new Vector3(p0.x - perp.x, p0.y - perp.y, 0));
-            vertices.Add(new Vector3(p1.x + perp.x, p1.y + perp.y, 0));
-            vertices.Add(new Vector3(p1.x - perp.x, p1.y - perp.y, 0));
-
-            indices.Add(idx);
-            indices.Add(idx + 2);
-            indices.Add(idx + 1);
-            indices.Add(idx + 1);
-            indices.Add(idx + 2);
-            indices.Add(idx + 3);
-
-            colors.Add(lineColor);
-            colors.Add(lineColor);
-            colors.Add(lineColor);
-            colors.Add(lineColor);
+            AppendCellOutline(grid, id, center, halfWidth, lineColor, _verticesBuf, _indicesBuf, _colorsBuf);
         }
 
         if (_mesh == null)
@@ -69,10 +54,81 @@ public class GridRenderer : MonoBehaviour
         else
             _mesh.Clear();
 
-        _mesh.SetVertices(vertices);
-        _mesh.SetColors(colors);
-        _mesh.SetIndices(indices, MeshTopology.Triangles, 0);
+        _mesh.indexFormat = _verticesBuf.Count > 65535
+            ? UnityEngine.Rendering.IndexFormat.UInt32
+            : UnityEngine.Rendering.IndexFormat.UInt16;
+        _mesh.SetVertices(_verticesBuf);
+        _mesh.SetColors(_colorsBuf);
+        _mesh.SetIndices(_indicesBuf, MeshTopology.Triangles, 0);
         _meshFilter.sharedMesh = _mesh;
+    }
+
+    private static void AppendCellOutline(
+        ITessellation grid, int id, Vector2 center, float halfWidth, Color color,
+        List<Vector3> vertices, List<int> indices, List<Color> colors)
+    {
+        var n = grid.GetCornersCount(id);
+        if (n < 2) return;
+
+        var baseIdx = vertices.Count;
+        for (var i = 0; i < n; i++)
+        {
+            var prev = grid.GetCorner(id, (i - 1 + n) % n);
+            var curr = grid.GetCorner(id, i);
+            var next = grid.GetCorner(id, (i + 1) % n);
+
+            var d1x = curr.x - prev.x;
+            var d1y = curr.y - prev.y;
+            var d1len = Mathf.Sqrt(d1x * d1x + d1y * d1y);
+            if (d1len > 0f) { d1x /= d1len; d1y /= d1len; }
+
+            var d2x = next.x - curr.x;
+            var d2y = next.y - curr.y;
+            var d2len = Mathf.Sqrt(d2x * d2x + d2y * d2y);
+            if (d2len > 0f) { d2x /= d2len; d2y /= d2len; }
+
+            // Outward perpendicular for CW polygon in Y-up: rotate direction -90 deg.
+            // For dir = (1, 0) -> outward = (0, -1). For dir = (0, 1) -> outward = (1, 0).
+            var n1x = d1y;
+            var n1y = -d1x;
+            var n2x = d2y;
+            var n2y = -d2x;
+
+            // Miter = halfWidth * (n1 + n2) / (1 + dot(n1, n2)). Cap denominator to avoid
+            // miter spikes at near-180deg turns (not expected for cell polygons, but cheap insurance).
+            var sumX = n1x + n2x;
+            var sumY = n1y + n2y;
+            var dot = n1x * n2x + n1y * n2y;
+            var denom = 1f + dot;
+            if (denom < 0.05f) denom = 0.05f;
+            var mx = sumX * (halfWidth / denom);
+            var my = sumY * (halfWidth / denom);
+
+            var ox = curr.x + mx - center.x;
+            var oy = curr.y + my - center.y;
+            var ix = curr.x - mx - center.x;
+            var iy = curr.y - my - center.y;
+
+            vertices.Add(new Vector3(ox, oy, 0f));
+            vertices.Add(new Vector3(ix, iy, 0f));
+            colors.Add(color);
+            colors.Add(color);
+        }
+
+        // Two triangles per segment between consecutive corner pairs. Wraps closed.
+        for (var i = 0; i < n; i++)
+        {
+            var a = baseIdx + i * 2;
+            var b = baseIdx + i * 2 + 1;
+            var c = baseIdx + (i + 1) % n * 2;
+            var d = baseIdx + (i + 1) % n * 2 + 1;
+            indices.Add(a);
+            indices.Add(c);
+            indices.Add(b);
+            indices.Add(b);
+            indices.Add(c);
+            indices.Add(d);
+        }
     }
 
     private void EnsureComponents()
@@ -86,33 +142,5 @@ public class GridRenderer : MonoBehaviour
             if (shader != null)
                 _meshRenderer.sharedMaterial = new Material(shader);
         }
-    }
-
-    private static HashSet<(Vector2, Vector2)> CollectEdges(ITessellation grid)
-    {
-        var edges = new HashSet<(Vector2, Vector2)>();
-        for (var id = 0; id < grid.CellCount; id++)
-        {
-            var n = grid.GetCornersCount(id);
-            for (var c = 0; c < n; c++)
-            {
-                var p1 = grid.GetCorner(id, c);
-                var p2 = grid.GetCorner(id, (c + 1) % n);
-
-                var a = Round(new Vector2(p1.x, p1.y));
-                var b = Round(new Vector2(p2.x, p2.y));
-
-                var edge = a.x < b.x || Mathf.Approximately(a.x, b.x) && a.y < b.y
-                    ? (a, b)
-                    : (b, a);
-                edges.Add(edge);
-            }
-        }
-        return edges;
-    }
-
-    private static Vector2 Round(Vector2 v)
-    {
-        return new Vector2(Mathf.Round(v.x * 1000f) / 1000f, Mathf.Round(v.y * 1000f) / 1000f);
     }
 }
