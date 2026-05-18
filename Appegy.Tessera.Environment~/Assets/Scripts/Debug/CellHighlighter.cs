@@ -151,27 +151,110 @@ public class CellHighlighter : MonoBehaviour
     private void AddCellFill(int id, Color color, List<Vector3> vertices, List<int> indices, List<Color> colors)
     {
         var n = _grid.GetCornersCount(id);
-        var center = _grid.GetCenter(id);
-        var cx = center.x - _gridCenter.x;
-        var cy = center.y - _gridCenter.y;
+        if (n < 3) return;
 
-        var baseIdx = vertices.Count;
-        vertices.Add(new Vector3(cx, cy, 0.01f));
-        colors.Add(color);
-
+        var corners = new Vector2[n];
         for (var i = 0; i < n; i++)
         {
-            var corner = _grid.GetCorner(id, i);
-            vertices.Add(new Vector3(corner.x - _gridCenter.x, corner.y - _gridCenter.y, 0.01f));
+            var c = _grid.GetCorner(id, i);
+            corners[i] = new Vector2(c.x - _gridCenter.x, c.y - _gridCenter.y);
+        }
+
+        var baseIdx = vertices.Count;
+        for (var i = 0; i < n; i++)
+        {
+            vertices.Add(new Vector3(corners[i].x, corners[i].y, 0.01f));
             colors.Add(color);
         }
 
-        for (var i = 0; i < n; i++)
+        TriangulateEarClipping(corners, indices, baseIdx);
+    }
+
+    // Ear-clipping for a simple polygon in CW order (Y-up frame). Handles
+    // concave polygons such as puzzle pieces where neighbour tabs poke inward.
+    // O(n^2) which is fine for typical cell corner counts (<= a few hundred).
+    private static void TriangulateEarClipping(Vector2[] poly, List<int> indices, int baseIdx)
+    {
+        var n = poly.Length;
+        if (n < 3) return;
+        if (n == 3)
         {
             indices.Add(baseIdx);
-            indices.Add(baseIdx + 1 + i);
-            indices.Add(baseIdx + 1 + (i + 1) % n);
+            indices.Add(baseIdx + 1);
+            indices.Add(baseIdx + 2);
+            return;
         }
+
+        var prev = new int[n];
+        var next = new int[n];
+        for (var i = 0; i < n; i++)
+        {
+            prev[i] = (i - 1 + n) % n;
+            next[i] = (i + 1) % n;
+        }
+
+        var remaining = n;
+        var head = 0;
+        var safety = n * 2;
+        while (remaining > 3 && safety-- > 0)
+        {
+            var earFound = false;
+            var v = head;
+            for (var iter = 0; iter < remaining; iter++)
+            {
+                if (IsEar(poly, prev[v], v, next[v], next, prev))
+                {
+                    indices.Add(baseIdx + prev[v]);
+                    indices.Add(baseIdx + v);
+                    indices.Add(baseIdx + next[v]);
+                    next[prev[v]] = next[v];
+                    prev[next[v]] = prev[v];
+                    if (v == head) head = next[v];
+                    remaining--;
+                    earFound = true;
+                    break;
+                }
+                v = next[v];
+            }
+            if (!earFound) break;
+        }
+
+        if (remaining == 3)
+        {
+            indices.Add(baseIdx + prev[head]);
+            indices.Add(baseIdx + head);
+            indices.Add(baseIdx + next[head]);
+        }
+    }
+
+    private static bool IsEar(Vector2[] poly, int pi, int ci, int ni, int[] next, int[] prev)
+    {
+        var a = poly[pi];
+        var b = poly[ci];
+        var c = poly[ni];
+
+        // Convex check for CW input (Y-up): cross(ab, bc) < 0.
+        var cross = (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x);
+        if (cross >= 0f) return false;
+
+        // No other remaining polygon vertex lies inside triangle abc.
+        var v = next[ni];
+        while (v != pi)
+        {
+            if (PointInTriangle(poly[v], a, b, c)) return false;
+            v = next[v];
+        }
+        return true;
+    }
+
+    private static bool PointInTriangle(Vector2 p, Vector2 a, Vector2 b, Vector2 c)
+    {
+        var d1 = (p.x - b.x) * (a.y - b.y) - (a.x - b.x) * (p.y - b.y);
+        var d2 = (p.x - c.x) * (b.y - c.y) - (b.x - c.x) * (p.y - c.y);
+        var d3 = (p.x - a.x) * (c.y - a.y) - (c.x - a.x) * (p.y - a.y);
+        var hasNeg = d1 < 0f || d2 < 0f || d3 < 0f;
+        var hasPos = d1 > 0f || d2 > 0f || d3 > 0f;
+        return !(hasNeg && hasPos);
     }
 
     private void ClearHighlight()

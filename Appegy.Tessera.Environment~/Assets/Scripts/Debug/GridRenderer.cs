@@ -88,9 +88,18 @@ public class GridRenderer : MonoBehaviour
         }
     }
 
-    private static HashSet<(Vector2, Vector2)> CollectEdges(ITessellation grid)
+    // Each interior edge is reported by both cells that share it. We dedupe by the
+    // (sorted) pair of endpoint coordinates. The previous version rounded to 1/1000
+    // before hashing, which collapses too aggressively at very small cellSize and
+    // could merge distinct segments. Now we match endpoints bit-exactly: for grids
+    // whose adjacent cells produce identical corner values (square, hex, puzzle —
+    // both cells reference the same float2[] for the shared edge) this dedupes
+    // cleanly. For grids whose endpoints differ by epsilon (Voronoi seam vertices)
+    // dedup misses and the edge gets drawn twice — visually identical.
+    private static List<(Vector2, Vector2)> CollectEdges(ITessellation grid)
     {
-        var edges = new HashSet<(Vector2, Vector2)>();
+        var seen = new HashSet<(float, float, float, float)>();
+        var edges = new List<(Vector2, Vector2)>();
         for (var id = 0; id < grid.CellCount; id++)
         {
             var n = grid.GetCornersCount(id);
@@ -98,21 +107,15 @@ public class GridRenderer : MonoBehaviour
             {
                 var p1 = grid.GetCorner(id, c);
                 var p2 = grid.GetCorner(id, (c + 1) % n);
-
-                var a = Round(new Vector2(p1.x, p1.y));
-                var b = Round(new Vector2(p2.x, p2.y));
-
-                var edge = a.x < b.x || Mathf.Approximately(a.x, b.x) && a.y < b.y
-                    ? (a, b)
-                    : (b, a);
-                edges.Add(edge);
+                var key = p1.x < p2.x || p1.x == p2.x && p1.y < p2.y
+                    ? (p1.x, p1.y, p2.x, p2.y)
+                    : (p2.x, p2.y, p1.x, p1.y);
+                if (seen.Add(key))
+                {
+                    edges.Add((new Vector2(key.Item1, key.Item2), new Vector2(key.Item3, key.Item4)));
+                }
             }
         }
         return edges;
-    }
-
-    private static Vector2 Round(Vector2 v)
-    {
-        return new Vector2(Mathf.Round(v.x * 1000f) / 1000f, Mathf.Round(v.y * 1000f) / 1000f);
     }
 }

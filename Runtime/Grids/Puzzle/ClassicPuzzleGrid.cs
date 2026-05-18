@@ -346,14 +346,27 @@ namespace Appegy.Tessera
             };
         }
 
+        // Maximum corner count for any cell at any parameter setting:
+        // 4 + 4 * (SamplesPerEdge - 2), with SamplesPerEdge = 3 * MaxInternalSubdivisions + 1
+        // = 3 * 16 + 1 = 49 → 4 + 4 * 47 = 192. 384 leaves comfortable headroom.
+        private const int PointInCellStackThreshold = 384;
+
         private bool PointInCell(float2 p, int cx, int cy)
         {
             var id = IdOf(cx, cy);
             var count = GetCornersCount(id);
-            var poly = new float2[count];
+            Span<float2> poly = count <= PointInCellStackThreshold
+                ? stackalloc float2[count]
+                : new float2[count];
             CopyCorners(id, poly);
+            return PointInPolygon(p, poly);
+        }
+
+        private static bool PointInPolygon(float2 p, ReadOnlySpan<float2> poly)
+        {
             var inside = false;
-            for (int i = 0, jPrev = count - 1; i < count; jPrev = i++)
+            var n = poly.Length;
+            for (int i = 0, jPrev = n - 1; i < n; jPrev = i++)
             {
                 var ci = poly[i];
                 var cj = poly[jPrev];
