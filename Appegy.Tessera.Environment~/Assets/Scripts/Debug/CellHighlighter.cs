@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Appegy.Tessera;
 using Unity.Mathematics;
@@ -22,6 +23,16 @@ public class CellHighlighter : MonoBehaviour
     private Mesh _mesh;
     private MeshFilter _meshFilter;
     private MeshRenderer _meshRenderer;
+    private Camera _camera;
+
+    // Buffers reused across every RebuildHighlightMesh call so hovering produces
+    // zero per-frame GC allocations once the lists / arrays have grown to peak size.
+    private readonly List<Vector3> _verticesBuf = new();
+    private readonly List<int> _indicesBuf = new();
+    private readonly List<Color> _colorsBuf = new();
+    private Vector2[] _cornersBuf = Array.Empty<Vector2>();
+    private int[] _earPrevBuf = Array.Empty<int>();
+    private int[] _earNextBuf = Array.Empty<int>();
 
     private GridDebugView _view;
 
@@ -30,13 +41,14 @@ public class CellHighlighter : MonoBehaviour
         if (!Application.isPlaying) return;
         if (_view == null) return;
 
-        var cam = Camera.main;
-        if (cam == null) return;
+        // Camera.main does an internal FindGameObjectWithTag; cache it.
+        if (_camera == null) _camera = Camera.main;
+        if (_camera == null) return;
         var mouse = Mouse.current;
         if (mouse == null) return;
 
         var mousePos = mouse.position.ReadValue();
-        var worldPos = cam.ScreenToWorldPoint(new Vector3(mousePos.x, mousePos.y, -cam.transform.position.z));
+        var worldPos = _camera.ScreenToWorldPoint(new Vector3(mousePos.x, mousePos.y, -_camera.transform.position.z));
         ProcessWorldPoint(new Vector2(worldPos.x, worldPos.y));
     }
 
@@ -128,11 +140,11 @@ public class CellHighlighter : MonoBehaviour
     {
         EnsureComponents();
 
-        var vertices = new List<Vector3>();
-        var indices = new List<int>();
-        var colors = new List<Color>();
+        _verticesBuf.Clear();
+        _indicesBuf.Clear();
+        _colorsBuf.Clear();
 
-        AddCellFill(hoveredId, _view.HoveredColor, vertices, indices, colors);
+        AddCellFill(hoveredId, _view.HoveredColor);
 
         // Walk the neighbour list, not the corner polyline. For non-polygonal grids
         // (ClassicPuzzleGrid) GetCornersCount >> GetNeighborCount; using the former
@@ -143,43 +155,43 @@ public class CellHighlighter : MonoBehaviour
         {
             var nb = _grid.GetNeighbor(hoveredId, i);
             if (nb == -1) continue;
-            AddCellFill(nb, _view.NeighborColor, vertices, indices, colors);
+            AddCellFill(nb, _view.NeighborColor);
         }
 
         _mesh.Clear();
-        _mesh.SetVertices(vertices);
-        _mesh.SetColors(colors);
-        _mesh.SetIndices(indices, MeshTopology.Triangles, 0);
+        _mesh.SetVertices(_verticesBuf);
+        _mesh.SetColors(_colorsBuf);
+        _mesh.SetIndices(_indicesBuf, MeshTopology.Triangles, 0);
     }
 
-    private void AddCellFill(int id, Color color, List<Vector3> vertices, List<int> indices, List<Color> colors)
+    private void AddCellFill(int id, Color color)
     {
         var n = _grid.GetCornersCount(id);
         if (n < 3) return;
 
-        var corners = new Vector2[n];
+        if (_cornersBuf.Length < n) _cornersBuf = new Vector2[n];
         for (var i = 0; i < n; i++)
         {
             var c = _grid.GetCorner(id, i);
-            corners[i] = new Vector2(c.x - _gridCenter.x, c.y - _gridCenter.y);
+            _cornersBuf[i] = new Vector2(c.x - _gridCenter.x, c.y - _gridCenter.y);
         }
 
-        var baseIdx = vertices.Count;
+        var baseIdx = _verticesBuf.Count;
         for (var i = 0; i < n; i++)
         {
-            vertices.Add(new Vector3(corners[i].x, corners[i].y, 0.01f));
-            colors.Add(color);
+            _verticesBuf.Add(new Vector3(_cornersBuf[i].x, _cornersBuf[i].y, 0.01f));
+            _colorsBuf.Add(color);
         }
 
-        TriangulateEarClipping(corners, indices, baseIdx);
+        TriangulateEarClipping(_cornersBuf, n, _indicesBuf, baseIdx);
     }
 
     // Ear-clipping for a simple polygon in CW order (Y-up frame). Handles
     // concave polygons such as puzzle pieces where neighbour tabs poke inward.
     // O(n^2) which is fine for typical cell corner counts (<= a few hundred).
-    private static void TriangulateEarClipping(Vector2[] poly, List<int> indices, int baseIdx)
+    // Uses instance prev/next buffers so it is allocation-free after warm-up.
+    private void TriangulateEarClipping(Vector2[] poly, int n, List<int> indices, int baseIdx)
     {
-        var n = poly.Length;
         if (n < 3) return;
         if (n == 3)
         {
@@ -189,8 +201,10 @@ public class CellHighlighter : MonoBehaviour
             return;
         }
 
-        var prev = new int[n];
-        var next = new int[n];
+        if (_earPrevBuf.Length < n) _earPrevBuf = new int[n];
+        if (_earNextBuf.Length < n) _earNextBuf = new int[n];
+        var prev = _earPrevBuf;
+        var next = _earNextBuf;
         for (var i = 0; i < n; i++)
         {
             prev[i] = (i - 1 + n) % n;
