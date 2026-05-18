@@ -22,7 +22,7 @@ namespace Appegy.Tessera
             float2 p1,
             uint edgeSeed,
             float tabSize,
-            float headMax,
+            float jitter,
             int bezierSubdivisions,
             Span<float2> dest)
         {
@@ -40,8 +40,8 @@ namespace Appegy.Tessera
             var perp = new float2(-tangent.y, tangent.x);
 
             var rng = new Mulberry32(edgeSeed);
-            // Jitter range. ClassicPuzzleParameters guarantees j >= 0.02.
-            var j = (headMax - 2f * tabSize) * 0.5f;
+            var t = tabSize;
+            var j = jitter;
             var a = rng.Range(-j, j);
             var b = rng.Range(-j, j);
             var c = rng.Range(-j, j);
@@ -55,12 +55,12 @@ namespace Appegy.Tessera
             Span<float2> ctrl = stackalloc float2[10];
             ctrl[0] = At(p0, tangent, perp, 0f, 0f);
             ctrl[1] = At(p0, tangent, perp, 0.2f, s * a);
-            ctrl[2] = At(p0, tangent, perp, 0.5f + b + d, s * (-tabSize + c));
-            ctrl[3] = At(p0, tangent, perp, 0.5f - tabSize + b, s * (tabSize + c));
-            ctrl[4] = At(p0, tangent, perp, 0.5f - 2f * tabSize + b - d, s * (3f * tabSize + c));
-            ctrl[5] = At(p0, tangent, perp, 0.5f + 2f * tabSize + b - d, s * (3f * tabSize + c));
-            ctrl[6] = At(p0, tangent, perp, 0.5f + tabSize + b, s * (tabSize + c));
-            ctrl[7] = At(p0, tangent, perp, 0.5f + b + d, s * (-tabSize + c));
+            ctrl[2] = At(p0, tangent, perp, 0.5f + b + d, s * (-t + c));
+            ctrl[3] = At(p0, tangent, perp, 0.5f - t + b, s * (t + c));
+            ctrl[4] = At(p0, tangent, perp, 0.5f - 2f * t + b - d, s * (3f * t + c));
+            ctrl[5] = At(p0, tangent, perp, 0.5f + 2f * t + b - d, s * (3f * t + c));
+            ctrl[6] = At(p0, tangent, perp, 0.5f + t + b, s * (t + c));
+            ctrl[7] = At(p0, tangent, perp, 0.5f + b + d, s * (-t + c));
             ctrl[8] = At(p0, tangent, perp, 0.8f, s * e);
             ctrl[9] = At(p0, tangent, perp, 1f, 0f);
 

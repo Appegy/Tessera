@@ -53,6 +53,10 @@ namespace Appegy.Tessera
             _samplesPerEdge = parameters.SamplesPerEdge;
             _interiorN = _samplesPerEdge - 2;
 
+            var resolvedTabSize = parameters.ResolvedTabSize;
+            var resolvedJitter = parameters.ResolvedJitter;
+            var resolvedSubdivisions = parameters.BezierSubdivisions;
+
             // Vertical interior edges: between (x, y) and (x+1, y) for x in [0, Width-2].
             // Walked TR(x, y) -> BR(x, y) (top to bottom).
             _vertEdges = new float2[(width - 1) * height][];
@@ -64,7 +68,7 @@ namespace Appegy.Tessera
                     var p1 = new float2((x + 1) * cellSize, y * cellSize);
                     var poly = new float2[_samplesPerEdge];
                     var es = PuzzleEdgeSeed.Compute(seed, 0, x, y);
-                    DraradechTab.Generate(p0, p1, es, parameters.TabSize, parameters.HeadMax, parameters.BezierSubdivisions, poly);
+                    DraradechTab.Generate(p0, p1, es, resolvedTabSize, resolvedJitter, resolvedSubdivisions, poly);
                     _vertEdges[y * (width - 1) + x] = poly;
                 }
             }
@@ -80,7 +84,7 @@ namespace Appegy.Tessera
                     var p1 = new float2((x + 1) * cellSize, (y + 1) * cellSize);
                     var poly = new float2[_samplesPerEdge];
                     var es = PuzzleEdgeSeed.Compute(seed, 1, x, y);
-                    DraradechTab.Generate(p0, p1, es, parameters.TabSize, parameters.HeadMax, parameters.BezierSubdivisions, poly);
+                    DraradechTab.Generate(p0, p1, es, resolvedTabSize, resolvedJitter, resolvedSubdivisions, poly);
                     _horizEdges[y * width + x] = poly;
                 }
             }

@@ -38,9 +38,9 @@ public class GridDebugView : MonoBehaviour
 
     [Header("Classic Puzzle")]
     [SerializeField] private int _puzzleSeed = 0;
-    [SerializeField] [Range(ClassicPuzzleParameters.MinTabSize, ClassicPuzzleParameters.MaxTabSize)] private float _puzzleTabSize = ClassicPuzzleParameters.DefaultTabSize;
-    [SerializeField] [Range(ClassicPuzzleParameters.MinHeadMax, ClassicPuzzleParameters.MaxHeadMax)] private float _puzzleHeadMax = ClassicPuzzleParameters.DefaultHeadMax;
-    [SerializeField] [Range(ClassicPuzzleParameters.MinBezierSubdivisions, ClassicPuzzleParameters.MaxBezierSubdivisions)] private int _puzzleBezierSubdivisions = ClassicPuzzleParameters.DefaultBezierSubdivisions;
+    [SerializeField] [Range(0f, 1f)] private float _puzzleTabSize = 0.5f;
+    [SerializeField] [Range(0f, 1f)] private float _puzzleVariation = 0.5f;
+    [SerializeField] [Range(0f, 1f)] private float _puzzleSmoothness = 0.5f;
 
     [Header("Grid Appearance")]
     [SerializeField] [Range(0.001f, 0.2f)] private float _lineWidth = 0.02f;
@@ -191,11 +191,7 @@ public class GridDebugView : MonoBehaviour
             }
             case GridKind.ClassicPuzzle:
             {
-                // Constructor invariant: HeadMax >= 2 * TabSize + 0.04. Clamp TabSize down
-                // so the HeadMax slider always wins when sliders are dragged into conflict.
-                var maxTabForHeadMax = (_puzzleHeadMax - 0.04f) * 0.5f;
-                var safeTabSize = Mathf.Clamp(_puzzleTabSize, ClassicPuzzleParameters.MinTabSize, Mathf.Min(ClassicPuzzleParameters.MaxTabSize, maxTabForHeadMax));
-                var parameters = new ClassicPuzzleParameters(safeTabSize, _puzzleHeadMax, _puzzleBezierSubdivisions);
+                var parameters = new ClassicPuzzleParameters(_puzzleTabSize, _puzzleVariation, _puzzleSmoothness);
                 return new ClassicPuzzleGrid(_width, _height, _inscribedRadius * 2f, _puzzleSeed, parameters);
             }
             default:
