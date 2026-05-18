@@ -3,20 +3,8 @@ using Unity.Mathematics;
 
 namespace Appegy.Tessera
 {
-    /// <summary>
-    ///     Generates the canonical jigsaw silhouette ("Draradech") between two
-    ///     endpoints as a polyline of three cubic Bezier segments sharing endpoints.
-    ///     10 control points define the shape; per-edge variation comes from a
-    ///     deterministic Mulberry32 stream seeded by the edge id. The same edge id
-    ///     always produces the same polyline so neighbouring cells stitch exactly.
-    /// </summary>
     internal static class DraradechTab
     {
-        /// <summary>
-        ///     Fills <paramref name="dest" /> with the polyline from <paramref name="p0" /> to
-        ///     <paramref name="p1" />. <paramref name="dest" />.Length must equal
-        ///     <c>3 * bezierSubdivisions + 1</c>. Both endpoints are included.
-        /// </summary>
         public static void Generate(
             float2 p0,
             float2 p1,
@@ -32,10 +20,8 @@ namespace Appegy.Tessera
                 throw new ArgumentException($"dest length must equal 3 * bezierSubdivisions + 1 (= {samples}).", nameof(dest));
             }
 
-            // Local frame: u along the edge (range [0, 1]), w perpendicular (range scaled
-            // by edge length). origin = p0, tangent = p1 - p0, perp rotates tangent +90 deg
-            // (Y-up). For a CW-traversed cell, +w points OUT of the cell, which is exactly
-            // what the demo asserts.
+            // Local frame: u along edge, w perpendicular (+90deg, Y-up).
+            // For a CW-traversed cell +w points OUT of the cell.
             var tangent = p1 - p0;
             var perp = new float2(-tangent.y, tangent.x);
 
@@ -47,11 +33,11 @@ namespace Appegy.Tessera
             var c = rng.Range(-j, j);
             var d = rng.Range(-j, j);
             var e = rng.Range(-j, j);
-            // Random sign: tab pokes outward (+) or inward (-) of the canonical direction.
-            // Either cell sees the same polyline; only the traversal direction differs.
+            // Random sign: tab pokes outward (+) or inward (-). Both neighbours see the
+            // same polyline; only traversal direction differs.
             var s = rng.NextFloat() > 0.5f ? 1f : -1f;
 
-            // 10 control points in local (u, w) coordinates. Identical to demo's genJigsaw.
+            // 10 control points in (u, w) coordinates, matching demo's genJigsaw.
             Span<float2> ctrl = stackalloc float2[10];
             ctrl[0] = At(p0, tangent, perp, 0f, 0f);
             ctrl[1] = At(p0, tangent, perp, 0.2f, s * a);
@@ -64,8 +50,6 @@ namespace Appegy.Tessera
             ctrl[8] = At(p0, tangent, perp, 0.8f, s * e);
             ctrl[9] = At(p0, tangent, perp, 1f, 0f);
 
-            // Three cubic Beziers: ctrl[0..3], ctrl[3..6], ctrl[6..9]. Endpoints are
-            // shared so the joining point is written only once.
             var idx = 0;
             SampleCubic(ctrl[0], ctrl[1], ctrl[2], ctrl[3], bezierSubdivisions, dest, ref idx, includeStart: true);
             SampleCubic(ctrl[3], ctrl[4], ctrl[5], ctrl[6], bezierSubdivisions, dest, ref idx, includeStart: false);

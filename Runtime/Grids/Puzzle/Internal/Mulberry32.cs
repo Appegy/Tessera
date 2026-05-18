@@ -1,10 +1,7 @@
 namespace Appegy.Tessera
 {
-    /// <summary>
-    ///     Port of the mulberry32 PRNG used by the playground demo
-    ///     (<c>Documentation~/puzzle-styles-demo.html</c>) so generated edge polylines
-    ///     match the demo bit-for-bit for the same edge seed.
-    /// </summary>
+    // Port of mulberry32 PRNG used by the playground demo
+    // (Documentation~/puzzle-styles-demo.html) so edge polylines match bit-for-bit.
     internal struct Mulberry32
     {
         private uint _state;

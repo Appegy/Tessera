@@ -2,7 +2,6 @@ using Unity.Mathematics;
 
 namespace Appegy.Tessera
 {
-    /// <summary>Axis-aligned rectangle in grid-local coordinates.</summary>
     public readonly struct Bounds2
     {
         public float2 Min { get; }
@@ -17,11 +16,10 @@ namespace Appegy.Tessera
             Max = max;
         }
 
-        /// <summary>Inclusive containment: returns true iff the point lies in the closed rectangle <c>[Min, Max]</c>.</summary>
         public bool Contains(float2 p)
         {
-            return p.x >= Min.x && p.x <= Max.x &&
-                   p.y >= Min.y && p.y <= Max.y;
+            return p.x >= Min.x && p.x <= Max.x
+                && p.y >= Min.y && p.y <= Max.y;
         }
 
         public override string ToString()

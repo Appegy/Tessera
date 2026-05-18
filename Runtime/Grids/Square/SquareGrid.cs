@@ -3,11 +3,6 @@ using Unity.Mathematics;
 
 namespace Appegy.Tessera
 {
-    /// <summary>
-    ///     Finite square grid, 4-connected (no diagonals).
-    ///     Cell <c>(x, y)</c> has id <c>y * Width + x</c> and occupies the rectangle
-    ///     <c>[x*CellSize, (x+1)*CellSize] x [y*CellSize, (y+1)*CellSize]</c>.
-    /// </summary>
     public sealed class SquareGrid : ITessellation
     {
         public SquareGrid(int width, int height, float cellSize)
@@ -30,18 +25,17 @@ namespace Appegy.Tessera
         public int CellCount { get; }
         public Bounds2 Bounds { get; }
 
+        public int IdOf(int x, int y) => y * Width + x;
+        public (int X, int Y) XYOf(int id) => (id % Width, id / Width);
+
         public float2 GetCenter(int id)
         {
             var (x, y) = XYOf(id);
             return new float2((x + 0.5f) * CellSize, (y + 0.5f) * CellSize);
         }
 
-        public int GetCornersCount(int id)
-        {
-            return 4;
-        }
+        public int GetCornersCount(int id) => 4;
 
-        // Corners clockwise from top-right: 0=TR, 1=BR, 2=BL, 3=TL.
         public float2 GetCorner(int id, int cornerIndex)
         {
             var (x, y) = XYOf(id);
@@ -64,22 +58,14 @@ namespace Appegy.Tessera
             var x1 = (x + 1) * CellSize;
             var y0 = y * CellSize;
             var y1 = (y + 1) * CellSize;
-            dest[0] = new float2(x1, y1); // TR
-            dest[1] = new float2(x1, y0); // BR
-            dest[2] = new float2(x0, y0); // BL
-            dest[3] = new float2(x0, y1); // TL
+            dest[0] = new float2(x1, y1);
+            dest[1] = new float2(x1, y0);
+            dest[2] = new float2(x0, y0);
+            dest[3] = new float2(x0, y1);
         }
 
-        public int GetNeighborCount(int id)
-        {
-            return 4;
-        }
+        public int GetNeighborCount(int id) => 4;
 
-        // Edge j (corner j -> corner (j+1)%4) is shared with neighbor j.
-        // Edge 0: TR -> BR -> right neighbor (x+1, y)
-        // Edge 1: BR -> BL -> bottom neighbor (x, y-1)
-        // Edge 2: BL -> TL -> left neighbor (x-1, y)
-        // Edge 3: TL -> TR -> top neighbor (x, y+1)
         public int GetNeighbor(int id, int neighborIndex)
         {
             var (x, y) = XYOf(id);
@@ -134,16 +120,6 @@ namespace Appegy.Tessera
             var (ax, ay) = XYOf(a);
             var (bx, by) = XYOf(b);
             return Math.Abs(ax - bx) + Math.Abs(ay - by);
-        }
-
-        public int IdOf(int x, int y)
-        {
-            return y * Width + x;
-        }
-
-        public (int X, int Y) XYOf(int id)
-        {
-            return (id % Width, id / Width);
         }
     }
 }

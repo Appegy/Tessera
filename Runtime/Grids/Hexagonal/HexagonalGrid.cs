@@ -3,20 +3,12 @@ using Unity.Mathematics;
 
 namespace Appegy.Tessera
 {
-    /// <summary>
-    ///     Finite hexagonal grid, 6-connected. Layout (offset coordinate system) controlled by
-    ///     <see cref="HexagonalGridType" />: pointy-top vs flat-top, with odd or even row/column shifted.
-    ///     Cell <c>(x, y)</c> has id <c>y * Width + x</c>. Cell (0, 0) center sits at pixel (0, 0).
-    ///     Note: <c>Bounds.Min</c> is not necessarily at the origin; consult <c>Bounds</c> directly.
-    /// </summary>
     public sealed class HexagonalGrid : ITessellation
     {
         private static readonly float _sqrt3 = math.sqrt(3f);
 
-        // Neighbor offsets in the new aligned ordering (CW; edge[i] shared with neighbor[i]).
-        // Pointy: 0=R, 1=BR, 2=BL, 3=L, 4=TL, 5=TR.
-        // Flat:   0=TR, 1=BR, 2=B, 3=BL, 4=TL, 5=T.
-        // Two tables per orientation: A = unshifted row/col (or shifted-left in PointyEven), B = the other.
+        // Neighbour offsets per orientation. Two tables: A for unshifted row/col (or shifted-left
+        // in PointyEven), B for the other. Order is CW; edge[i] is shared with neighbour[i].
         private static readonly (int dx, int dy)[] _pointyA = { (+1, 0), (0, -1), (-1, -1), (-1, 0), (-1, +1), (0, +1) };
         private static readonly (int dx, int dy)[] _pointyB = { (+1, 0), (+1, -1), (0, -1), (-1, 0), (0, +1), (+1, +1) };
         private static readonly (int dx, int dy)[] _flatA = { (+1, 0), (+1, -1), (0, -1), (-1, -1), (-1, 0), (0, +1) };
@@ -37,7 +29,7 @@ namespace Appegy.Tessera
             Type = type;
             CellCount = width * height;
 
-            _describedRadius = inscribedRadius / math.cos(math.PI / 6f); // = 2/sqrt(3) * inscribedRadius
+            _describedRadius = inscribedRadius / math.cos(math.PI / 6f);
             _isPointy = type is HexagonalGridType.PointyOdd or HexagonalGridType.PointyEven;
 
             Bounds = ComputeBoundsBySweep();
@@ -51,19 +43,17 @@ namespace Appegy.Tessera
         public int CellCount { get; }
         public Bounds2 Bounds { get; }
 
+        public int IdOf(int x, int y) => y * Width + x;
+        public (int X, int Y) XYOf(int id) => (id % Width, id / Width);
+
         public float2 GetCenter(int id)
         {
             var (x, y) = XYOf(id);
             return CenterOf(x, y);
         }
 
-        public int GetCornersCount(int id)
-        {
-            return 6;
-        }
+        public int GetCornersCount(int id) => 6;
 
-        // Pointy: corner[i] at angle 30° - 60°·i (CW from TR corner at 30°).
-        // Flat:   corner[i] at angle 60° - 60°·i (CW from TR corner at 60°).
         public float2 GetCorner(int id, int cornerIndex)
         {
             var idx = (cornerIndex % 6 + 6) % 6;
@@ -85,10 +75,7 @@ namespace Appegy.Tessera
             }
         }
 
-        public int GetNeighborCount(int id)
-        {
-            return 6;
-        }
+        public int GetNeighborCount(int id) => 6;
 
         public int GetNeighbor(int id, int neighborIndex)
         {
@@ -132,7 +119,6 @@ namespace Appegy.Tessera
 
         public int GetCellAt(float2 point)
         {
-            // Convert pixel to fractional cubic, round to nearest integer cubic, convert back to offset.
             float fq, fr;
             if (_isPointy)
             {
@@ -154,15 +140,9 @@ namespace Appegy.Tessera
             var rDiff = math.abs(rr - fr);
             var sDiff = math.abs(rs - fs);
 
-            if (qDiff > rDiff && qDiff > sDiff)
-            {
-                rq = -rr - rs;
-            }
-            else if (rDiff > sDiff)
-            {
-                rr = -rq - rs;
-            }
-            // else rs is correct (no need to adjust)
+            if (qDiff > rDiff && qDiff > sDiff) rq = -rr - rs;
+            else if (rDiff > sDiff) rr = -rq - rs;
+
             var (ox, oy) = CubicToOffset(rq, rr);
             if (ox < 0 || ox >= Width || oy < 0 || oy >= Height) return -1;
             return IdOf(ox, oy);
@@ -175,16 +155,6 @@ namespace Appegy.Tessera
             var (acx, acy, acz) = OffsetToCubic(ax, ay);
             var (bcx, bcy, bcz) = OffsetToCubic(bx, by);
             return (Math.Abs(acx - bcx) + Math.Abs(acy - bcy) + Math.Abs(acz - bcz)) / 2;
-        }
-
-        public int IdOf(int x, int y)
-        {
-            return y * Width + x;
-        }
-
-        public (int X, int Y) XYOf(int id)
-        {
-            return (id % Width, id / Width);
         }
 
         private float2 CenterOf(int x, int y)
@@ -209,20 +179,14 @@ namespace Appegy.Tessera
             if (_isPointy)
             {
                 var oddRow = (y & 1) == 1;
-                // PointyOdd: odd row → B (shifted right). Even row → A.
-                // PointyEven: odd row → A (shifted left). Even row → B.
                 return Type == HexagonalGridType.PointyOdd
                     ? oddRow ? _pointyB : _pointyA
-                    : oddRow
-                        ? _pointyA
-                        : _pointyB;
+                    : oddRow ? _pointyA : _pointyB;
             }
             var oddCol = (x & 1) == 1;
             return Type == HexagonalGridType.FlatOdd
                 ? oddCol ? _flatB : _flatA
-                : oddCol
-                    ? _flatA
-                    : _flatB;
+                : oddCol ? _flatA : _flatB;
         }
 
         private (int X, int Y, int Z) OffsetToCubic(int ox, int oy)
@@ -258,14 +222,14 @@ namespace Appegy.Tessera
 
         private (int X, int Y) CubicToOffset(int cx, int cz)
         {
-            switch (Type)
+            return Type switch
             {
-                case HexagonalGridType.PointyOdd: return (cx + (cz - (cz & 1)) / 2, cz);
-                case HexagonalGridType.PointyEven: return (cx + (cz + (cz & 1)) / 2, cz);
-                case HexagonalGridType.FlatOdd: return (cx, cz + (cx - (cx & 1)) / 2);
-                case HexagonalGridType.FlatEven: return (cx, cz + (cx + (cx & 1)) / 2);
-                default: throw new ArgumentOutOfRangeException();
-            }
+                HexagonalGridType.PointyOdd => (cx + (cz - (cz & 1)) / 2, cz),
+                HexagonalGridType.PointyEven => (cx + (cz + (cz & 1)) / 2, cz),
+                HexagonalGridType.FlatOdd => (cx, cz + (cx - (cx & 1)) / 2),
+                HexagonalGridType.FlatEven => (cx, cz + (cx + (cx & 1)) / 2),
+                _ => throw new ArgumentOutOfRangeException()
+            };
         }
 
         private Bounds2 ComputeBoundsBySweep()
