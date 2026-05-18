@@ -20,6 +20,7 @@ public class CellHighlighter : MonoBehaviour
     private ITessellation _grid;
     private Vector2 _gridCenter;
     private int _lastHovered = -1;
+    private Vector2 _lastMousePos = new(float.NaN, float.NaN);
     private Mesh _mesh;
     private MeshFilter _meshFilter;
     private MeshRenderer _meshRenderer;
@@ -34,6 +35,12 @@ public class CellHighlighter : MonoBehaviour
     private int[] _earPrevBuf = Array.Empty<int>();
     private int[] _earNextBuf = Array.Empty<int>();
 
+    // Per-cell triangulation cache: rebuilt once in Init(), reused on every hover.
+    // Avoids running ear-clipping ~70k ops per hover change.
+    private Vector3[][] _cellVertsCache;
+    private int[][] _cellTrisCache;
+    private readonly List<int> _trisScratch = new();
+
     private GridDebugView _view;
 
     private void Update()
@@ -41,13 +48,18 @@ public class CellHighlighter : MonoBehaviour
         if (!Application.isPlaying) return;
         if (_view == null) return;
 
+        var mouse = Mouse.current;
+        if (mouse == null) return;
+        var mousePos = mouse.position.ReadValue();
+        // Skip when the cursor hasn't moved since last frame: the cell under it
+        // can't have changed either, so all the GetCellAt + rebuild work is wasted.
+        if (mousePos == _lastMousePos) return;
+        _lastMousePos = mousePos;
+
         // Camera.main does an internal FindGameObjectWithTag; cache it.
         if (_camera == null) _camera = Camera.main;
         if (_camera == null) return;
-        var mouse = Mouse.current;
-        if (mouse == null) return;
 
-        var mousePos = mouse.position.ReadValue();
         var worldPos = _camera.ScreenToWorldPoint(new Vector3(mousePos.x, mousePos.y, -_camera.transform.position.z));
         ProcessWorldPoint(new Vector2(worldPos.x, worldPos.y));
     }
@@ -92,7 +104,47 @@ public class CellHighlighter : MonoBehaviour
         _collider.offset = Vector2.zero;
 
         _lastHovered = -1;
+        _lastMousePos = new Vector2(float.NaN, float.NaN);
+        BuildTriangulationCache();
         ClearHighlight();
+    }
+
+    // One-time cost when the grid changes; afterwards every hover just appends
+    // precomputed vertices and indices to the mesh buffers.
+    private void BuildTriangulationCache()
+    {
+        var cellCount = _grid.CellCount;
+        if (_cellVertsCache == null || _cellVertsCache.Length != cellCount)
+        {
+            _cellVertsCache = new Vector3[cellCount][];
+            _cellTrisCache = new int[cellCount][];
+        }
+        for (var id = 0; id < cellCount; id++)
+        {
+            var n = _grid.GetCornersCount(id);
+            if (n < 3)
+            {
+                _cellVertsCache[id] = Array.Empty<Vector3>();
+                _cellTrisCache[id] = Array.Empty<int>();
+                continue;
+            }
+
+            if (_cornersBuf.Length < n) _cornersBuf = new Vector2[n];
+            var verts = new Vector3[n];
+            for (var i = 0; i < n; i++)
+            {
+                var c = _grid.GetCorner(id, i);
+                var x = c.x - _gridCenter.x;
+                var y = c.y - _gridCenter.y;
+                _cornersBuf[i] = new Vector2(x, y);
+                verts[i] = new Vector3(x, y, 0.01f);
+            }
+            _cellVertsCache[id] = verts;
+
+            _trisScratch.Clear();
+            TriangulateEarClipping(_cornersBuf, n, _trisScratch, 0);
+            _cellTrisCache[id] = _trisScratch.ToArray();
+        }
     }
 
 #if UNITY_EDITOR
@@ -166,24 +218,21 @@ public class CellHighlighter : MonoBehaviour
 
     private void AddCellFill(int id, Color color)
     {
-        var n = _grid.GetCornersCount(id);
-        if (n < 3) return;
-
-        if (_cornersBuf.Length < n) _cornersBuf = new Vector2[n];
-        for (var i = 0; i < n; i++)
-        {
-            var c = _grid.GetCorner(id, i);
-            _cornersBuf[i] = new Vector2(c.x - _gridCenter.x, c.y - _gridCenter.y);
-        }
+        if (_cellVertsCache == null || id < 0 || id >= _cellVertsCache.Length) return;
+        var verts = _cellVertsCache[id];
+        var tris = _cellTrisCache[id];
+        if (verts.Length < 3) return;
 
         var baseIdx = _verticesBuf.Count;
-        for (var i = 0; i < n; i++)
+        for (var i = 0; i < verts.Length; i++)
         {
-            _verticesBuf.Add(new Vector3(_cornersBuf[i].x, _cornersBuf[i].y, 0.01f));
+            _verticesBuf.Add(verts[i]);
             _colorsBuf.Add(color);
         }
-
-        TriangulateEarClipping(_cornersBuf, n, _indicesBuf, baseIdx);
+        for (var i = 0; i < tris.Length; i++)
+        {
+            _indicesBuf.Add(baseIdx + tris[i]);
+        }
     }
 
     // Ear-clipping for a simple polygon in CW order (Y-up frame). Handles
