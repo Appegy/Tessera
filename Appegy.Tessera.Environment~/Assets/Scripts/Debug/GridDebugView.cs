@@ -48,8 +48,8 @@ public class GridDebugView : MonoBehaviour
 
     [Header("Highlight")]
     [SerializeField] private bool _enableHighlighter = true;
-    [SerializeField] private Color _hoveredColor = new(0.91f, 0.40f, 0.35f, 0.25f);
-    [SerializeField] private Color _neighborColor = new(0.91f, 0.66f, 0.24f, 0.19f);
+    [SerializeField] private Color _hoveredColor = new(0.91f, 0.40f, 0.35f, 0.70f);
+    [SerializeField] private Color _neighborColor = new(0.91f, 0.66f, 0.24f, 0.55f);
     private CellHighlighter _cellHighlighter;
 
     private GridRenderer _gridRenderer;
