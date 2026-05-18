@@ -271,21 +271,114 @@ namespace Appegy.Tessera.Tests
             }
         }
 
-        [TestCase(0f, 0f, 0f, Description = "Minimum every axis")]
-        [TestCase(1f, 1f, 1f, Description = "Maximum every axis")]
-        [TestCase(1f, 0f, 0.5f, Description = "Big tabs, zero variation")]
-        [TestCase(0f, 1f, 0.5f, Description = "Tiny tabs, max variation")]
-        [TestCase(1f, 1f, 0f, Description = "Max tabs and variation, coarse polyline")]
-        [TestCase(1f, 1f, 1f, Description = "Max everything")]
-        public void Polygon_HasNoSelfIntersection_ParameterExtremes(float tabSize, float variation, float smoothness)
+        // Every corner of the public parameter cube (eight combinations of
+        // {0, 1} per axis) across multiple seeds. The strictest boundary
+        // coverage we can do without resorting to randomization.
+        [TestCase(0f, 0f, 0f)]
+        [TestCase(0f, 0f, 1f)]
+        [TestCase(0f, 1f, 0f)]
+        [TestCase(0f, 1f, 1f)]
+        [TestCase(1f, 0f, 0f)]
+        [TestCase(1f, 0f, 1f)]
+        [TestCase(1f, 1f, 0f)]
+        [TestCase(1f, 1f, 1f)]
+        public void Polygon_HasNoSelfIntersection_AllCubeCorners(float tabSize, float variation, float smoothness)
         {
-            // Spot-check extreme corners across multiple seeds.
-            for (var seed = 0; seed < 4; seed++)
+            for (var seed = 0; seed < 8; seed++)
             {
                 var p = new ClassicPuzzleParameters(tabSize, variation, smoothness);
                 var g = new ClassicPuzzleGrid(3, 3, 1f, seed, p);
                 AssertNoCellSelfIntersection(g, $"T={tabSize} V={variation} S={smoothness} seed={seed}");
                 AssertSharedEdgesAgree(g, seed);
+                AssertAllCellsCw(g, seed);
+            }
+        }
+
+        // Randomized fuzz over the full (T, V, S, seed) input space. Deterministic
+        // via a fixed PRNG seed so failures are reproducible. Catches anything the
+        // 216-point sweep might miss between grid samples.
+        [Test]
+        public void Polygon_HasNoSelfIntersection_RandomizedFuzz()
+        {
+            var rng = new System.Random(20260518);
+            for (var trial = 0; trial < 200; trial++)
+            {
+                var t = (float)rng.NextDouble();
+                var v = (float)rng.NextDouble();
+                var s = (float)rng.NextDouble();
+                var seed = rng.Next();
+                var p = new ClassicPuzzleParameters(t, v, s);
+                var g = new ClassicPuzzleGrid(3, 3, 1f, seed, p);
+                AssertNoCellSelfIntersection(g, $"trial={trial} T={t:F3} V={v:F3} S={s:F3} seed={seed}");
+            }
+        }
+
+        // Out-of-range and NaN inputs get silently clamped to [0, 1] in
+        // ClassicPuzzleParameters, so the resulting grid must still produce a
+        // simple polygon. Lock this behavior in.
+        [Test]
+        public void Polygon_HasNoSelfIntersection_OutOfRangeAndNanInputs()
+        {
+            var combos = new (float t, float v, float s)[]
+            {
+                (float.NaN, float.NaN, float.NaN),
+                (-1f, -1f, -1f),
+                (2f, 2f, 2f),
+                (float.NegativeInfinity, float.PositiveInfinity, float.NaN),
+                (-1000f, 1000f, 0.5f),
+                (float.NaN, 0.3f, 0.7f),
+                (1.5f, -0.5f, float.NaN),
+            };
+            foreach (var (t, v, s) in combos)
+            {
+                var p = new ClassicPuzzleParameters(t, v, s);
+                var g = new ClassicPuzzleGrid(3, 3, 1f, 42, p);
+                AssertNoCellSelfIntersection(g, $"T={t} V={v} S={s}");
+                AssertPolygonsTileRectangle(g, $"T={t} V={v} S={s}");
+            }
+        }
+
+        // Sanity: even at extreme inputs the polygon coordinates are always
+        // finite numbers (no NaN / Infinity leaking through).
+        [TestCase(0f, 0f, 0f)]
+        [TestCase(0f, 0f, 1f)]
+        [TestCase(0f, 1f, 0f)]
+        [TestCase(0f, 1f, 1f)]
+        [TestCase(1f, 0f, 0f)]
+        [TestCase(1f, 0f, 1f)]
+        [TestCase(1f, 1f, 0f)]
+        [TestCase(1f, 1f, 1f)]
+        public void Corners_AreAlwaysFinite(float tabSize, float variation, float smoothness)
+        {
+            var p = new ClassicPuzzleParameters(tabSize, variation, smoothness);
+            var g = new ClassicPuzzleGrid(4, 4, 1f, 42, p);
+            for (var id = 0; id < g.CellCount; id++)
+            {
+                var n = g.GetCornersCount(id);
+                for (var k = 0; k < n; k++)
+                {
+                    var c = g.GetCorner(id, k);
+                    Assert.IsTrue(math.isfinite(c.x), $"T={tabSize} V={variation} S={smoothness} cell={id} corner={k} non-finite x: {c.x}");
+                    Assert.IsTrue(math.isfinite(c.y), $"T={tabSize} V={variation} S={smoothness} cell={id} corner={k} non-finite y: {c.y}");
+                }
+            }
+        }
+
+        // Tiling invariant under random parameters: total polygon area must
+        // exactly equal grid rectangle area regardless of inputs.
+        [Test]
+        public void Polygon_TilesRectangle_RandomizedFuzz()
+        {
+            var rng = new System.Random(20260519);
+            for (var trial = 0; trial < 50; trial++)
+            {
+                var t = (float)rng.NextDouble();
+                var v = (float)rng.NextDouble();
+                var s = (float)rng.NextDouble();
+                var seed = rng.Next();
+                var p = new ClassicPuzzleParameters(t, v, s);
+                var g = new ClassicPuzzleGrid(3, 3, 1f, seed, p);
+                AssertPolygonsTileRectangle(g, $"trial={trial} T={t:F3} V={v:F3} S={s:F3} seed={seed}");
             }
         }
 

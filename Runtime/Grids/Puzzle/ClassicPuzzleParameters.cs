@@ -12,8 +12,8 @@ namespace Appegy.Tessera
     {
         internal const float MinInternalTabSize = 0.06f;
         internal const float MaxInternalTabSize = 0.14f;
-        internal const float MinInternalJitter = 0.02f;
-        internal const float MaxInternalJitter = 0.06f;
+        internal const float MinInternalJitter = 0.025f;
+        internal const float MaxInternalJitter = 0.055f;
         internal const int MinInternalSubdivisions = 4;
         internal const int MaxInternalSubdivisions = 16;
 
