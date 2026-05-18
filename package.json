@@ -2,7 +2,7 @@
   "name": "com.appegy.tessera",
   "displayName": "Appegy: Tessera",
   "description": "2D grid geometry for Unity: square and hex tessellations.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "unity": "2021.3",
   "documentationUrl": "https://github.com/Appegy/Tessera",
   "changelogUrl": "https://github.com/Appegy/Tessera/releases",

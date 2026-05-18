@@ -4,10 +4,6 @@ using Unity.Mathematics;
 
 namespace Appegy.Tessera
 {
-    /// <summary>
-    ///     Irregular cell grid based on a centroidal Voronoi tessellation clipped to a rectangular bounds.
-    ///     See <c>Documentation~/voronoi-grid-design.md</c>.
-    /// </summary>
     public sealed class VoronoiGrid : ITessellation
     {
         private readonly Bounds2 _bounds;
@@ -72,10 +68,7 @@ namespace Appegy.Tessera
             var arr = _neighbors[a];
             for (var i = 0; i < arr.Length; i++)
             {
-                if (arr[i] == b)
-                {
-                    return true;
-                }
+                if (arr[i] == b) return true;
             }
             return false;
         }
@@ -86,10 +79,7 @@ namespace Appegy.Tessera
             var arr = _neighbors[cell];
             for (var i = 0; i < arr.Length; i++)
             {
-                if (arr[i] == neighbor)
-                {
-                    return i;
-                }
+                if (arr[i] == neighbor) return i;
             }
             return -1;
         }
@@ -131,10 +121,6 @@ namespace Appegy.Tessera
                     queue.Enqueue((n, d + 1));
                 }
             }
-            // Defensive guard. The dual graph of a Voronoi tessellation clipped to a
-            // convex Bounds2 is connected by construction (every cell shares at least one
-            // edge with another cell or with the bounds). Reaching this point implies
-            // internal corruption of _neighbors and is not part of the public contract.
             throw new InvalidOperationException($"Cells {a} and {b} are in disconnected components.");
         }
     }

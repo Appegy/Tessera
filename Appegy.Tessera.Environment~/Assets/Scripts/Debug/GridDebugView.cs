@@ -19,7 +19,8 @@ public class GridDebugView : MonoBehaviour
         HexPointyEven,
         HexFlatOdd,
         HexFlatEven,
-        Voronoi
+        Voronoi,
+        ClassicPuzzle
     }
 
     [Header("Grid")]
@@ -35,14 +36,20 @@ public class GridDebugView : MonoBehaviour
     [SerializeField] private int _voronoiSeed = 0;
     [SerializeField] [Range(0, 16)] private int _relaxationIterations = 3;
 
+    [Header("Classic Puzzle")]
+    [SerializeField] private int _puzzleSeed = 0;
+    [SerializeField] [Range(0f, 1f)] private float _puzzleTabSize = 0.5f;
+    [SerializeField] [Range(0f, 1f)] private float _puzzleVariation = 0.5f;
+    [SerializeField] [Range(0f, 1f)] private float _puzzleSmoothness = 0.5f;
+
     [Header("Grid Appearance")]
     [SerializeField] [Range(0.001f, 0.2f)] private float _lineWidth = 0.02f;
     [SerializeField] private Color _lineColor = Color.white;
 
     [Header("Highlight")]
     [SerializeField] private bool _enableHighlighter = true;
-    [SerializeField] private Color _hoveredColor = new(0.91f, 0.40f, 0.35f, 0.25f);
-    [SerializeField] private Color _neighborColor = new(0.91f, 0.66f, 0.24f, 0.19f);
+    [SerializeField] private Color _hoveredColor = new(0.91f, 0.40f, 0.35f, 0.70f);
+    [SerializeField] private Color _neighborColor = new(0.91f, 0.66f, 0.24f, 0.55f);
     private CellHighlighter _cellHighlighter;
 
     private GridRenderer _gridRenderer;
@@ -181,6 +188,11 @@ public class GridDebugView : MonoBehaviour
                 var size = new float2(_width * _inscribedRadius * 2f, _height * _inscribedRadius * 2f);
                 var bounds = new Bounds2(float2.zero, size);
                 return new VoronoiGrid(bounds, _cellCount, _voronoiSeed, _relaxationIterations);
+            }
+            case GridKind.ClassicPuzzle:
+            {
+                var parameters = new ClassicPuzzleParameters(_puzzleTabSize, _puzzleVariation, _puzzleSmoothness);
+                return new ClassicPuzzleGrid(_width, _height, _inscribedRadius * 2f, _puzzleSeed, parameters);
             }
             default:
                 return new SquareGrid(_width, _height, _inscribedRadius * 2f);
