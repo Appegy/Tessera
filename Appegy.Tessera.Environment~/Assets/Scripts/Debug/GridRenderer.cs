@@ -69,6 +69,13 @@ public class GridRenderer : MonoBehaviour
         else
             _mesh.Clear();
 
+        // Large puzzle grids easily exceed Unity's default 16-bit index limit
+        // (65535 vertices). Each edge segment is a 4-vertex quad, so a 20x20
+        // puzzle at default smoothness is already past the cap. Promote to
+        // 32-bit indices to render the whole mesh.
+        _mesh.indexFormat = vertices.Count > 65535
+            ? UnityEngine.Rendering.IndexFormat.UInt32
+            : UnityEngine.Rendering.IndexFormat.UInt16;
         _mesh.SetVertices(vertices);
         _mesh.SetColors(colors);
         _mesh.SetIndices(indices, MeshTopology.Triangles, 0);
