@@ -134,8 +134,12 @@ public class CellHighlighter : MonoBehaviour
 
         AddCellFill(hoveredId, _view.HoveredColor, vertices, indices, colors);
 
-        var n = _grid.GetCornersCount(hoveredId);
-        for (var i = 0; i < n; i++)
+        // Walk the neighbour list, not the corner polyline. For non-polygonal grids
+        // (ClassicPuzzleGrid) GetCornersCount >> GetNeighborCount; using the former
+        // here used to iterate ~120 times and re-render each of the 4 real
+        // neighbours 30 times per hover, killing performance.
+        var neighborCount = _grid.GetNeighborCount(hoveredId);
+        for (var i = 0; i < neighborCount; i++)
         {
             var nb = _grid.GetNeighbor(hoveredId, i);
             if (nb == -1) continue;
