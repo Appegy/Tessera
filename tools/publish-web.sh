@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Publishes the local WebGL build to the orphan `web-build` branch that GitHub
+# Publishes the local WebGL build to the orphan `demo` branch that GitHub
 # Pages serves (https://appegy.github.io/Tessera/). The build branch holds only
 # the build and never merges anywhere.
 #
@@ -8,7 +8,7 @@
 #      into Documentation~/webgl  (File > Build Settings/Profiles > WebGL > Build,
 #      target folder = Documentation~/webgl). Compression is set to Disabled so
 #      GitHub Pages serves it without Content-Encoding headers.
-#   2. Run this script. It force-pushes the build to `web-build`; GitHub Pages
+#   2. Run this script. It force-pushes the build to `demo`; GitHub Pages
 #      redeploys automatically within ~1 minute.
 set -euo pipefail
 
@@ -30,10 +30,10 @@ touch "$TMP/.nojekyll"           # skip Jekyll so Build/ and TemplateData/ are s
 
 cd "$TMP"
 git init -q
-git checkout -q -b web-build
+git checkout -q -b demo
 git add -A
 git -c user.email="build@appegy" -c user.name="Tessera Build" commit -q -m "WebGL build: Tessera Playground"
 git remote add origin "$REMOTE"
-git push -f origin web-build
+git push -f origin demo
 
-echo "Published to web-build. Live shortly at https://appegy.github.io/Tessera/"
+echo "Published to demo. Live shortly at https://appegy.github.io/Tessera/"
