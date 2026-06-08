@@ -147,9 +147,13 @@ namespace Appegy.Tessera.Demo
             var b = poly[ci];
             var c = poly[ni];
 
-            // Convex check for CW input (Y-up): cross(ab, bc) < 0.
+            // Convex check for CW input (Y-up): reflex when cross(ab, bc) > 0. A scale-relative
+            // tolerance treats near-collinear vertices (straight stems/shoulders, duplicates) as
+            // zero-area ears, so they get clipped instead of stalling the algorithm.
             var cross = (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x);
-            if (cross >= 0f) return false;
+            var eps = 1e-5f * (Mathf.Abs(b.x - a.x) + Mathf.Abs(b.y - a.y)) * (Mathf.Abs(c.x - b.x) + Mathf.Abs(c.y - b.y));
+            if (cross > eps) return false;     // reflex
+            if (cross >= -eps) return true;    // ~collinear: zero-area ear, contains nothing
 
             var v = next[ni];
             while (v != pi)

@@ -199,7 +199,7 @@ public class CellHighlighter : MonoBehaviour
         AddCellFill(hoveredId, _view.HoveredColor);
 
         // Walk the neighbour list, not the corner polyline. For non-polygonal grids
-        // (ClassicPuzzleGrid) GetCornersCount >> GetNeighborCount; using the former
+        // (DraradechPuzzleGrid) GetCornersCount >> GetNeighborCount; using the former
         // here used to iterate ~120 times and re-render each of the 4 real
         // neighbours 30 times per hover, killing performance.
         var neighborCount = _grid.GetNeighborCount(hoveredId);
@@ -300,9 +300,13 @@ public class CellHighlighter : MonoBehaviour
         var b = poly[ci];
         var c = poly[ni];
 
-        // Convex check for CW input (Y-up): cross(ab, bc) < 0.
+        // Convex check for CW input (Y-up): reflex when cross(ab, bc) > 0. A scale-relative
+        // tolerance treats near-collinear vertices (straight stems/shoulders, duplicates) as
+        // zero-area ears, so they get clipped instead of stalling the algorithm.
         var cross = (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x);
-        if (cross >= 0f) return false;
+        var eps = 1e-5f * (Mathf.Abs(b.x - a.x) + Mathf.Abs(b.y - a.y)) * (Mathf.Abs(c.x - b.x) + Mathf.Abs(c.y - b.y));
+        if (cross > eps) return false;     // reflex
+        if (cross >= -eps) return true;    // ~collinear: zero-area ear, contains nothing
 
         // No other remaining polygon vertex lies inside triangle abc.
         var v = next[ni];
