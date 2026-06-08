@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Unity.Mathematics;
 using UnityEngine;
 
 namespace Appegy.Tessera.Demo
@@ -27,7 +28,7 @@ namespace Appegy.Tessera.Demo
         private readonly List<Color> _colors = new();
         private int[] _prevBuf = Array.Empty<int>();
         private int[] _nextBuf = Array.Empty<int>();
-        private Vector2[] _cornersBuf = Array.Empty<Vector2>();
+        private float2[] _cornersBuf = Array.Empty<float2>();
 
         // Per-cell triangulation cache, rebuilt once per grid and reused on every highlight change.
         private Vector3[][] _cellVerts;
@@ -148,20 +149,20 @@ namespace Appegy.Tessera.Demo
                     continue;
                 }
 
-                if (_cornersBuf.Length < n) _cornersBuf = new Vector2[n];
+                if (_cornersBuf.Length < n) _cornersBuf = new float2[n];
                 var verts = new Vector3[n];
                 for (var i = 0; i < n; i++)
                 {
                     var c = _grid.GetCorner(id, i);
                     var x = c.x - _center.x;
                     var y = c.y - _center.y;
-                    _cornersBuf[i] = new Vector2(x, y);
+                    _cornersBuf[i] = new float2(x, y);
                     verts[i] = new Vector3(x, y, -0.01f);
                 }
                 _cellVerts[id] = verts;
 
                 _trisScratch.Clear();
-                GridMeshBuilder.Triangulate(_cornersBuf, n, _trisScratch, 0, ref _prevBuf, ref _nextBuf);
+                EarClipping.Triangulate(_cornersBuf, n, _trisScratch, 0, ref _prevBuf, ref _nextBuf);
                 _cellTris[id] = _trisScratch.ToArray();
             }
         }

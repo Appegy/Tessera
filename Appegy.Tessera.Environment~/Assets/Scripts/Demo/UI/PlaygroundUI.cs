@@ -110,8 +110,42 @@ namespace Appegy.Tessera.Demo
             highlightRow.Add(highlightToggle);
             container.Add(highlightRow);
 
+            container.Add(BuildLineWidth());
+
             container.Add(BuildSegmented("Theme", new[] { "Dark", "Light" }, _isLight ? 1 : 0, i => ApplyTheme(i == 1)));
             container.Add(BuildSegmented("Text Size", new[] { "Small", "Medium", "Large" }, _uiScaleIndex, SetUiScale));
+        }
+
+        // 1.0 keeps the current line width; 0 makes the outline thin. The [0, 1] slider maps onto
+        // [thin, current] so the default (1) leaves the look unchanged.
+        private VisualElement BuildLineWidth()
+        {
+            const float minWidth = 0.01f;
+            var maxWidth = _controller.LineWidth;
+            if (maxWidth <= minWidth) maxWidth = 0.05f;
+
+            var row = new VisualElement();
+            row.AddToClassList("param");
+            var head = new VisualElement();
+            head.AddToClassList("param-head");
+            var caption = new Label("Line Width");
+            caption.AddToClassList("param-label");
+            var value = new Label("100%");
+            value.AddToClassList("param-value");
+            head.Add(caption);
+            head.Add(value);
+            row.Add(head);
+
+            var slider = new Slider(0f, 1f) { value = 1f };
+            slider.AddToClassList("param-slider");
+            slider.RegisterValueChangedCallback(e =>
+            {
+                var t = Mathf.Clamp01(e.newValue);
+                _controller.LineWidth = Mathf.Lerp(minWidth, maxWidth, t);
+                value.text = Mathf.RoundToInt(t * 100f) + "%";
+            });
+            row.Add(slider);
+            return row;
         }
 
         private VisualElement BuildSegmented(string label, string[] options, int selected, Action<int> onSelect)
