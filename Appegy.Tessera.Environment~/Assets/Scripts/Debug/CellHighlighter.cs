@@ -31,7 +31,7 @@ public class CellHighlighter : MonoBehaviour
     private readonly List<Vector3> _verticesBuf = new();
     private readonly List<int> _indicesBuf = new();
     private readonly List<Color> _colorsBuf = new();
-    private Vector2[] _cornersBuf = Array.Empty<Vector2>();
+    private float2[] _cornersBuf = Array.Empty<float2>();
     private int[] _earPrevBuf = Array.Empty<int>();
     private int[] _earNextBuf = Array.Empty<int>();
 
@@ -129,20 +129,20 @@ public class CellHighlighter : MonoBehaviour
                 continue;
             }
 
-            if (_cornersBuf.Length < n) _cornersBuf = new Vector2[n];
+            if (_cornersBuf.Length < n) _cornersBuf = new float2[n];
             var verts = new Vector3[n];
             for (var i = 0; i < n; i++)
             {
                 var c = _grid.GetCorner(id, i);
                 var x = c.x - _gridCenter.x;
                 var y = c.y - _gridCenter.y;
-                _cornersBuf[i] = new Vector2(x, y);
+                _cornersBuf[i] = new float2(x, y);
                 verts[i] = new Vector3(x, y, 0.01f);
             }
             _cellVertsCache[id] = verts;
 
             _trisScratch.Clear();
-            TriangulateEarClipping(_cornersBuf, n, _trisScratch, 0);
+            EarClipping.Triangulate(_cornersBuf, n, _trisScratch, 0, ref _earPrevBuf, ref _earNextBuf);
             _cellTrisCache[id] = _trisScratch.ToArray();
         }
     }
@@ -233,99 +233,6 @@ public class CellHighlighter : MonoBehaviour
         {
             _indicesBuf.Add(baseIdx + tris[i]);
         }
-    }
-
-    // Ear-clipping for a simple polygon in CW order (Y-up frame). Handles
-    // concave polygons such as puzzle pieces where neighbour tabs poke inward.
-    // O(n^2) which is fine for typical cell corner counts (<= a few hundred).
-    // Uses instance prev/next buffers so it is allocation-free after warm-up.
-    private void TriangulateEarClipping(Vector2[] poly, int n, List<int> indices, int baseIdx)
-    {
-        if (n < 3) return;
-        if (n == 3)
-        {
-            indices.Add(baseIdx);
-            indices.Add(baseIdx + 1);
-            indices.Add(baseIdx + 2);
-            return;
-        }
-
-        if (_earPrevBuf.Length < n) _earPrevBuf = new int[n];
-        if (_earNextBuf.Length < n) _earNextBuf = new int[n];
-        var prev = _earPrevBuf;
-        var next = _earNextBuf;
-        for (var i = 0; i < n; i++)
-        {
-            prev[i] = (i - 1 + n) % n;
-            next[i] = (i + 1) % n;
-        }
-
-        var remaining = n;
-        var head = 0;
-        var safety = n * 2;
-        while (remaining > 3 && safety-- > 0)
-        {
-            var earFound = false;
-            var v = head;
-            for (var iter = 0; iter < remaining; iter++)
-            {
-                if (IsEar(poly, prev[v], v, next[v], next, prev))
-                {
-                    indices.Add(baseIdx + prev[v]);
-                    indices.Add(baseIdx + v);
-                    indices.Add(baseIdx + next[v]);
-                    next[prev[v]] = next[v];
-                    prev[next[v]] = prev[v];
-                    if (v == head) head = next[v];
-                    remaining--;
-                    earFound = true;
-                    break;
-                }
-                v = next[v];
-            }
-            if (!earFound) break;
-        }
-
-        if (remaining == 3)
-        {
-            indices.Add(baseIdx + prev[head]);
-            indices.Add(baseIdx + head);
-            indices.Add(baseIdx + next[head]);
-        }
-    }
-
-    private static bool IsEar(Vector2[] poly, int pi, int ci, int ni, int[] next, int[] prev)
-    {
-        var a = poly[pi];
-        var b = poly[ci];
-        var c = poly[ni];
-
-        // Convex check for CW input (Y-up): reflex when cross(ab, bc) > 0. A scale-relative
-        // tolerance treats near-collinear vertices (straight stems/shoulders, duplicates) as
-        // zero-area ears, so they get clipped instead of stalling the algorithm.
-        var cross = (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x);
-        var eps = 1e-5f * (Mathf.Abs(b.x - a.x) + Mathf.Abs(b.y - a.y)) * (Mathf.Abs(c.x - b.x) + Mathf.Abs(c.y - b.y));
-        if (cross > eps) return false;     // reflex
-        if (cross >= -eps) return true;    // ~collinear: zero-area ear, contains nothing
-
-        // No other remaining polygon vertex lies inside triangle abc.
-        var v = next[ni];
-        while (v != pi)
-        {
-            if (PointInTriangle(poly[v], a, b, c)) return false;
-            v = next[v];
-        }
-        return true;
-    }
-
-    private static bool PointInTriangle(Vector2 p, Vector2 a, Vector2 b, Vector2 c)
-    {
-        var d1 = (p.x - b.x) * (a.y - b.y) - (a.x - b.x) * (p.y - b.y);
-        var d2 = (p.x - c.x) * (b.y - c.y) - (b.x - c.x) * (p.y - c.y);
-        var d3 = (p.x - a.x) * (c.y - a.y) - (c.x - a.x) * (p.y - a.y);
-        var hasNeg = d1 < 0f || d2 < 0f || d3 < 0f;
-        var hasPos = d1 > 0f || d2 > 0f || d3 > 0f;
-        return !(hasNeg && hasPos);
     }
 
     private void ClearHighlight()
