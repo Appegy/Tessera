@@ -3,16 +3,9 @@ using Unity.Mathematics;
 
 namespace Appegy.Tessera
 {
-    // Builds one interior puzzle edge: a gently bowed baseline (Roundness) carrying a tab at its
-    // midpoint. The tab is a round head joined to the body by two concave neck fillets, each tangent
-    // to the body edge and to the head circle, so the outline is C1-smooth. TabOffset morphs the tab
-    // from a plain semicircle bump (no neck) to a lifted knob with a neck and overhang.
-    //
-    // TabDeform leans the whole tab by a per-tab shear (anchored at the body): every tab point is
-    // shifted along the edge by lean * protrusion, so the head leans while the base stays put. Being
-    // affine it preserves smoothness and the fillet tangencies and never self-intersects, and tab
-    // size stays constant (only the lean varies). Body bow and tab poke directions are independent
-    // random signs. All randomness comes from the per-edge seed, shared by both neighbours.
+    // One interior puzzle edge: a bowed baseline carrying a tab (round head + two concave neck
+    // fillets, all tangent so the outline is C1). TabDeform leans the tab by a per-tab affine shear.
+    // Bow and tab directions are independent signs from the per-edge seed (shared by both neighbours).
     internal static class PuzzleEdge
     {
         public static void Generate(
@@ -39,22 +32,20 @@ namespace Appegy.Tessera
             var perp = new float2(-tangent.y, tangent.x);   // length L, outward for CW traversal
 
             var rng = new Mulberry32(edgeSeed);
-            var sBulge = rng.NextFloat() > 0.5f ? 1f : -1f; // body bow direction
-            var sTab = rng.NextFloat() > 0.5f ? 1f : -1f;   // tab poke direction (independent of bow)
-            // Per-tab lean (drawn even when deform is 0 so the sign draws above stay stable).
-            var leanJit = rng.Range(-1f, 1f);
-            var lean = deform * ClassicPuzzleParameters.MaxLean * leanJit;
+            var sBulge = rng.NextFloat() > 0.5f ? 1f : -1f;
+            var sTab = rng.NextFloat() > 0.5f ? 1f : -1f;
+            var lean = deform * ClassicPuzzleParameters.MaxLean * rng.Range(-1f, 1f);
 
-            var rr = radius;                                // head radius (fraction of L)
-            var rf = fillet;                                // neck fillet radius
-            var hh = headHeight;                            // head centre height above the body
+            var rr = radius;
+            var rf = fillet;
+            var hh = headHeight;
             var sum = rr + rf;
-            // Attach half-width that keeps each fillet tangent to both the body edge and the head.
-            // At headHeight = fillet = 0 this gives dx = radius: a plain 180-degree semicircle bump.
+            // Attach half-width keeping each fillet tangent to both edge and head; at hh = rf = 0 it is
+            // a plain semicircle (dx = radius).
             var dx = math.sqrt(math.max(0f, sum * sum - (hh - rf) * (hh - rf)));
             var xL = 0.5f - dx;
             var xR = 0.5f + dx;
-            var yBase = Bulge(bulge, xL);                   // bow height under the attach (same at xR)
+            var yBase = Bulge(bulge, xL);
             var baseOffset = sBulge * yBase;
 
             var phiHead = math.acos(math.clamp((rf - hh) / math.max(sum, 1e-6f), -1f, 1f));
@@ -64,35 +55,35 @@ namespace Appegy.Tessera
 
             var idx = 0;
 
-            // Left shoulder: p0 -> left attach, following the bow.
+            // Left shoulder.
             for (var k = 0; k <= sh; k++)
             {
                 var x = math.lerp(0f, xL, (float)k / sh);
                 dest[idx++] = At(p0, tangent, perp, x, sBulge * Bulge(bulge, x));
             }
 
-            // Left fillet: attach -> head junction (concave; skip the shared attach point).
+            // Left fillet (skips the shared attach point).
             for (var k = 1; k <= ff; k++)
             {
                 var a = math.lerp(aBase, aTanL, (float)k / ff);
                 dest[idx++] = Tab(p0, tangent, perp, xL + rf * math.cos(a), rf + rf * math.sin(a), lean, baseOffset, sTab);
             }
 
-            // Head: left junction -> over the top -> right junction (skip the shared junction).
+            // Head, over the top.
             for (var k = 1; k <= hd; k++)
             {
                 var phi = math.lerp(-phiHead, phiHead, (float)k / hd);
                 dest[idx++] = Tab(p0, tangent, perp, 0.5f + rr * math.sin(phi), hh + rr * math.cos(phi), lean, baseOffset, sTab);
             }
 
-            // Right fillet: head junction -> right attach (concave; skip the shared junction).
+            // Right fillet.
             for (var k = 1; k <= ff; k++)
             {
                 var a = math.lerp(aTanR, 1.5f * math.PI, (float)k / ff);
                 dest[idx++] = Tab(p0, tangent, perp, xR + rf * math.cos(a), rf + rf * math.sin(a), lean, baseOffset, sTab);
             }
 
-            // Right shoulder: right attach -> p1 (skip the shared attach point).
+            // Right shoulder.
             for (var k = 1; k <= sh; k++)
             {
                 var x = math.lerp(xR, 1f, (float)k / sh);
@@ -100,18 +91,12 @@ namespace Appegy.Tessera
             }
         }
 
-        // Symmetric parabolic bow: 0 at the ends, 'bulge' (fraction of L) at the midpoint.
         private static float Bulge(float bulge, float x) => 4f * bulge * x * (1f - x);
 
-        // A tab-local point (px along edge, py protrusion above the body) leaned by the shear
-        // (anchored at py = 0, so the base stays put and the head leans) and mapped to world.
+        // Tab-local point (px along, py out) leaned by the shear, then mapped to world.
         private static float2 Tab(float2 p0, float2 tangent, float2 perp, float px, float py, float lean, float baseOffset, float sTab)
-        {
-            var px2 = px + lean * py;
-            return At(p0, tangent, perp, px2, baseOffset + sTab * py);
-        }
+            => At(p0, tangent, perp, px + lean * py, baseOffset + sTab * py);
 
-        // Map (x along edge, signed perpendicular offset), both fractions of L, into world space.
         private static float2 At(float2 p0, float2 tangent, float2 perp, float x, float perpOffset)
             => p0 + x * tangent + perpOffset * perp;
     }
