@@ -20,6 +20,7 @@ public class GridDebugView : MonoBehaviour
         HexFlatOdd,
         HexFlatEven,
         Voronoi,
+        DraradechPuzzle,
         ClassicPuzzle
     }
 
@@ -36,11 +37,17 @@ public class GridDebugView : MonoBehaviour
     [SerializeField] private int _voronoiSeed = 0;
     [SerializeField] [Range(0, 16)] private int _relaxationIterations = 3;
 
-    [Header("Classic Puzzle")]
+    [Header("Draradech Puzzle")]
     [SerializeField] private int _puzzleSeed = 0;
     [SerializeField] [Range(0f, 1f)] private float _puzzleTabSize = 0.5f;
     [SerializeField] [Range(0f, 1f)] private float _puzzleVariation = 0.5f;
     [SerializeField] [Range(0f, 1f)] private float _puzzleSmoothness = 0.5f;
+
+    [Header("Classic Puzzle")]
+    [SerializeField] private int _classicSeed = 0;
+    [SerializeField] [Range(0f, 1f)] private float _classicRoundness = 0.5f;
+    [SerializeField] [Range(0f, 1f)] private float _classicTabRadius = 0.5f;
+    [SerializeField] [Range(0f, 1f)] private float _classicTabOffset = 0.5f;
 
     [Header("Grid Appearance")]
     [SerializeField] [Range(0.001f, 0.2f)] private float _lineWidth = 0.02f;
@@ -189,10 +196,15 @@ public class GridDebugView : MonoBehaviour
                 var bounds = new Bounds2(float2.zero, size);
                 return new VoronoiGrid(bounds, _cellCount, _voronoiSeed, _relaxationIterations);
             }
+            case GridKind.DraradechPuzzle:
+            {
+                var parameters = new DraradechPuzzleParameters(_puzzleTabSize, _puzzleVariation, _puzzleSmoothness);
+                return new DraradechPuzzleGrid(_width, _height, _inscribedRadius * 2f, _puzzleSeed, parameters);
+            }
             case GridKind.ClassicPuzzle:
             {
-                var parameters = new ClassicPuzzleParameters(_puzzleTabSize, _puzzleVariation, _puzzleSmoothness);
-                return new ClassicPuzzleGrid(_width, _height, _inscribedRadius * 2f, _puzzleSeed, parameters);
+                var parameters = new ClassicPuzzleParameters(_classicRoundness, _classicTabRadius, _classicTabOffset);
+                return new ClassicPuzzleGrid(_width, _height, _inscribedRadius * 2f, _classicSeed, parameters);
             }
             default:
                 return new SquareGrid(_width, _height, _inscribedRadius * 2f);
