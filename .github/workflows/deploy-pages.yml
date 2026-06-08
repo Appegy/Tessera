@@ -1,6 +1,6 @@
 # Builds the Tessera playground (WebGL) with game-ci and publishes it to the
-# `web-build` branch, which GitHub Pages serves (https://appegy.github.io/Tessera/).
-# Nothing is committed to the source branch; the build lives only on web-build.
+# `demo` branch, which GitHub Pages serves (https://appegy.github.io/Tessera/).
+# Nothing is committed to the source branch; the build lives only on demo.
 #
 # Secrets (repo-level): UNITY_LICENSE (Personal .ulf contents), UNITY_EMAIL, UNITY_PASSWORD.
 # CI builds with Unity 6000.4.8f1 (newest game-ci WebGL image in the 6000.4 line);
@@ -11,7 +11,7 @@ name: Build & publish WebGL
 on:
   workflow_dispatch:
   push:
-    branches: [main, ivan/web-demo]
+    branches: [main]
     paths:
       - 'Appegy.Tessera.Environment~/**'
       - 'Runtime/**'
@@ -26,7 +26,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build WebGL & publish to web-build
+    name: Build WebGL & publish to demo
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -56,7 +56,7 @@ jobs:
           buildName: Tessera
           allowDirtyBuild: true
 
-      - name: Publish build to web-build branch
+      - name: Publish build to demo branch
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -74,8 +74,8 @@ jobs:
           touch "$SITE/.nojekyll"
           cd "$SITE"
           git init -q
-          git checkout -q -b web-build
+          git checkout -q -b demo
           git add -A
           git -c user.email=actions@github.com -c user.name="github-actions[bot]" commit -q -m "WebGL build (${GITHUB_SHA::7})"
-          git push -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" web-build
-          echo "Published to web-build -> Pages will redeploy."
+          git push -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" demo
+          echo "Published to demo -> Pages will redeploy."
