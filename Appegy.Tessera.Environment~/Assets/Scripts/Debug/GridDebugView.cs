@@ -48,6 +48,7 @@ public class GridDebugView : MonoBehaviour
     [SerializeField] [Range(0f, 1f)] private float _classicRoundness = 0.5f;
     [SerializeField] [Range(0f, 1f)] private float _classicTabRadius = 0.5f;
     [SerializeField] [Range(0f, 1f)] private float _classicTabOffset = 0.5f;
+    [SerializeField] [Range(0f, 1f)] private float _classicTabDeform = 0.4f;
 
     [Header("Grid Appearance")]
     [SerializeField] [Range(0.001f, 0.2f)] private float _lineWidth = 0.02f;
@@ -203,7 +204,7 @@ public class GridDebugView : MonoBehaviour
             }
             case GridKind.ClassicPuzzle:
             {
-                var parameters = new ClassicPuzzleParameters(_classicRoundness, _classicTabRadius, _classicTabOffset);
+                var parameters = new ClassicPuzzleParameters(_classicRoundness, _classicTabRadius, _classicTabOffset, _classicTabDeform);
                 return new ClassicPuzzleGrid(_width, _height, _inscribedRadius * 2f, _classicSeed, parameters);
             }
             default:

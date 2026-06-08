@@ -25,13 +25,19 @@ namespace Appegy.Tessera
         internal const float MaxRadius = 0.119f;
         // Head centre height above the body at TabOffset = 1, as a fraction of head radius.
         internal const float HeadHeightMax = 1.5f;
-        // Neck fillet radius at TabOffset = 1, as a fraction of head radius. Kept below HeadHeightMax
-        // so the head always sits above the fillets and the attach width stays real.
-        internal const float FilletMax = 0.35f;
+        // Neck waist half-width as a fraction of head radius. The fillet radius is derived to hold
+        // this constant once the head lifts off, so raising TabOffset lengthens the neck instead of
+        // pinching it. Must be < 1 so the head still overhangs the neck.
+        internal const float NeckWidth = 0.7f;
         // Floor for the fillet radius (fraction of head radius) so the fillet never collapses to
-        // coincident points (which would pinch the mitered outline). At TabOffset = 0 this leaves a
-        // semicircle bump with a barely-rounded base instead of degenerate duplicates.
+        // coincident points (which would pinch the mitered outline). While the floor is active (low
+        // TabOffset) the head sits near the body as a semicircle bump with a barely-rounded base.
         internal const float FilletMin = 0.05f;
+        // Deform at TabDeform = 1: a smooth per-tab lean (shear) of the whole tab, anchored at the
+        // body, like Draradech's gentle asymmetry. Being affine it stays smooth, keeps the fillet
+        // tangencies and never self-intersects. Tab SIZE stays constant (only the lean varies), so
+        // tabs read as uniform - no high-frequency wobble and no size jitter.
+        internal const float MaxLean = 0.45f; // shear: along-edge shift per unit protrusion
 
         // Curve resolution. Smoothness is internal, not a user slider.
         internal const int ShoulderSubdivisions = 4;
@@ -41,15 +47,17 @@ namespace Appegy.Tessera
         public float Roundness { get; }
         public float TabRadius { get; }
         public float TabOffset { get; }
+        public float TabDeform { get; }
 
-        public ClassicPuzzleParameters(float roundness, float tabRadius, float tabOffset)
+        public ClassicPuzzleParameters(float roundness, float tabRadius, float tabOffset, float tabDeform = 0f)
         {
             Roundness = Normalize(roundness);
             TabRadius = Normalize(tabRadius);
             TabOffset = Normalize(tabOffset);
+            TabDeform = Normalize(tabDeform);
         }
 
-        public static ClassicPuzzleParameters Default => new ClassicPuzzleParameters(0.5f, 0.5f, 0.5f);
+        public static ClassicPuzzleParameters Default => new ClassicPuzzleParameters(0.5f, 0.5f, 0.5f, 0f);
 
         // p0 + left shoulder (Sh + 1) + left fillet (Fillet) + head (Head) + right fillet (Fillet) + right shoulder (Sh).
         public int SamplesPerEdge => 2 * ShoulderSubdivisions + 2 * FilletSubdivisions + HeadSubdivisions + 1;
@@ -58,7 +66,22 @@ namespace Appegy.Tessera
         internal float ResolvedBulge => Roundness * MaxBulge;
         internal float ResolvedRadius => math.lerp(MinRadius, MaxRadius, TabRadius);
         internal float ResolvedHeadHeight => ResolvedRadius * HeadHeightMax * TabOffset;
-        internal float ResolvedFillet => ResolvedRadius * math.max(FilletMin, FilletMax * TabOffset);
+        internal float ResolvedDeform => TabDeform;
+
+        // Fillet radius derived to keep the neck waist at NeckWidth * radius (constant), floored so a
+        // low TabOffset stays a near-semicircle. With c = sqrt(1 - NeckWidth^2), choosing
+        // rf = (hh - c*R)/(1 + c) makes (hh - rf)/(R + rf) = c, hence waist = R*sqrt(1 - c^2) = NeckWidth*R.
+        internal float ResolvedFillet
+        {
+            get
+            {
+                var r = ResolvedRadius;
+                var hh = ResolvedHeadHeight;
+                var c = math.sqrt(1f - NeckWidth * NeckWidth);
+                var rf = (hh - c * r) / (1f + c);
+                return math.max(FilletMin * r, rf);
+            }
+        }
 
         private static float Normalize(float v)
         {

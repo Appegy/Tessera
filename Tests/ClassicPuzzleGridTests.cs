@@ -112,13 +112,19 @@ namespace Appegy.Tessera.Tests
         // ---- A tab actually deforms interior cells away from a plain square ----
 
         [Test]
-        public void InteriorCell_AreaDiffersFromPlainSquare()
+        public void InteriorCell_BoundaryLongerThanPlainSquare()
         {
             const float s = 2f;
             var g = new ClassicPuzzleGrid(4, 4, s, 11, Params(0f, 1f, 1f));
-            // Centre cell has a tab on all four sides; its area cannot equal the bare square.
+            // A centre cell has a tab on all four sides. Whatever way each tab points (so the area can
+            // cancel back to the square), every tab is a detour that lengthens the boundary.
             var id = g.IdOf(1, 1);
-            Assert.AreNotEqual(s * s, PolygonArea(g, id));
+            var n = g.GetCornersCount(id);
+            Span<float2> pts = stackalloc float2[n];
+            g.CopyCorners(id, pts);
+            var perimeter = 0f;
+            for (var i = 0; i < n; i++) perimeter += math.distance(pts[i], pts[(i + 1) % n]);
+            Assert.Greater(perimeter, 4f * s);
         }
 
         // ---- GetCellAt resolves a cell centre to its own id ----
@@ -139,6 +145,25 @@ namespace Appegy.Tessera.Tests
             var g = new ClassicPuzzleGrid(4, 4, 2f, 0, Params(0.5f, 0.5f, 0.5f));
             Assert.AreEqual(-1, g.GetCellAt(new float2(-1f, -1f)));
             Assert.AreEqual(-1, g.GetCellAt(new float2(100f, 100f)));
+        }
+
+        // ---- Head deform keeps the grid valid (tiling, positive area, containment) ----
+
+        [Test]
+        public void MaxDeform_PreservesTilingAndContainment()
+        {
+            const float s = 1.5f;
+            const int w = 5, h = 5;
+            var g = new ClassicPuzzleGrid(w, h, s, 13, new ClassicPuzzleParameters(1f, 1f, 1f, 1f));
+            var sum = 0f;
+            for (var id = 0; id < g.CellCount; id++)
+            {
+                var area = PolygonArea(g, id);
+                Assert.Greater(area, 0f, $"cell {id} degenerate");
+                Assert.AreEqual(id, g.GetCellAt(g.GetCenter(id)));
+                sum += area;
+            }
+            Assert.AreEqual(w * h * s * s, sum, 1e-2f);
         }
     }
 }

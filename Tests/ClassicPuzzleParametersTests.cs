@@ -13,6 +13,7 @@ namespace Appegy.Tessera.Tests
             Assert.AreEqual(0.5f, p.Roundness);
             Assert.AreEqual(0.5f, p.TabRadius);
             Assert.AreEqual(0.5f, p.TabOffset);
+            Assert.AreEqual(0f, p.TabDeform);
         }
 
         [Test]
@@ -35,18 +36,21 @@ namespace Appegy.Tessera.Tests
             var pR = new ClassicPuzzleParameters(input, 0.5f, 0.5f);
             var pRad = new ClassicPuzzleParameters(0.5f, input, 0.5f);
             var pOff = new ClassicPuzzleParameters(0.5f, 0.5f, input);
+            var pDef = new ClassicPuzzleParameters(0.5f, 0.5f, 0.5f, input);
             Assert.AreEqual(expected, pR.Roundness);
             Assert.AreEqual(expected, pRad.TabRadius);
             Assert.AreEqual(expected, pOff.TabOffset);
+            Assert.AreEqual(expected, pDef.TabDeform);
         }
 
         [Test]
         public void Construct_NaN_FallsBackToZero()
         {
-            var p = new ClassicPuzzleParameters(float.NaN, float.NaN, float.NaN);
+            var p = new ClassicPuzzleParameters(float.NaN, float.NaN, float.NaN, float.NaN);
             Assert.AreEqual(0f, p.Roundness);
             Assert.AreEqual(0f, p.TabRadius);
             Assert.AreEqual(0f, p.TabOffset);
+            Assert.AreEqual(0f, p.TabDeform);
         }
 
         [Test]
@@ -65,13 +69,15 @@ namespace Appegy.Tessera.Tests
             for (var i = 0; i <= 20; i++)
             {
                 var t = i / 20f;
-                var p = new ClassicPuzzleParameters(t, t, t);
+                var p = new ClassicPuzzleParameters(t, t, t, t);
                 Assert.GreaterOrEqual(p.ResolvedRadius, ClassicPuzzleParameters.MinRadius - Eps);
                 Assert.LessOrEqual(p.ResolvedRadius, ClassicPuzzleParameters.MaxRadius + Eps);
                 Assert.GreaterOrEqual(p.ResolvedHeadHeight, -Eps);
                 Assert.LessOrEqual(p.ResolvedHeadHeight, p.ResolvedRadius * ClassicPuzzleParameters.HeadHeightMax + Eps);
-                Assert.GreaterOrEqual(p.ResolvedFillet, -Eps);
-                Assert.LessOrEqual(p.ResolvedFillet, p.ResolvedRadius * ClassicPuzzleParameters.FilletMax + Eps);
+                Assert.GreaterOrEqual(p.ResolvedFillet, p.ResolvedRadius * ClassicPuzzleParameters.FilletMin - Eps);
+                Assert.LessOrEqual(p.ResolvedFillet, p.ResolvedRadius + Eps);
+                Assert.GreaterOrEqual(p.ResolvedDeform, -Eps);
+                Assert.LessOrEqual(p.ResolvedDeform, 1f + Eps);
                 Assert.GreaterOrEqual(p.ResolvedBulge, 0f);
                 Assert.LessOrEqual(p.ResolvedBulge, ClassicPuzzleParameters.MaxBulge + Eps);
             }
@@ -90,19 +96,19 @@ namespace Appegy.Tessera.Tests
         [Test]
         public void NeckRatios_AreSane()
         {
-            // Head must sit above the fillets, and the reach must be non-trivial at full offset.
-            Assert.Greater(ClassicPuzzleParameters.HeadHeightMax, ClassicPuzzleParameters.FilletMax);
-            Assert.Greater(ClassicPuzzleParameters.FilletMax, 0f);
+            // The head must overhang the neck (waist < head radius), and the floor must be positive.
+            Assert.Greater(ClassicPuzzleParameters.NeckWidth, 0f);
+            Assert.Less(ClassicPuzzleParameters.NeckWidth, 1f);
+            Assert.Greater(ClassicPuzzleParameters.FilletMin, 0f);
         }
 
         [Test]
         public void TabStaysInsideNeighbourEnvelope()
         {
-            // Perpendicular reach (bow + head centre height + head radius) must stay below 0.5, or
-            // GetCellAt's 5-cell search would miss.
-            var tip = ClassicPuzzleParameters.MaxBulge
-                      + ClassicPuzzleParameters.HeadHeightMax * ClassicPuzzleParameters.MaxRadius
-                      + ClassicPuzzleParameters.MaxRadius;
+            // Perpendicular reach (bow + tab height) must stay below 0.5, or GetCellAt's 5-cell
+            // search would miss. Deform is a pure along-edge lean, so it does not change the reach.
+            var tabHeight = (ClassicPuzzleParameters.HeadHeightMax + 1f) * ClassicPuzzleParameters.MaxRadius;
+            var tip = ClassicPuzzleParameters.MaxBulge + tabHeight;
             Assert.Less(tip, 0.5f);
         }
 

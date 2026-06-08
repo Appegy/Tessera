@@ -51,6 +51,7 @@ namespace Appegy.Tessera
             var radius = parameters.ResolvedRadius;
             var headHeight = parameters.ResolvedHeadHeight;
             var fillet = parameters.ResolvedFillet;
+            var deform = parameters.ResolvedDeform;
 
             _vertEdges = new float2[(width - 1) * height][];
             for (var y = 0; y < height; y++)
@@ -61,7 +62,7 @@ namespace Appegy.Tessera
                     var p1 = new float2((x + 1) * cellSize, y * cellSize);
                     var poly = new float2[_samplesPerEdge];
                     var es = PuzzleEdgeSeed.Compute(seed, 0, x, y);
-                    PuzzleEdge.Generate(p0, p1, es, bulge, radius, headHeight, fillet, poly);
+                    PuzzleEdge.Generate(p0, p1, es, bulge, radius, headHeight, fillet, deform, poly);
                     _vertEdges[y * (width - 1) + x] = poly;
                 }
             }
@@ -75,7 +76,7 @@ namespace Appegy.Tessera
                     var p1 = new float2((x + 1) * cellSize, (y + 1) * cellSize);
                     var poly = new float2[_samplesPerEdge];
                     var es = PuzzleEdgeSeed.Compute(seed, 1, x, y);
-                    PuzzleEdge.Generate(p0, p1, es, bulge, radius, headHeight, fillet, poly);
+                    PuzzleEdge.Generate(p0, p1, es, bulge, radius, headHeight, fillet, deform, poly);
                     _horizEdges[y * width + x] = poly;
                 }
             }
