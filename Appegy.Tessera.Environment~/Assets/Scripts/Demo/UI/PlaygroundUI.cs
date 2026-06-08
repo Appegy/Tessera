@@ -28,6 +28,11 @@ namespace Appegy.Tessera.Demo
         private bool _isLight;
         private int _uiScaleIndex = 1;
 
+#if UNITY_WEBGL && !UNITY_EDITOR
+        [System.Runtime.InteropServices.DllImport("__Internal")]
+        private static extern void TesseraSetTheme(int isLight);
+#endif
+
         private void Awake()
         {
             if (_document == null) _document = GetComponent<UIDocument>();
@@ -161,6 +166,10 @@ namespace Appegy.Tessera.Demo
                     new Color(0.40f, 0.47f, 0.95f, 0.26f));
 
             PlayerPrefs.SetInt(ThemePrefKey, light ? 1 : 0);
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+            TesseraSetTheme(light ? 1 : 0);
+#endif
         }
 
         public void SetUiScale(int index)

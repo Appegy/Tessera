@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en-us">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>{{{ PRODUCT_NAME }}}</title>
+  <meta name="description" content="{{{ PRODUCT_NAME }}} — a 2D grid-geometry playground.">
+  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#14151E">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%2314151E'/><rect x='8.5' y='8.5' width='15' height='15' rx='3' fill='none' stroke='%236C7CF0' stroke-width='2'/><rect x='13' y='13' width='6' height='6' rx='1.5' fill='%236C7CF0'/></svg>">
+  <style>
+    /* ===== Theme tokens (default = DARK). setTesseraTheme() swaps the class. ===== */
+    :root {
+      --bg:        #14151E;
+      --surface:   #1B1D27;
+      --text:      #E8EAF2;
+      --muted:     #8A90A6;
+      --accent:    #6C7CF0;
+      --accent-hi: #9AA6FF;
+      --grid:      rgba(108, 124, 240, 0.10);
+      --grid-bold: rgba(108, 124, 240, 0.20);
+      --glow:      rgba(108, 124, 240, 0.28);
+      --vignette:  rgba(0, 0, 0, 0.45);
+      --track:     rgba(255, 255, 255, 0.07);
+      --shimmer:   rgba(255, 255, 255, 0.55);
+      --chrome-bg: rgba(27, 29, 39, 0.55);
+      --chrome-br: rgba(255, 255, 255, 0.10);
+      --hairline:  rgba(255, 255, 255, 0.08);
+    }
+    html.tessera-light {
+      --bg:        #EEF0F5;
+      --surface:   #FFFFFF;
+      --text:      #1A1E2C;
+      --muted:     #6E7488;
+      --accent:    #545EDE;
+      --accent-hi: #7C84F0;
+      --grid:      rgba(84, 94, 222, 0.08);
+      --grid-bold: rgba(84, 94, 222, 0.16);
+      --glow:      rgba(84, 94, 222, 0.18);
+      --vignette:  rgba(120, 130, 160, 0.16);
+      --track:     rgba(20, 24, 40, 0.08);
+      --shimmer:   rgba(255, 255, 255, 0.85);
+      --chrome-bg: rgba(255, 255, 255, 0.65);
+      --chrome-br: rgba(20, 24, 40, 0.10);
+      --hairline:  rgba(20, 24, 40, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Inter", sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -webkit-tap-highlight-color: transparent;
+      transition: background-color 0.55s cubic-bezier(0.4, 0, 0.2, 1), color 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+      touch-action: none;
+    }
+
+    /* ===== Full-window canvas. Unity matches the GL render target to this
+       CSS box * devicePixelRatio, so it stays crisp and full-window on resize. ===== */
+    #unity-canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      background: var(--bg);
+      transition: background-color 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+      outline: none;
+    }
+
+    /* ===== Generative tessellation backdrop (runs during load only). ===== */
+    #tessera-bg {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    /* ===== Loading curtain ===== */
+    #tessera-loader {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background:
+        radial-gradient(ellipse 120% 90% at 50% 44%, transparent 38%, var(--vignette) 100%),
+        var(--bg);
+      opacity: 1;
+      transition: opacity 0.7s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+      will-change: opacity;
+    }
+    #tessera-loader.tessera-hidden { opacity: 0; pointer-events: none; }
+
+    /* soft radial glow centred behind the wordmark */
+    #tessera-glow {
+      position: absolute;
+      top: 44%;
+      left: 50%;
+      width: min(120vw, 1000px);
+      height: min(120vw, 1000px);
+      transform: translate(-50%, -50%);
+      background: radial-gradient(circle at center, var(--glow) 0%, rgba(0, 0, 0, 0) 62%);
+      filter: blur(6px);
+      pointer-events: none;
+      animation: tessera-breathe 6.5s ease-in-out infinite;
+    }
+    @keyframes tessera-breathe {
+      0%, 100% { opacity: 0.65; transform: translate(-50%, -50%) scale(1.00); }
+      50%      { opacity: 1.00; transform: translate(-50%, -50%) scale(1.06); }
+    }
+
+    .brand {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      transform: translateY(-2vh);
+      animation: tessera-intro 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+    @keyframes tessera-intro {
+      from { opacity: 0; transform: translateY(14px) scale(0.985); }
+      to   { opacity: 1; transform: translateY(-2vh) scale(1); }
+    }
+
+    /* nested tessellating tiles mark */
+    .brand-mark {
+      width: 56px;
+      height: 56px;
+      margin-bottom: 26px;
+      position: relative;
+      animation: tessera-mark 3.6s ease-in-out infinite;
+    }
+    .brand-mark span {
+      position: absolute;
+      inset: 0;
+      border: 1.5px solid var(--accent);
+      border-radius: 3px;
+    }
+    .brand-mark span:nth-child(1) { transform: rotate(0deg)  scale(1.00); opacity: 0.28; }
+    .brand-mark span:nth-child(2) { transform: rotate(15deg) scale(0.74); opacity: 0.55; }
+    .brand-mark span:nth-child(3) { transform: rotate(30deg) scale(0.48); opacity: 0.85; }
+    .brand-mark span:nth-child(4) {
+      inset: 42%;
+      border: none;
+      background: var(--accent);
+      border-radius: 2px;
+      opacity: 1;
+    }
+    @keyframes tessera-mark {
+      0%, 100% { transform: translateY(0)    rotate(0deg); }
+      50%      { transform: translateY(-4px) rotate(45deg); }
+    }
+
+    .brand-title {
+      font-size: clamp(34px, 8vw, 58px);
+      font-weight: 700;
+      letter-spacing: 0.42em;
+      text-indent: 0.42em;
+      margin: 0;
+      line-height: 1;
+      color: var(--text);
+      background: linear-gradient(180deg, var(--text) 0%, var(--muted) 165%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      user-select: none;
+    }
+
+    .brand-sub {
+      margin-top: 14px;
+      font-family: ui-monospace, "SF Mono", "JetBrains Mono", "Fira Code", Menlo, Consolas, monospace;
+      font-size: clamp(10px, 2.6vw, 12px);
+      letter-spacing: 0.30em;
+      text-transform: uppercase;
+      color: var(--muted);
+      transition: color 0.55s ease;
+      user-select: none;
+    }
+
+    /* ===== Progress ===== */
+    .progress-wrap {
+      margin-top: 42px;
+      width: clamp(200px, 56vw, 320px);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .progress-track {
+      position: relative;
+      height: 3px;
+      width: 100%;
+      border-radius: 999px;
+      background: var(--track);
+      overflow: hidden;
+      transition: background-color 0.55s ease;
+    }
+    .progress-fill {
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 0%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--accent), var(--accent-hi));
+      box-shadow: 0 0 12px var(--accent);
+      transition: width 0.25s ease;
+      will-change: width;
+    }
+    .progress-fill::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent, var(--shimmer), transparent);
+      transform: translateX(-100%);
+      animation: tessera-shimmer 1.5s ease-in-out infinite;
+      opacity: 0.7;
+    }
+    @keyframes tessera-shimmer {
+      0%   { transform: translateX(-110%); }
+      60%, 100% { transform: translateX(220%); }
+    }
+    .progress-meta {
+      display: flex;
+      justify-content: space-between;
+      font-family: ui-monospace, "SF Mono", "JetBrains Mono", "Fira Code", Menlo, Consolas, monospace;
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+      transition: color 0.55s ease;
+    }
+    .progress-meta .pct { font-variant-numeric: tabular-nums; }
+
+    /* ===== Chrome: fullscreen toggle ===== */
+    #tessera-chrome {
+      position: fixed;
+      z-index: 15;
+      right: max(16px, env(safe-area-inset-right));
+      bottom: max(16px, env(safe-area-inset-bottom));
+      display: flex;
+      gap: 10px;
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity 0.5s ease, transform 0.5s ease;
+      pointer-events: none;
+    }
+    #tessera-chrome.tessera-ready { opacity: 1; transform: translateY(0); pointer-events: auto; }
+    .chrome-btn {
+      width: 40px;
+      height: 40px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      border: 1px solid var(--chrome-br);
+      border-radius: 12px;
+      background: var(--chrome-bg);
+      color: var(--muted);
+      cursor: pointer;
+      backdrop-filter: blur(12px) saturate(140%);
+      -webkit-backdrop-filter: blur(12px) saturate(140%);
+      transition: color 0.2s ease, border-color 0.2s ease, background-color 0.55s ease, transform 0.12s ease;
+    }
+    .chrome-btn:hover  { color: var(--text); border-color: var(--accent); }
+    .chrome-btn:active { transform: scale(0.93); }
+    .chrome-btn svg { width: 18px; height: 18px; display: block; }
+
+    /* ===== Non-blocking message banner ===== */
+    #tessera-banner {
+      position: fixed;
+      z-index: 30;
+      left: 50%;
+      top: 18px;
+      transform: translateX(-50%);
+      max-width: min(92vw, 560px);
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+    }
+    #tessera-banner > div {
+      padding: 10px 16px;
+      border-radius: 10px;
+      font-size: 13px;
+      line-height: 1.4;
+      background: var(--surface);
+      border: 1px solid var(--hairline);
+      color: var(--text);
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+    }
+    #tessera-banner > div.error   { border-color: rgba(224, 85, 107, 0.6); }
+    #tessera-banner > div.warning { border-color: rgba(224, 182, 85, 0.6); }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; }
+      html, body, #tessera-loader, #unity-canvas { transition-duration: 0.001ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Unity render target: fills the whole viewport -->
+  <canvas id="unity-canvas" tabindex="-1"></canvas>
+
+  <!-- Drifting tessellation backdrop, active only while loading -->
+  <canvas id="tessera-bg"></canvas>
+
+  <!-- Branded loading curtain -->
+  <div id="tessera-loader" role="status" aria-live="polite" aria-label="Loading Tessera">
+    <div id="tessera-glow"></div>
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+      <h1 class="brand-title">TESSERA</h1>
+      <div class="brand-sub">grid · geometry · playground</div>
+      <div class="progress-wrap">
+        <div class="progress-track"><div class="progress-fill" id="tessera-progress"></div></div>
+        <div class="progress-meta">
+          <span id="tessera-status">initializing</span>
+          <span class="pct" id="tessera-percent">0%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Minimal chrome -->
+  <div id="tessera-chrome">
+    <button class="chrome-btn" id="tessera-fullscreen" type="button" title="Toggle fullscreen" aria-label="Toggle fullscreen">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M4 9V5a1 1 0 0 1 1-1h4M20 9V5a1 1 0 0 0-1-1h-4M4 15v4a1 1 0 0 0 1 1h4M20 15v4a1 1 0 0 1-1 1h-4"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Non-critical warnings / errors -->
+  <div id="tessera-banner"></div>
+
+  <script>
+    "use strict";
+
+    var canvas     = document.querySelector("#unity-canvas");
+    var bgCanvas   = document.querySelector("#tessera-bg");
+    var loaderEl   = document.querySelector("#tessera-loader");
+    var progressEl = document.querySelector("#tessera-progress");
+    var percentEl  = document.querySelector("#tessera-percent");
+    var statusEl   = document.querySelector("#tessera-status");
+    var chromeEl   = document.querySelector("#tessera-chrome");
+    var fsBtn      = document.querySelector("#tessera-fullscreen");
+    var bannerEl   = document.querySelector("#tessera-banner");
+
+    var unityInstance = null;
+
+    /* ---------------------------------------------------------------
+       THEME SYNC: window.setTesseraTheme(isLight)
+       Boolean -> toggles the .tessera-light class on <html>; CSS custom
+       properties + transitions animate the swap. Default DARK. Defined
+       before the loader runs, so Unity can call it at any time.
+    --------------------------------------------------------------- */
+    (function () {
+      var META = { dark: "#14151E", light: "#EEF0F5" };
+      var themeMeta = document.querySelector('meta[name="theme-color"]');
+      window.setTesseraTheme = function (isLight) {
+        var light = !!isLight;
+        document.documentElement.classList.toggle("tessera-light", light);
+        if (themeMeta) themeMeta.setAttribute("content", light ? META.light : META.dark);
+      };
+      window.setTesseraTheme(false);
+    })();
+
+    /* ---------------------------------------------------------------
+       GENERATIVE BACKDROP: a drifting grid with a few pulsing accent
+       tiles. Runs only while the curtain is up, then is cancelled to
+       free the main thread once the demo is interactive.
+    --------------------------------------------------------------- */
+    var bgCtx = bgCanvas.getContext("2d");
+    var bgRaf = 0;
+    var bgStart = performance.now();
+    var bgDpr = 1;
+
+    function cssVar(name) {
+      return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    }
+    function sizeBgCanvas() {
+      bgDpr = Math.min(window.devicePixelRatio || 1, 2);
+      bgCanvas.width  = Math.floor(window.innerWidth  * bgDpr);
+      bgCanvas.height = Math.floor(window.innerHeight * bgDpr);
+    }
+    sizeBgCanvas();
+
+    function drawBg(now) {
+      var t = (now - bgStart) / 1000;
+      var w = bgCanvas.width, h = bgCanvas.height;
+      bgCtx.clearRect(0, 0, w, h);
+
+      var cell = 46 * bgDpr;
+      var ox = (t * 9 * bgDpr) % cell;
+      var oy = (t * 6 * bgDpr) % cell;
+
+      bgCtx.lineWidth = 1;
+      bgCtx.strokeStyle = cssVar("--grid") || "rgba(108,124,240,0.10)";
+      bgCtx.beginPath();
+      for (var x = -ox; x <= w; x += cell) { bgCtx.moveTo(x, 0); bgCtx.lineTo(x, h); }
+      for (var y = -oy; y <= h; y += cell) { bgCtx.moveTo(0, y); bgCtx.lineTo(w, y); }
+      bgCtx.stroke();
+
+      var cols = Math.ceil(w / cell) + 1;
+      var rows = Math.ceil(h / cell) + 1;
+      bgCtx.strokeStyle = cssVar("--grid-bold") || "rgba(108,124,240,0.20)";
+      bgCtx.lineWidth = 1.5 * bgDpr;
+      for (var i = 0; i < 7; i++) {
+        var phase = t * 0.35 + i * 1.7;
+        var gx = Math.floor((Math.sin(phase) * 0.5 + 0.5) * cols) * cell - ox;
+        var gy = Math.floor((Math.cos(phase * 0.8 + i) * 0.5 + 0.5) * rows) * cell - oy;
+        var pulse = 0.5 + 0.5 * Math.sin(t * 2 + i);
+        bgCtx.globalAlpha = 0.25 + pulse * 0.55;
+        bgCtx.strokeRect(gx, gy, cell, cell);
+      }
+      bgCtx.globalAlpha = 1;
+      bgRaf = requestAnimationFrame(drawBg);
+    }
+    bgRaf = requestAnimationFrame(drawBg);
+
+    function stopBg() {
+      if (bgRaf) cancelAnimationFrame(bgRaf);
+      bgRaf = 0;
+      bgCanvas.style.display = "none";
+    }
+
+    /* Resize: the canvas is CSS-driven, so only the backdrop needs a nudge. */
+    var resizeRaf = 0;
+    window.addEventListener("resize", function () {
+      if (resizeRaf) cancelAnimationFrame(resizeRaf);
+      resizeRaf = requestAnimationFrame(sizeBgCanvas);
+    });
+    window.addEventListener("orientationchange", function () { setTimeout(sizeBgCanvas, 200); });
+
+    /* ---------------------------------------------------------------
+       MESSAGE BANNER (replaces the default alert()).
+    --------------------------------------------------------------- */
+    function unityShowBanner(msg, type) {
+      var div = document.createElement("div");
+      div.className = type || "";
+      div.innerHTML = msg;
+      bannerEl.appendChild(div);
+      bannerEl.style.display = "flex";
+      if (type !== "error") {
+        setTimeout(function () {
+          if (div.parentNode) div.parentNode.removeChild(div);
+          if (!bannerEl.children.length) bannerEl.style.display = "none";
+        }, 5000);
+      }
+    }
+
+    /* ---------------------------------------------------------------
+       PROGRESS + FADE
+    --------------------------------------------------------------- */
+    function setProgress(p) {
+      var pct = Math.round(Math.max(0, Math.min(1, p || 0)) * 100);
+      progressEl.style.width = pct + "%";
+      percentEl.textContent = pct + "%";
+      if (pct < 25)      statusEl.textContent = "fetching build";
+      else if (pct < 70) statusEl.textContent = "decompressing";
+      else if (pct < 99) statusEl.textContent = "warming up";
+      else               statusEl.textContent = "ready";
+    }
+
+    function onReady(instance) {
+      unityInstance = instance;
+      window.tesseraUnity = instance;
+      setProgress(1);
+      loaderEl.classList.add("tessera-hidden");
+      chromeEl.classList.add("tessera-ready");
+      fsBtn.onclick = function () { instance.SetFullscreen(1); };
+      setTimeout(function () {
+        if (loaderEl.parentNode) loaderEl.parentNode.removeChild(loaderEl);
+        stopBg();
+      }, 750);
+    }
+
+    function onFail(message) {
+      statusEl.textContent = "failed";
+      unityShowBanner(String(message), "error");
+    }
+
+    /* ---------------------------------------------------------------
+       UNITY BOOT (template macros resolved at build time). All URLs are
+       relative so the page works under the GitHub Pages subpath.
+    --------------------------------------------------------------- */
+    var buildUrl = "Build";
+    var config = {
+      arguments: [],
+      dataUrl: buildUrl + "/{{{ DATA_FILENAME }}}",
+      frameworkUrl: buildUrl + "/{{{ FRAMEWORK_FILENAME }}}",
+      codeUrl: buildUrl + "/{{{ CODE_FILENAME }}}",
+      streamingAssetsUrl: "StreamingAssets",
+      companyName: "{{{ COMPANY_NAME }}}",
+      productName: "{{{ PRODUCT_NAME }}}",
+      productVersion: "{{{ PRODUCT_VERSION }}}",
+      showBanner: unityShowBanner
+    };
+
+    var script = document.createElement("script");
+    script.src = buildUrl + "/{{{ LOADER_FILENAME }}}";
+    script.onload = function () {
+      createUnityInstance(canvas, config, setProgress).then(onReady).catch(onFail);
+    };
+    script.onerror = function () { onFail("Failed to load the Tessera engine. Please refresh."); };
+    document.body.appendChild(script);
+  </script>
+</body>
+</html>

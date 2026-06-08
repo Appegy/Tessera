@@ -81,6 +81,7 @@ namespace Appegy.Tessera.Demo
             set
             {
                 _enableHighlight = value;
+                DemoStatePrefs.SaveHighlight(value);
                 if (!value && _gridView != null) { _gridView.ClearHighlight(); _lastHovered = -1; }
             }
         }
@@ -108,7 +109,9 @@ namespace Appegy.Tessera.Demo
         private void Awake()
         {
             _demos = GridDemoRegistry.CreateAll();
-            Select(_demos[0]);
+            foreach (var demo in _demos) DemoStatePrefs.LoadParams(demo);
+            _enableHighlight = DemoStatePrefs.LoadHighlight(_enableHighlight);
+            Select(_demos[DemoStatePrefs.LoadGridIndex(_demos.Count)]);
         }
 
         private void Start()
@@ -127,11 +130,22 @@ namespace Appegy.Tessera.Demo
         public void Select(GridDemo demo)
         {
             if (demo == null || demo == _current) return;
-            if (_current != null) _current.Changed -= Rebuild;
+            if (_current != null)
+            {
+                _current.Changed -= Rebuild;
+                _current.Changed -= SaveCurrentParams;
+            }
             _current = demo;
             _current.Changed += Rebuild;
+            _current.Changed += SaveCurrentParams;
+            DemoStatePrefs.SaveGridIndex(_demos.IndexOf(demo));
             Rebuild();
             CurrentChanged?.Invoke();
+        }
+
+        private void SaveCurrentParams()
+        {
+            if (_current != null) DemoStatePrefs.SaveParams(_current);
         }
 
         /// <summary>Rerolls the first seed parameter of the active demo, if it has one.</summary>
