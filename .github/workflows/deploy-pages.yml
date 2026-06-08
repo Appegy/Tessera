@@ -1,52 +1,81 @@
-# Publishes the playground HTML from Documentation~/ to GitHub Pages.
-# Uses the modern Pages flow (artifact + deploy-pages action) so we don't
-# touch any branch. Triggers only when the playground file changes.
+# Builds the Tessera playground (WebGL) with game-ci and publishes it to the
+# `web-build` branch, which GitHub Pages serves (https://appegy.github.io/Tessera/).
+# Nothing is committed to the source branch; the build lives only on web-build.
 #
-# Prerequisite (one-time): GitHub repo → Settings → Pages → Source = "GitHub Actions".
+# Secrets (repo-level): UNITY_LICENSE (Personal .ulf contents), UNITY_EMAIL, UNITY_PASSWORD.
+# CI builds with Unity 6000.4.8f1 (newest game-ci WebGL image in the 6000.4 line);
+# the project is authored in 6000.4.10f1 — same-minor patch builds are compatible.
 
-name: Deploy playground to GitHub Pages
+name: Build & publish WebGL
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'Documentation~/puzzle-styles-demo.html'
-      - '.github/workflows/deploy-pages.yml'
   workflow_dispatch:
+  push:
+    branches: [main, ivan/web-demo]
+    paths:
+      - 'Appegy.Tessera.Environment~/**'
+      - 'Runtime/**'
+      - '.github/workflows/deploy-pages.yml'
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
-# Allow one in-flight deployment at a time; let it finish rather than cancel.
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: webgl-publish
+  cancel-in-progress: true
 
 jobs:
-  deploy:
+  build:
+    name: Build WebGL & publish to web-build
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-
-      - name: Stage site
-        run: |
-          mkdir -p _site
-          cp 'Documentation~/puzzle-styles-demo.html' _site/index.html
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
         with:
-          path: _site
+          lfs: true
 
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Cache Library
+        uses: actions/cache@v4
+        with:
+          path: Appegy.Tessera.Environment~/Library
+          key: Library-WebGL-${{ hashFiles('Appegy.Tessera.Environment~/Assets/**', 'Appegy.Tessera.Environment~/Packages/**', 'Appegy.Tessera.Environment~/ProjectSettings/**') }}
+          restore-keys: |
+            Library-WebGL-
+            Library-
+
+      - name: Build WebGL
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          projectPath: Appegy.Tessera.Environment~
+          unityVersion: 6000.4.8f1
+          targetPlatform: WebGL
+          buildName: Tessera
+          allowDirtyBuild: true
+
+      - name: Publish build to web-build branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          sudo chown -R "$(id -u):$(id -g)" build || true
+          INDEX="$(find build -name index.html | head -1)"
+          if [ -z "$INDEX" ]; then
+            echo "No index.html found under build/:"; find build -maxdepth 4 || true; exit 1
+          fi
+          SRC="$(dirname "$INDEX")"
+          echo "WebGL build at: $SRC"
+          SITE="$RUNNER_TEMP/site"
+          rm -rf "$SITE"; mkdir -p "$SITE"
+          cp -r "$SRC"/. "$SITE/"
+          touch "$SITE/.nojekyll"
+          cd "$SITE"
+          git init -q
+          git checkout -q -b web-build
+          git add -A
+          git -c user.email=actions@github.com -c user.name="github-actions[bot]" commit -q -m "WebGL build (${GITHUB_SHA::7})"
+          git push -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" web-build
+          echo "Published to web-build -> Pages will redeploy."

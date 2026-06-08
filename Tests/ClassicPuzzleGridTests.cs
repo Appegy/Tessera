@@ -529,8 +529,8 @@ namespace Appegy.Tessera.Tests
                         if (i == 0 && j == n - 1) continue;
                         var c = corners[j];
                         var d = corners[(j + 1) % n];
-                        Assert.IsFalse(SegmentsProperlyIntersect(a, b, c, d),
-                            $"{label} cell={id} edges {i}->{(i + 1) % n} and {j}->{(j + 1) % n} cross");
+                        if (SegmentsProperlyIntersect(a, b, c, d))
+                            Assert.Fail($"{label} cell={id} edges {i}->{(i + 1) % n} and {j}->{(j + 1) % n} cross");
                     }
                 }
             }

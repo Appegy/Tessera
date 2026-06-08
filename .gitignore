@@ -3,3 +3,6 @@
 .agents/
 .DS_Store
 opencode.json
+
+# Local WebGL build output (published to the web-build branch, never committed to source)
+Documentation~/webgl/

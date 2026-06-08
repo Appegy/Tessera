@@ -58,3 +58,7 @@ sysinfo.txt
 
 # Ignore AndroidLogcatSettings.asset
 ProjectSettings/AndroidLogcatSettings.asset
+
+# Editor / MCP screenshots (test artifacts, not part of the demo)
+/[Aa]ssets/[Ss]creenshots/
+/[Aa]ssets/[Ss]creenshots.meta
