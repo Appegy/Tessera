@@ -7,9 +7,10 @@ namespace Appegy.Tessera.Demo
         private IntParameter _columns;
         private IntParameter _rows;
         private SeedParameter _seed;
-        private FloatParameter _smoothness;
-        private FloatParameter _tabSize;
-        private FloatParameter _variation;
+        private FloatParameter _roundness;
+        private FloatParameter _tabRadius;
+        private FloatParameter _tabOffset;
+        private FloatParameter _tabDeform;
 
         public override string DisplayName => "Classic Puzzle";
         public override string Icon => "extension";
@@ -19,20 +20,22 @@ namespace Appegy.Tessera.Demo
             _columns = new IntParameter("columns", "Columns", 1, 32, 6);
             _rows = new IntParameter("rows", "Rows", 1, 32, 6);
             _seed = new SeedParameter("seed", "Seed", 0);
-            _tabSize = new FloatParameter("tabSize", "Tab Size", 0f, 1f, 0.5f);
-            _variation = new FloatParameter("variation", "Variation", 0f, 1f, 0.5f);
-            _smoothness = new FloatParameter("smoothness", "Smoothness", 0f, 1f, 0.5f);
+            _roundness = new FloatParameter("roundness", "Roundness", 0f, 1f, 0.5f);
+            _tabRadius = new FloatParameter("tabRadius", "Tab Radius", 0f, 1f, 0.5f);
+            _tabOffset = new FloatParameter("tabOffset", "Tab Offset", 0f, 1f, 0.5f);
+            _tabDeform = new FloatParameter("tabDeform", "Tab Deform", 0f, 1f, 0.4f);
             parameters.Add(_columns);
             parameters.Add(_rows);
             parameters.Add(_seed);
-            parameters.Add(_tabSize);
-            parameters.Add(_variation);
-            parameters.Add(_smoothness);
+            parameters.Add(_roundness);
+            parameters.Add(_tabRadius);
+            parameters.Add(_tabOffset);
+            parameters.Add(_tabDeform);
         }
 
         protected override ClassicPuzzleGrid Build()
         {
-            var parameters = new ClassicPuzzleParameters(_tabSize.Value, _variation.Value, _smoothness.Value);
+            var parameters = new ClassicPuzzleParameters(_roundness.Value, _tabRadius.Value, _tabOffset.Value, _tabDeform.Value);
             return new ClassicPuzzleGrid(_columns.Value, _rows.Value, 1f, _seed.Value, parameters);
         }
     }

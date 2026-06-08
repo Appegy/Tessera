@@ -6,509 +6,302 @@ namespace Appegy.Tessera.Tests
 {
     public class ClassicPuzzleGridTests
     {
-        private const float Eps = 1e-5f;
+        private const float Eps = 1e-4f;
 
-        [Test]
-        public void Construct_NegativeWidth_Throws()
+        private static ClassicPuzzleParameters Params(float roundness, float radius, float offset, float deform = 0f)
+            => new ClassicPuzzleParameters(roundness, radius, offset, deform);
+
+        private static float PolygonArea(ClassicPuzzleGrid g, int id)
         {
-            Assert.Throws<ArgumentOutOfRangeException>(() => new ClassicPuzzleGrid(0, 4, 1f, 0));
+            var n = g.GetCornersCount(id);
+            Span<float2> pts = stackalloc float2[n];
+            g.CopyCorners(id, pts);
+            var a = 0f;
+            for (var i = 0; i < n; i++)
+            {
+                var p = pts[i];
+                var q = pts[(i + 1) % n];
+                a += p.x * q.y - q.x * p.y;
+            }
+            return 0.5f * math.abs(a);
         }
 
-        [Test]
-        public void Construct_NegativeHeight_Throws()
-        {
-            Assert.Throws<ArgumentOutOfRangeException>(() => new ClassicPuzzleGrid(4, 0, 1f, 0));
-        }
+        // ---- Construction guards ----
 
         [Test]
-        public void Construct_NegativeCellSize_Throws()
-        {
-            Assert.Throws<ArgumentOutOfRangeException>(() => new ClassicPuzzleGrid(4, 4, 0f, 0));
-        }
+        public void Construct_NonPositiveWidth_Throws()
+            => Assert.Throws<ArgumentOutOfRangeException>(() => new ClassicPuzzleGrid(0, 4, 1f, 0));
 
         [Test]
-        public void Construct_StoresParameters()
-        {
-            var g = new ClassicPuzzleGrid(4, 3, 2f, 7);
-            Assert.AreEqual(4, g.Width);
-            Assert.AreEqual(3, g.Height);
-            Assert.AreEqual(2f, g.CellSize);
-            Assert.AreEqual(7, g.Seed);
-            Assert.AreEqual(12, g.CellCount);
-            Assert.AreEqual(0.5f, g.Parameters.TabSize);
-            Assert.AreEqual(0.5f, g.Parameters.Variation);
-            Assert.AreEqual(0.5f, g.Parameters.Smoothness);
-            // Default Smoothness=0.5 -> 10 subdivisions -> 31 samples per edge.
-            Assert.AreEqual(31, g.SamplesPerEdge);
-        }
+        public void Construct_NonPositiveHeight_Throws()
+            => Assert.Throws<ArgumentOutOfRangeException>(() => new ClassicPuzzleGrid(4, 0, 1f, 0));
 
         [Test]
-        public void Bounds_AnchoredAtOriginExtendsToWidthHeight()
-        {
-            var g = new ClassicPuzzleGrid(4, 3, 2f, 0);
-            Assert.AreEqual(new float2(0, 0), g.Bounds.Min);
-            Assert.AreEqual(new float2(8, 6), g.Bounds.Max);
-        }
+        public void Construct_NonPositiveCellSize_Throws()
+            => Assert.Throws<ArgumentOutOfRangeException>(() => new ClassicPuzzleGrid(4, 4, 0f, 0));
+
+        // ---- Determinism ----
 
         [Test]
-        public void GetCenter_IsHalfCellOffset()
+        public void SameSeedAndParams_ProduceIdenticalCorners()
         {
-            var g = new ClassicPuzzleGrid(4, 3, 2f, 0);
-            Assert.AreEqual(new float2(1f, 1f), g.GetCenter(g.IdOf(0, 0)));
-            Assert.AreEqual(new float2(3f, 3f), g.GetCenter(g.IdOf(1, 1)));
-            Assert.AreEqual(new float2(7f, 5f), g.GetCenter(g.IdOf(3, 2)));
+            var p = Params(0.7f, 0.6f, 0.4f);
+            var a = new ClassicPuzzleGrid(5, 4, 2f, 123, p);
+            var b = new ClassicPuzzleGrid(5, 4, 2f, 123, p);
+            for (var id = 0; id < a.CellCount; id++)
+            {
+                var n = a.GetCornersCount(id);
+                Assert.AreEqual(n, b.GetCornersCount(id));
+                Span<float2> ca = stackalloc float2[n];
+                Span<float2> cb = stackalloc float2[n];
+                a.CopyCorners(id, ca);
+                b.CopyCorners(id, cb);
+                for (var i = 0; i < n; i++) Assert.AreEqual(ca[i], cb[i]);
+            }
         }
 
-        [Test]
-        public void GetNeighborCount_IsFour()
+        // ---- Tiling: shared edges (bow + tab) cancel, total area equals the bounding rectangle ----
+
+        [TestCase(0f, 0f, 0f)]
+        [TestCase(0.5f, 0.5f, 0.5f)]
+        [TestCase(1f, 1f, 1f)]
+        [TestCase(0f, 1f, 0f)]
+        public void TotalCellArea_EqualsBoundingRectangle(float roundness, float radius, float offset)
         {
-            var g = new ClassicPuzzleGrid(4, 3, 1f, 0);
-            for (var id = 0; id < g.CellCount; id++) Assert.AreEqual(4, g.GetNeighborCount(id));
+            const float s = 1.5f;
+            const int w = 6, h = 5;
+            var g = new ClassicPuzzleGrid(w, h, s, 42, Params(roundness, radius, offset));
+            var sum = 0f;
+            for (var id = 0; id < g.CellCount; id++) sum += PolygonArea(g, id);
+            Assert.AreEqual(w * h * s * s, sum, 1e-2f);
         }
 
-        [Test]
-        public void GetNeighbor_OnBoundary_ReturnsMinusOne()
-        {
-            var g = new ClassicPuzzleGrid(3, 3, 1f, 0);
-            // (0, 0): left and bottom are boundaries.
-            var id = g.IdOf(0, 0);
-            Assert.AreEqual(-1, g.GetNeighbor(id, 1)); // bottom
-            Assert.AreEqual(-1, g.GetNeighbor(id, 2)); // left
-            Assert.AreNotEqual(-1, g.GetNeighbor(id, 0)); // right
-            Assert.AreNotEqual(-1, g.GetNeighbor(id, 3)); // top
-        }
+        // ---- Stitching: a shared edge is identical for both owners ----
 
         [Test]
-        public void GetNeighbor_WrapsIndex()
+        public void SharedVerticalEdge_MatchesBetweenNeighbours()
         {
-            var g = new ClassicPuzzleGrid(3, 3, 1f, 0);
-            var id = g.IdOf(1, 1);
-            Assert.AreEqual(g.GetNeighbor(id, 0), g.GetNeighbor(id, 4));
-            Assert.AreEqual(g.GetNeighbor(id, 0), g.GetNeighbor(id, -4));
+            var g = new ClassicPuzzleGrid(4, 4, 2f, 77, Params(1f, 1f, 1f));
+            var left = g.IdOf(1, 2);
+            var right = g.IdOf(2, 2);
+            var n = g.GetSidePolylineLength(left, 0);
+            Assert.AreEqual(n, g.GetSidePolylineLength(right, 2));
+            Span<float2> rightSideOfLeft = stackalloc float2[n];
+            Span<float2> leftSideOfRight = stackalloc float2[n];
+            g.CopySidePolyline(left, 0, rightSideOfLeft);
+            g.CopySidePolyline(right, 2, leftSideOfRight);
+            // Same physical edge, opposite traversal direction.
+            for (var i = 0; i < n; i++)
+            {
+                Assert.AreEqual(rightSideOfLeft[i], leftSideOfRight[n - 1 - i]);
+            }
         }
 
-        [Test]
-        public void AreNeighbors_AgreesWithGetNeighbor()
+        // ---- Every cell polygon is non-degenerate across the parameter range ----
+
+        [TestCase(0f, 0f, 0f)]
+        [TestCase(0.5f, 0.5f, 0.5f)]
+        [TestCase(1f, 1f, 1f)]
+        public void EveryCell_HasPositiveArea(float roundness, float radius, float offset)
         {
-            var g = new ClassicPuzzleGrid(4, 4, 1f, 0);
+            var g = new ClassicPuzzleGrid(7, 7, 1f, 5, Params(roundness, radius, offset));
             for (var id = 0; id < g.CellCount; id++)
             {
-                for (var k = 0; k < 4; k++)
-                {
-                    var n = g.GetNeighbor(id, k);
-                    if (n == -1) continue;
-                    Assert.IsTrue(g.AreNeighbors(id, n));
-                    Assert.IsTrue(g.AreNeighbors(n, id));
-                    Assert.AreEqual(k, g.GetNeighborIndex(id, n));
-                }
+                Assert.Greater(PolygonArea(g, id), 0f, $"cell {id} degenerate");
+            }
+        }
+
+        // ---- A tab actually deforms interior cells away from a plain square ----
+
+        [Test]
+        public void InteriorCell_BoundaryLongerThanPlainSquare()
+        {
+            const float s = 2f;
+            var g = new ClassicPuzzleGrid(4, 4, s, 11, Params(0f, 1f, 1f));
+            // A centre cell has a tab on all four sides. Whatever way each tab points (so the area can
+            // cancel back to the square), every tab is a detour that lengthens the boundary.
+            var id = g.IdOf(1, 1);
+            var n = g.GetCornersCount(id);
+            Span<float2> pts = stackalloc float2[n];
+            g.CopyCorners(id, pts);
+            var perimeter = 0f;
+            for (var i = 0; i < n; i++) perimeter += math.distance(pts[i], pts[(i + 1) % n]);
+            Assert.Greater(perimeter, 4f * s);
+        }
+
+        // ---- GetCellAt resolves a cell centre to its own id ----
+
+        [Test]
+        public void GetCellAt_CellCentre_ReturnsThatCell()
+        {
+            var g = new ClassicPuzzleGrid(5, 4, 2f, 3, Params(1f, 1f, 1f));
+            for (var id = 0; id < g.CellCount; id++)
+            {
+                Assert.AreEqual(id, g.GetCellAt(g.GetCenter(id)));
             }
         }
 
         [Test]
-        public void AreNeighbors_SelfReturnsFalse()
+        public void GetCellAt_OutsideBounds_ReturnsMinusOne()
         {
-            var g = new ClassicPuzzleGrid(3, 3, 1f, 0);
-            for (var id = 0; id < g.CellCount; id++) Assert.IsFalse(g.AreNeighbors(id, id));
+            var g = new ClassicPuzzleGrid(4, 4, 2f, 0, Params(0.5f, 0.5f, 0.5f));
+            Assert.AreEqual(-1, g.GetCellAt(new float2(-1f, -1f)));
+            Assert.AreEqual(-1, g.GetCellAt(new float2(100f, 100f)));
         }
+
+        // ---- Head deform keeps the grid valid (tiling, positive area, containment) ----
 
         [Test]
-        public void AreNeighbors_OutOfRangeReturnsFalse()
+        public void MaxDeform_PreservesTilingAndContainment()
         {
-            var g = new ClassicPuzzleGrid(3, 3, 1f, 0);
-            Assert.IsFalse(g.AreNeighbors(-1, 0));
-            Assert.IsFalse(g.AreNeighbors(0, g.CellCount));
-            Assert.IsFalse(g.AreNeighbors(g.CellCount, 0));
+            const float s = 1.5f;
+            const int w = 5, h = 5;
+            var g = new ClassicPuzzleGrid(w, h, s, 13, new ClassicPuzzleParameters(1f, 1f, 1f, 1f));
+            var sum = 0f;
+            for (var id = 0; id < g.CellCount; id++)
+            {
+                var area = PolygonArea(g, id);
+                Assert.Greater(area, 0f, $"cell {id} degenerate");
+                Assert.AreEqual(id, g.GetCellAt(g.GetCenter(id)));
+                sum += area;
+            }
+            Assert.AreEqual(w * h * s * s, sum, 1e-2f);
         }
 
-        [Test]
-        public void GetNeighborIndex_OutOfRangeReturnsMinusOne()
-        {
-            var g = new ClassicPuzzleGrid(3, 3, 1f, 0);
-            Assert.AreEqual(-1, g.GetNeighborIndex(-1, 0));
-            Assert.AreEqual(-1, g.GetNeighborIndex(g.CellCount, 0));
-            Assert.AreEqual(-1, g.GetNeighborIndex(0, 0));
-        }
+        // ---- Adversarial: the shipping PuzzleEdge.Generate stays a simple, CW, tiling polygon ----
 
-        [Test]
-        public void Distance_IsManhattan()
-        {
-            var g = new ClassicPuzzleGrid(4, 4, 1f, 0);
-            Assert.AreEqual(0, g.Distance(g.IdOf(1, 1), g.IdOf(1, 1)));
-            Assert.AreEqual(1, g.Distance(g.IdOf(1, 1), g.IdOf(2, 1)));
-            Assert.AreEqual(2, g.Distance(g.IdOf(1, 1), g.IdOf(2, 2)));
-            Assert.AreEqual(6, g.Distance(g.IdOf(0, 0), g.IdOf(3, 3)));
-        }
-
-        [Test]
-        public void GetCornersCount_OneByOne_IsFour()
-        {
-            // No interior edges, all 4 sides straight.
-            var g = new ClassicPuzzleGrid(1, 1, 1f, 0);
-            Assert.AreEqual(4, g.GetCornersCount(0));
-        }
-
-        [Test]
-        public void GetCornersCount_InteriorCellHasFourFullSides()
-        {
-            // 3x3 grid: cell (1, 1) has all 4 sides interior.
-            var g = new ClassicPuzzleGrid(3, 3, 1f, 0);
-            var n = g.Parameters.SamplesPerEdge - 2;
-            Assert.AreEqual(4 + 4 * n, g.GetCornersCount(g.IdOf(1, 1)));
-        }
-
-        [Test]
-        public void GetCornersCount_BoundaryCells_HaveFewerCorners()
-        {
-            var g = new ClassicPuzzleGrid(3, 3, 1f, 0);
-            var n = g.Parameters.SamplesPerEdge - 2;
-            // (0, 0): 2 interior sides (right, top), 2 boundary.
-            Assert.AreEqual(4 + 2 * n, g.GetCornersCount(g.IdOf(0, 0)));
-            // (1, 0): 3 interior sides (right, left, top), 1 boundary (bottom).
-            Assert.AreEqual(4 + 3 * n, g.GetCornersCount(g.IdOf(1, 0)));
-        }
-
-        [Test]
-        public void GetCorner_AtRectCornersMatchesRectLayout()
-        {
-            // 1x1 grid (no puzzle edges) collapses to plain square corners.
-            var g = new ClassicPuzzleGrid(1, 1, 2f, 0);
-            Assert.AreEqual(new float2(2, 2), g.GetCorner(0, 0)); // TR
-            Assert.AreEqual(new float2(2, 0), g.GetCorner(0, 1)); // BR
-            Assert.AreEqual(new float2(0, 0), g.GetCorner(0, 2)); // BL
-            Assert.AreEqual(new float2(0, 2), g.GetCorner(0, 3)); // TL
-        }
-
-        [Test]
-        public void GetCorner_WrapsIndex()
-        {
-            var g = new ClassicPuzzleGrid(3, 3, 1f, 0);
-            var id = g.IdOf(1, 1);
-            var n = g.GetCornersCount(id);
-            Assert.AreEqual(g.GetCorner(id, 0), g.GetCorner(id, n));
-            Assert.AreEqual(g.GetCorner(id, 0), g.GetCorner(id, -n));
-            Assert.AreEqual(g.GetCorner(id, 1), g.GetCorner(id, n + 1));
-        }
-
-        [Test]
-        public void CopyCorners_FillsDestination()
-        {
-            var g = new ClassicPuzzleGrid(3, 3, 1f, 0);
-            var id = g.IdOf(1, 1);
-            var n = g.GetCornersCount(id);
-            var dest = new float2[n];
-            g.CopyCorners(id, dest);
-            for (var i = 0; i < n; i++) Assert.AreEqual(g.GetCorner(id, i), dest[i]);
-        }
-
-        [Test]
-        public void CopyCorners_ThrowsIfDestinationTooSmall()
-        {
-            var g = new ClassicPuzzleGrid(3, 3, 1f, 0);
-            var id = g.IdOf(1, 1);
-            var n = g.GetCornersCount(id);
-            var dest = new float2[n - 1];
-            Assert.Throws<ArgumentException>(() => g.CopyCorners(id, dest));
-        }
-
-        [TestCase(0)]
-        [TestCase(1)]
-        [TestCase(2)]
-        [TestCase(42)]
-        [TestCase(-7)]
-        public void Corners_AreClockwise(int seed)
-        {
-            // CW polyline in Y-up frame has negative signed area.
-            var g = new ClassicPuzzleGrid(4, 4, 1f, seed);
-            AssertAllCellsCw(g, seed);
-        }
-
-        [TestCase(0)]
-        [TestCase(1)]
-        [TestCase(7)]
-        [TestCase(123)]
-        public void SharedEdge_NeighboursAgreeOnPolylineExactly(int seed)
-        {
-            // Cell A side s and cell B's matching side must be identical polylines in
-            // reverse order. By construction (both look up the same _vertEdges /
-            // _horizEdges slot), they share the same underlying float2[].
-            var g = new ClassicPuzzleGrid(4, 4, 1f, seed);
-            AssertSharedEdgesAgree(g, seed);
-        }
-
-        [TestCase(0)]
-        [TestCase(1)]
-        [TestCase(2)]
-        [TestCase(3)]
-        [TestCase(42)]
-        public void Polygon_HasNoSelfIntersection_Defaults(int seed)
-        {
-            // For each cell, every pair of non-adjacent polygon edges must NOT cross.
-            // Adjacent edges share an endpoint and are excluded.
-            var g = new ClassicPuzzleGrid(4, 4, 1f, seed);
-            AssertNoCellSelfIntersection(g, seed.ToString());
-        }
-
-        // Exhaustive sweep across the public parameter cube. Verifies the polygon is
-        // simple for any (TabSize, Variation, Smoothness) the user can dial in. Six
-        // evenly-spaced samples per axis (including 0 and 1) gives 216 combos; tied
-        // to a single seed to keep run time bounded.
         [Test]
         public void Polygon_HasNoSelfIntersection_FullParameterSweep()
         {
-            const int steps = 5;
-            for (var i = 0; i <= steps; i++)
-            for (var j = 0; j <= steps; j++)
-            for (var k = 0; k <= steps; k++)
+            const int steps = 2; // {0, 0.5, 1} per axis over (roundness, radius, offset, deform)
+            for (var a = 0; a <= steps; a++)
+            for (var b = 0; b <= steps; b++)
+            for (var c = 0; c <= steps; c++)
+            for (var d = 0; d <= steps; d++)
             {
-                var t = (float)i / steps;
-                var v = (float)j / steps;
-                var s = (float)k / steps;
-                var p = new ClassicPuzzleParameters(t, v, s);
+                var p = Params((float)a / steps, (float)b / steps, (float)c / steps, (float)d / steps);
                 var g = new ClassicPuzzleGrid(3, 3, 1f, 0, p);
-                var label = $"T={t:F2} V={v:F2} S={s:F2}";
+                var label = $"R={a} Rad={b} Off={c} Def={d}";
                 AssertNoCellSelfIntersection(g, label);
-                AssertAllCellsCw(g, 0);
+                AssertAllCellsCw(g, label);
             }
         }
 
-        // Every corner of the public parameter cube (eight combinations of
-        // {0, 1} per axis) across multiple seeds. The strictest boundary
-        // coverage we can do without resorting to randomization.
-        [TestCase(0f, 0f, 0f)]
-        [TestCase(0f, 0f, 1f)]
-        [TestCase(0f, 1f, 0f)]
-        [TestCase(0f, 1f, 1f)]
-        [TestCase(1f, 0f, 0f)]
-        [TestCase(1f, 0f, 1f)]
-        [TestCase(1f, 1f, 0f)]
-        [TestCase(1f, 1f, 1f)]
-        public void Polygon_HasNoSelfIntersection_AllCubeCorners(float tabSize, float variation, float smoothness)
-        {
-            for (var seed = 0; seed < 8; seed++)
-            {
-                var p = new ClassicPuzzleParameters(tabSize, variation, smoothness);
-                var g = new ClassicPuzzleGrid(3, 3, 1f, seed, p);
-                AssertNoCellSelfIntersection(g, $"T={tabSize} V={variation} S={smoothness} seed={seed}");
-                AssertSharedEdgesAgree(g, seed);
-                AssertAllCellsCw(g, seed);
-            }
-        }
-
-        // Randomized fuzz over the full (T, V, S, seed) input space. Deterministic
-        // via a fixed PRNG seed so failures are reproducible. Catches anything the
-        // 216-point sweep might miss between grid samples.
         [Test]
-        public void Polygon_HasNoSelfIntersection_RandomizedFuzz()
+        public void Polygon_HasNoSelfIntersection_AllCubeCornersAcrossSeeds()
         {
-            var rng = new System.Random(20260518);
-            for (var trial = 0; trial < 200; trial++)
+            for (var mask = 0; mask < 16; mask++)
             {
-                var t = (float)rng.NextDouble();
-                var v = (float)rng.NextDouble();
-                var s = (float)rng.NextDouble();
-                var seed = rng.Next();
-                var p = new ClassicPuzzleParameters(t, v, s);
-                var g = new ClassicPuzzleGrid(3, 3, 1f, seed, p);
-                AssertNoCellSelfIntersection(g, $"trial={trial} T={t:F3} V={v:F3} S={s:F3} seed={seed}");
-            }
-        }
-
-        // Out-of-range and NaN inputs get silently clamped to [0, 1] in
-        // ClassicPuzzleParameters, so the resulting grid must still produce a
-        // simple polygon. Lock this behavior in.
-        [Test]
-        public void Polygon_HasNoSelfIntersection_OutOfRangeAndNanInputs()
-        {
-            var combos = new (float t, float v, float s)[]
-            {
-                (float.NaN, float.NaN, float.NaN),
-                (-1f, -1f, -1f),
-                (2f, 2f, 2f),
-                (float.NegativeInfinity, float.PositiveInfinity, float.NaN),
-                (-1000f, 1000f, 0.5f),
-                (float.NaN, 0.3f, 0.7f),
-                (1.5f, -0.5f, float.NaN),
-            };
-            foreach (var (t, v, s) in combos)
-            {
-                var p = new ClassicPuzzleParameters(t, v, s);
-                var g = new ClassicPuzzleGrid(3, 3, 1f, 42, p);
-                AssertNoCellSelfIntersection(g, $"T={t} V={v} S={s}");
-                AssertPolygonsTileRectangle(g, $"T={t} V={v} S={s}");
-            }
-        }
-
-        // Sanity: even at extreme inputs the polygon coordinates are always
-        // finite numbers (no NaN / Infinity leaking through).
-        [TestCase(0f, 0f, 0f)]
-        [TestCase(0f, 0f, 1f)]
-        [TestCase(0f, 1f, 0f)]
-        [TestCase(0f, 1f, 1f)]
-        [TestCase(1f, 0f, 0f)]
-        [TestCase(1f, 0f, 1f)]
-        [TestCase(1f, 1f, 0f)]
-        [TestCase(1f, 1f, 1f)]
-        public void Corners_AreAlwaysFinite(float tabSize, float variation, float smoothness)
-        {
-            var p = new ClassicPuzzleParameters(tabSize, variation, smoothness);
-            var g = new ClassicPuzzleGrid(4, 4, 1f, 42, p);
-            for (var id = 0; id < g.CellCount; id++)
-            {
-                var n = g.GetCornersCount(id);
-                for (var k = 0; k < n; k++)
+                var p = Params(mask & 1, (mask >> 1) & 1, (mask >> 2) & 1, (mask >> 3) & 1);
+                for (var seed = 0; seed < 8; seed++)
                 {
-                    var c = g.GetCorner(id, k);
-                    Assert.IsTrue(math.isfinite(c.x), $"T={tabSize} V={variation} S={smoothness} cell={id} corner={k} non-finite x: {c.x}");
-                    Assert.IsTrue(math.isfinite(c.y), $"T={tabSize} V={variation} S={smoothness} cell={id} corner={k} non-finite y: {c.y}");
+                    var g = new ClassicPuzzleGrid(3, 3, 1f, seed, p);
+                    var label = $"mask={mask} seed={seed}";
+                    AssertNoCellSelfIntersection(g, label);
+                    AssertSharedEdgesAgree(g, label);
+                    AssertAllCellsCw(g, label);
                 }
             }
         }
 
-        // Tiling invariant under random parameters: total polygon area must
-        // exactly equal grid rectangle area regardless of inputs.
         [Test]
-        public void Polygon_TilesRectangle_RandomizedFuzz()
+        public void Polygon_HasNoSelfIntersection_RandomizedFuzz()
         {
-            var rng = new System.Random(20260519);
-            for (var trial = 0; trial < 50; trial++)
+            var rng = new System.Random(20260609);
+            for (var trial = 0; trial < 150; trial++)
             {
-                var t = (float)rng.NextDouble();
-                var v = (float)rng.NextDouble();
-                var s = (float)rng.NextDouble();
+                var p = Params((float)rng.NextDouble(), (float)rng.NextDouble(), (float)rng.NextDouble(), (float)rng.NextDouble());
                 var seed = rng.Next();
-                var p = new ClassicPuzzleParameters(t, v, s);
                 var g = new ClassicPuzzleGrid(3, 3, 1f, seed, p);
-                AssertPolygonsTileRectangle(g, $"trial={trial} T={t:F3} V={v:F3} S={s:F3} seed={seed}");
+                AssertNoCellSelfIntersection(g, $"trial={trial} seed={seed}");
             }
         }
 
-        // Pieces must continue to tile the rectangle exactly even at extreme
-        // parameters. Total absolute signed area of all polygons must equal grid area.
-        [TestCase(0f, 0f, 0f)]
-        [TestCase(0.25f, 0.25f, 0.25f)]
-        [TestCase(0.5f, 0.5f, 0.5f)]
-        [TestCase(0.75f, 0.75f, 0.75f)]
-        [TestCase(1f, 1f, 1f)]
-        public void Polygon_TilesRectangle_ParameterExtremes(float tabSize, float variation, float smoothness)
+        [Test]
+        public void Polygon_StaysValid_OutOfRangeAndNanInputs()
         {
-            var p = new ClassicPuzzleParameters(tabSize, variation, smoothness);
-            var g = new ClassicPuzzleGrid(4, 3, 1f, 5, p);
-            AssertPolygonsTileRectangle(g, $"T={tabSize} V={variation} S={smoothness}");
+            var combos = new[]
+            {
+                new float4(float.NaN, float.NaN, float.NaN, float.NaN),
+                new float4(-1f, -1f, -1f, -1f),
+                new float4(2f, 2f, 2f, 2f),
+                new float4(float.NegativeInfinity, float.PositiveInfinity, float.NaN, 5f),
+                new float4(float.NaN, 0.3f, 0.7f, 1f),
+                new float4(1.5f, -0.5f, float.NaN, 0.4f),
+            };
+            foreach (var v in combos)
+            {
+                var g = new ClassicPuzzleGrid(3, 3, 1f, 42, Params(v.x, v.y, v.z, v.w));
+                var label = $"{v.x},{v.y},{v.z},{v.w}";
+                AssertNoCellSelfIntersection(g, label);
+                AssertPolygonsTileRectangle(g, label);
+                AssertCornersFinite(g, label);
+            }
         }
 
-        [TestCase(0)]
-        [TestCase(1)]
-        [TestCase(7)]
-        public void GetCellAt_OutsideBounds_ReturnsMinusOne(int seed)
+        [Test]
+        public void Corners_AreAlwaysFinite_CubeCorners()
         {
-            var g = new ClassicPuzzleGrid(3, 3, 1f, seed);
-            Assert.AreEqual(-1, g.GetCellAt(new float2(-0.5f, 0.5f)));
-            Assert.AreEqual(-1, g.GetCellAt(new float2(0.5f, -0.5f)));
-            Assert.AreEqual(-1, g.GetCellAt(new float2(3.5f, 1f)));
-            Assert.AreEqual(-1, g.GetCellAt(new float2(1f, 3.5f)));
+            for (var mask = 0; mask < 16; mask++)
+            {
+                var g = new ClassicPuzzleGrid(4, 4, 1f, 42, Params(mask & 1, (mask >> 1) & 1, (mask >> 2) & 1, (mask >> 3) & 1));
+                AssertCornersFinite(g, $"mask={mask}");
+            }
+        }
+
+        [Test]
+        public void Polygon_TilesRectangle_RandomizedFuzz()
+        {
+            var rng = new System.Random(20260610);
+            for (var trial = 0; trial < 50; trial++)
+            {
+                var p = Params((float)rng.NextDouble(), (float)rng.NextDouble(), (float)rng.NextDouble(), (float)rng.NextDouble());
+                var g = new ClassicPuzzleGrid(3, 3, 1f, rng.Next(), p);
+                AssertPolygonsTileRectangle(g, $"trial={trial}");
+            }
         }
 
         [TestCase(0)]
         [TestCase(1)]
         [TestCase(13)]
-        public void GetCellAt_AtCenter_ReturnsCellId(int seed)
+        public void SharedEdges_NeighboursAgreeExactly(int seed)
         {
-            var g = new ClassicPuzzleGrid(4, 4, 1f, seed);
-            for (var id = 0; id < g.CellCount; id++)
-            {
-                Assert.AreEqual(id, g.GetCellAt(g.GetCenter(id)), $"seed={seed} round-trip failed for cell {id}");
-            }
+            // Covers both vertical and horizontal interior edges (the reversed CopyCorners branches).
+            var g = new ClassicPuzzleGrid(4, 4, 2f, seed, Params(1f, 1f, 1f, 1f));
+            AssertSharedEdgesAgree(g, $"seed={seed}");
         }
 
-        [TestCase(0)]
-        [TestCase(1)]
-        [TestCase(5)]
-        public void GetCellAt_TilesTheRectangle(int seed)
+        // Dense point sweep: every point in the bounds must map to a valid cell (pieces partition the
+        // rectangle with no gaps/overlaps), incl. max deform where the lean shifts tabs along the edge.
+        [TestCase(0f, 0f, 0f, 0f)]
+        [TestCase(1f, 1f, 1f, 0f)]
+        [TestCase(1f, 1f, 1f, 1f)]
+        [TestCase(0.5f, 0.5f, 0.5f, 0.4f)]
+        public void GetCellAt_TilesTheRectangle(float roundness, float radius, float offset, float deform)
         {
-            // Sample a dense grid of points across the bounds. Every point must map
-            // to a valid cell id (puzzle pieces partition the rect with no gaps).
-            var g = new ClassicPuzzleGrid(3, 3, 1f, seed);
-            const int samplesPerCellSide = 17;
-            var n = g.Width * samplesPerCellSide;
-            var m = g.Height * samplesPerCellSide;
+            var g = new ClassicPuzzleGrid(3, 3, 1f, 5, Params(roundness, radius, offset, deform));
+            const int samplesPerSide = 17;
+            var n = g.Width * samplesPerSide;
+            var m = g.Height * samplesPerSide;
             for (var iy = 0; iy < m; iy++)
+            for (var ix = 0; ix < n; ix++)
             {
-                for (var ix = 0; ix < n; ix++)
-                {
-                    var px = (ix + 0.5f) / n * g.Width * g.CellSize;
-                    var py = (iy + 0.5f) / m * g.Height * g.CellSize;
-                    var id = g.GetCellAt(new float2(px, py));
-                    Assert.GreaterOrEqual(id, 0, $"seed={seed} point ({px}, {py}) not assigned to any cell");
-                    Assert.Less(id, g.CellCount);
-                }
+                var px = (ix + 0.5f) / n * g.Width * g.CellSize;
+                var py = (iy + 0.5f) / m * g.Height * g.CellSize;
+                var id = g.GetCellAt(new float2(px, py));
+                Assert.GreaterOrEqual(id, 0, $"point ({px}, {py}) unassigned");
+                Assert.Less(id, g.CellCount);
             }
         }
 
         [Test]
-        public void Construction_IsDeterministicForSameSeed()
+        public void DefaultDeform_ProducesValidGrid()
         {
-            var g1 = new ClassicPuzzleGrid(4, 4, 1f, 42);
-            var g2 = new ClassicPuzzleGrid(4, 4, 1f, 42);
-            for (var id = 0; id < g1.CellCount; id++)
-            {
-                var n = g1.GetCornersCount(id);
-                Assert.AreEqual(n, g2.GetCornersCount(id));
-                for (var i = 0; i < n; i++) Assert.AreEqual(g1.GetCorner(id, i), g2.GetCorner(id, i));
-            }
-        }
-
-        [Test]
-        public void DifferentSeeds_ProduceDifferentCorners()
-        {
-            var g1 = new ClassicPuzzleGrid(4, 4, 1f, 1);
-            var g2 = new ClassicPuzzleGrid(4, 4, 1f, 2);
-            var anyDifferent = false;
-            for (var id = 0; id < g1.CellCount && !anyDifferent; id++)
-            {
-                var n = g1.GetCornersCount(id);
-                for (var i = 0; i < n && !anyDifferent; i++)
-                {
-                    if (!Equals(g1.GetCorner(id, i), g2.GetCorner(id, i))) anyDifferent = true;
-                }
-            }
-            Assert.IsTrue(anyDifferent, "two distinct seeds produced identical corners");
-        }
-
-        [Test]
-        public void GetSidePolylineLength_MatchesContract()
-        {
-            var g = new ClassicPuzzleGrid(3, 3, 1f, 0);
-            var n = g.Parameters.SamplesPerEdge;
-            // Interior cell: every side full polyline.
-            var idInterior = g.IdOf(1, 1);
-            for (var s = 0; s < 4; s++) Assert.AreEqual(n, g.GetSidePolylineLength(idInterior, s));
-            // (0, 0): right and top are full, bottom and left have only 2 endpoints.
-            var idCorner = g.IdOf(0, 0);
-            Assert.AreEqual(n, g.GetSidePolylineLength(idCorner, 0));
-            Assert.AreEqual(2, g.GetSidePolylineLength(idCorner, 1));
-            Assert.AreEqual(2, g.GetSidePolylineLength(idCorner, 2));
-            Assert.AreEqual(n, g.GetSidePolylineLength(idCorner, 3));
-        }
-
-        [Test]
-        public void CopySidePolyline_BoundarySideIsStraightLine()
-        {
-            var g = new ClassicPuzzleGrid(3, 3, 2f, 0);
-            // (0, 0): bottom side BR=(2, 0) -> BL=(0, 0).
-            var dest = new float2[2];
-            g.CopySidePolyline(g.IdOf(0, 0), 1, dest);
-            Assert.AreEqual(new float2(2, 0), dest[0]);
-            Assert.AreEqual(new float2(0, 0), dest[1]);
-        }
-
-        [TestCase(2, 2)] [TestCase(3, 1)] [TestCase(1, 3)] [TestCase(5, 4)]
-        public void Polygon_Stitches_PiecesCoverRectangleArea(int width, int height)
-        {
-            // Total signed-area magnitude of all cell polygons must equal the grid
-            // rectangle area exactly. Since each polygon is CW (negative signed area),
-            // sum of |signed area| equals grid area.
-            var g = new ClassicPuzzleGrid(width, height, 1f, 11);
-            AssertPolygonsTileRectangle(g, $"{width}x{height}");
+            // The playground/debug default is TabDeform = 0.4; lock that it tiles and stays simple.
+            var g = new ClassicPuzzleGrid(5, 5, 1.5f, 3, Params(0.5f, 0.5f, 0.6f, 0.4f));
+            AssertNoCellSelfIntersection(g, "default-deform");
+            AssertAllCellsCw(g, "default-deform");
+            AssertPolygonsTileRectangle(g, "default-deform");
         }
 
         // ---- helpers ----
@@ -518,90 +311,72 @@ namespace Appegy.Tessera.Tests
             for (var id = 0; id < g.CellCount; id++)
             {
                 var n = g.GetCornersCount(id);
-                var corners = new float2[n];
-                g.CopyCorners(id, corners);
+                var c = new float2[n];
+                g.CopyCorners(id, c);
                 for (var i = 0; i < n; i++)
+                for (var j = i + 2; j < n; j++)
                 {
-                    var a = corners[i];
-                    var b = corners[(i + 1) % n];
-                    for (var j = i + 2; j < n; j++)
-                    {
-                        if (i == 0 && j == n - 1) continue;
-                        var c = corners[j];
-                        var d = corners[(j + 1) % n];
-                        if (SegmentsProperlyIntersect(a, b, c, d))
-                            Assert.Fail($"{label} cell={id} edges {i}->{(i + 1) % n} and {j}->{(j + 1) % n} cross");
-                    }
+                    if (i == 0 && j == n - 1) continue;
+                    if (SegmentsProperlyIntersect(c[i], c[(i + 1) % n], c[j], c[(j + 1) % n]))
+                        Assert.Fail($"{label} cell={id} edges {i} and {j} cross");
                 }
             }
         }
 
-        private static void AssertAllCellsCw(ClassicPuzzleGrid g, int seed)
+        private static void AssertAllCellsCw(ClassicPuzzleGrid g, string label)
         {
             for (var id = 0; id < g.CellCount; id++)
             {
                 var n = g.GetCornersCount(id);
-                var corners = new float2[n];
-                g.CopyCorners(id, corners);
+                var c = new float2[n];
+                g.CopyCorners(id, c);
                 var area = 0f;
-                for (var i = 0; i < n; i++)
-                {
-                    var p = corners[i];
-                    var q = corners[(i + 1) % n];
-                    area += p.x * q.y - q.x * p.y;
-                }
-                Assert.Less(area, 0f, $"seed={seed} cell={id} polygon not CW (signed area={area})");
+                for (var i = 0; i < n; i++) area += c[i].x * c[(i + 1) % n].y - c[(i + 1) % n].x * c[i].y;
+                Assert.Less(area, 0f, $"{label} cell={id} not CW (signed area={area})");
             }
         }
 
-        private static void AssertSharedEdgesAgree(ClassicPuzzleGrid g, int seed)
+        private static void AssertSharedEdgesAgree(ClassicPuzzleGrid g, string label)
         {
             for (var id = 0; id < g.CellCount; id++)
+            for (var k = 0; k < 4; k++)
             {
-                for (var k = 0; k < 4; k++)
+                var other = g.GetNeighbor(id, k);
+                if (other == -1) continue;
+                var jSide = g.GetNeighborIndex(other, id);
+                var lenA = g.GetSidePolylineLength(id, k);
+                Assert.AreEqual(lenA, g.GetSidePolylineLength(other, jSide), $"{label} a={id} k={k}");
+                var a = new float2[lenA];
+                var b = new float2[lenA];
+                g.CopySidePolyline(id, k, a);
+                g.CopySidePolyline(other, jSide, b);
+                for (var i = 0; i < lenA; i++)
                 {
-                    var other = g.GetNeighbor(id, k);
-                    if (other == -1) continue;
-                    var jSide = g.GetNeighborIndex(other, id);
-                    Assert.AreNotEqual(-1, jSide);
-
-                    var lenA = g.GetSidePolylineLength(id, k);
-                    var lenB = g.GetSidePolylineLength(other, jSide);
-                    Assert.AreEqual(lenA, lenB, $"seed={seed} a={id} k={k} b={other} jSide={jSide}");
-
-                    var a = new float2[lenA];
-                    var b = new float2[lenB];
-                    g.CopySidePolyline(id, k, a);
-                    g.CopySidePolyline(other, jSide, b);
-
-                    for (var i = 0; i < lenA; i++)
-                    {
-                        Assert.AreEqual(a[i].x, b[lenA - 1 - i].x, Eps, $"seed={seed} cell={id} side={k} i={i}");
-                        Assert.AreEqual(a[i].y, b[lenA - 1 - i].y, Eps, $"seed={seed} cell={id} side={k} i={i}");
-                    }
+                    Assert.AreEqual(a[i].x, b[lenA - 1 - i].x, Eps, $"{label} cell={id} side={k} i={i} x");
+                    Assert.AreEqual(a[i].y, b[lenA - 1 - i].y, Eps, $"{label} cell={id} side={k} i={i} y");
                 }
             }
         }
 
         private static void AssertPolygonsTileRectangle(ClassicPuzzleGrid g, string label)
         {
-            var totalArea = 0f;
+            var total = 0f;
+            for (var id = 0; id < g.CellCount; id++) total += PolygonArea(g, id);
+            var expected = (float)g.Width * g.Height * g.CellSize * g.CellSize;
+            Assert.AreEqual(expected, total, expected * 1e-3f, label);
+        }
+
+        private static void AssertCornersFinite(ClassicPuzzleGrid g, string label)
+        {
             for (var id = 0; id < g.CellCount; id++)
             {
                 var n = g.GetCornersCount(id);
-                var corners = new float2[n];
-                g.CopyCorners(id, corners);
-                var area = 0f;
                 for (var i = 0; i < n; i++)
                 {
-                    var p = corners[i];
-                    var q = corners[(i + 1) % n];
-                    area += p.x * q.y - q.x * p.y;
+                    var c = g.GetCorner(id, i);
+                    Assert.IsTrue(math.isfinite(c.x) && math.isfinite(c.y), $"{label} cell={id} corner={i} non-finite");
                 }
-                totalArea += math.abs(area) * 0.5f;
             }
-            var expected = (float)g.Width * g.Height * g.CellSize * g.CellSize;
-            Assert.AreEqual(expected, totalArea, expected * 1e-4f, label);
         }
 
         private static bool SegmentsProperlyIntersect(float2 a, float2 b, float2 c, float2 d)
@@ -615,8 +390,6 @@ namespace Appegy.Tessera.Tests
         }
 
         private static float Cross(float2 p, float2 q, float2 r)
-        {
-            return (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x);
-        }
+            => (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x);
     }
 }

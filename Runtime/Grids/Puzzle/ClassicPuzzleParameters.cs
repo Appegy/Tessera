@@ -3,51 +3,58 @@ using Unity.Mathematics;
 namespace Appegy.Tessera
 {
     /// <summary>
-    /// Parameters of the Draradech jigsaw silhouette used by <see cref="ClassicPuzzleGrid"/>.
-    /// All inputs are normalized to [0, 1]; out-of-range values are clamped, NaN falls back
-    /// to 0.5. Internal physical ranges are chosen so the silhouette stays simple for every
-    /// seed across the input cube.
+    /// Tab shape parameters for <see cref="ClassicPuzzleGrid"/>. All inputs are normalized to [0, 1]
+    /// (clamped; NaN falls back to 0); internal ranges are fractions of the edge length.
     /// </summary>
     public readonly struct ClassicPuzzleParameters
     {
-        internal const float MinInternalTabSize = 0.06f;
-        internal const float MaxInternalTabSize = 0.14f;
-        internal const float MinInternalJitter = 0.025f;
-        internal const float MaxInternalJitter = 0.055f;
-        internal const int MinInternalSubdivisions = 4;
-        internal const int MaxInternalSubdivisions = 16;
+        internal const float MaxBulge = 0.0525f;     // edge bow at Roundness = 1
+        internal const float MinRadius = 0.07f;      // head radius range
+        internal const float MaxRadius = 0.119f;
+        internal const float HeadHeightMax = 1.5f;   // head centre height at TabOffset = 1, in radii
+        internal const float NeckWidth = 0.7f;       // neck waist half-width, in radii (< 1 to overhang)
+        internal const float FilletMin = 0.05f;      // fillet floor; below it the tab is a semicircle bump
+        internal const float MaxLean = 0.45f;        // deform: along-edge shift per unit protrusion
 
-        public float TabSize { get; }
-        public float Variation { get; }
-        public float Smoothness { get; }
+        internal const int ShoulderSubdivisions = 4;
+        internal const int FilletSubdivisions = 6;
+        internal const int HeadSubdivisions = 20;
 
-        public ClassicPuzzleParameters(float tabSize, float variation, float smoothness)
+        public float Roundness { get; }
+        public float TabRadius { get; }
+        public float TabOffset { get; }
+        public float TabDeform { get; }
+
+        public ClassicPuzzleParameters(float roundness, float tabRadius, float tabOffset, float tabDeform = 0f)
         {
-            TabSize = Normalize(tabSize);
-            Variation = Normalize(variation);
-            Smoothness = Normalize(smoothness);
+            Roundness = Normalize(roundness);
+            TabRadius = Normalize(tabRadius);
+            TabOffset = Normalize(tabOffset);
+            TabDeform = Normalize(tabDeform);
         }
 
-        public static ClassicPuzzleParameters Default => new ClassicPuzzleParameters(0.5f, 0.5f, 0.5f);
+        public static ClassicPuzzleParameters Default => new ClassicPuzzleParameters(0.5f, 0.5f, 0.5f, 0f);
 
-        public int SamplesPerEdge => 3 * BezierSubdivisions + 1;
+        public int SamplesPerEdge => 2 * ShoulderSubdivisions + 2 * FilletSubdivisions + HeadSubdivisions + 1;
 
-        public int BezierSubdivisions
+        internal float ResolvedBulge => Roundness * MaxBulge;
+        internal float ResolvedRadius => math.lerp(MinRadius, MaxRadius, TabRadius);
+        internal float ResolvedHeadHeight => ResolvedRadius * HeadHeightMax * TabOffset;
+        internal float ResolvedDeform => TabDeform;
+
+        // Fillet radius that holds the neck waist at NeckWidth * radius (with c = sqrt(1 - NeckWidth^2),
+        // rf = (hh - c*R)/(1 + c) gives (hh - rf)/(R + rf) = c), floored so low TabOffset stays a semicircle.
+        internal float ResolvedFillet
         {
             get
             {
-                var raw = math.lerp((float)MinInternalSubdivisions, (float)MaxInternalSubdivisions, Smoothness);
-                return (int)math.round(raw);
+                var r = ResolvedRadius;
+                var c = math.sqrt(1f - NeckWidth * NeckWidth);
+                var rf = (ResolvedHeadHeight - c * r) / (1f + c);
+                return math.max(FilletMin * r, rf);
             }
         }
 
-        internal float ResolvedTabSize => math.lerp(MinInternalTabSize, MaxInternalTabSize, TabSize);
-        internal float ResolvedJitter => math.lerp(MinInternalJitter, MaxInternalJitter, Variation);
-
-        private static float Normalize(float v)
-        {
-            if (float.IsNaN(v)) return 0.5f;
-            return math.clamp(v, 0f, 1f);
-        }
+        private static float Normalize(float v) => float.IsNaN(v) ? 0f : math.clamp(v, 0f, 1f);
     }
 }
