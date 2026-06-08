@@ -1,0 +1,38 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <ui:Style src="project://database/Assets/UI/Tessera.uss" />
+    <ui:VisualElement name="root" class="root">
+        <ui:VisualElement name="panel" class="panel">
+            <ui:VisualElement class="brand-row">
+                <ui:Label text="TESSERA" class="brand" />
+                <ui:Label name="info" text="" class="info-badge" />
+            </ui:VisualElement>
+            <ui:Label text="2D grid geometry playground" class="brand-sub" />
+            <ui:VisualElement class="divider" />
+
+            <ui:ScrollView name="body" class="body" mode="Vertical" vertical-scroller-visibility="Auto" horizontal-scroller-visibility="Hidden">
+                <ui:VisualElement class="section">
+                    <ui:VisualElement class="section-head">
+                        <ui:Label text="GRID TYPE" class="section-title" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="selector" class="selector" />
+                </ui:VisualElement>
+
+                <ui:VisualElement class="section">
+                    <ui:VisualElement class="section-head">
+                        <ui:VisualElement class="section-icon icon-tune" />
+                        <ui:Label text="PARAMETERS" class="section-title" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="params" />
+                </ui:VisualElement>
+
+                <ui:VisualElement class="section">
+                    <ui:VisualElement class="section-head">
+                        <ui:VisualElement class="section-icon icon-palette" />
+                        <ui:Label text="APPEARANCE" class="section-title" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="appearance" />
+                </ui:VisualElement>
+            </ui:ScrollView>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

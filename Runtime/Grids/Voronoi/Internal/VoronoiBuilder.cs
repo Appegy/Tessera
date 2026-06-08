@@ -87,6 +87,8 @@ namespace Appegy.Tessera
                     seeds[triangles[3 * t + 2]]);
             }
 
+            WeldCircumcenters(circumcenters);
+
             var edgeMap = BuildEdgeMap(triangles, triangleCount);
             var cellEdges = new List<CellEdge>[seeds.Length];
             var hullFarPoints = new List<float2>[seeds.Length];
@@ -596,6 +598,21 @@ namespace Appegy.Tessera
             }
 
             return area * 0.5f;
+        }
+
+        private static void WeldCircumcenters(float2[] points)
+        {
+            for (var i = 1; i < points.Length; i++)
+            {
+                for (var j = 0; j < i; j++)
+                {
+                    if (SamePoint(points[i], points[j]))
+                    {
+                        points[i] = points[j];
+                        break;
+                    }
+                }
+            }
         }
 
         private static bool SamePoint(float2 a, float2 b)
