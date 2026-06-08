@@ -9,7 +9,7 @@
       }
     },
     "com.coplaydev.unity-mcp": {
-      "version": "9.6.8",
+      "version": "9.7.1",
       "depth": 0,
       "source": "registry",
       "dependencies": {
@@ -101,6 +101,14 @@
       "depth": 0,
       "source": "builtin",
       "dependencies": {}
+    },
+    "com.unity.modules.screencapture": {
+      "version": "1.0.0",
+      "depth": 0,
+      "source": "builtin",
+      "dependencies": {
+        "com.unity.modules.imageconversion": "1.0.0"
+      }
     },
     "com.unity.modules.ui": {
       "version": "1.0.0",
