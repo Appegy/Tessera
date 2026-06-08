@@ -4,9 +4,8 @@ using UnityEngine;
 namespace Appegy.Tessera.Demo
 {
     /// <summary>
-    ///     Pure geometry helpers that turn an <see cref="ITessellation" /> into renderable meshes:
-    ///     a mitered triangle strip per cell outline and an ear-clipping triangulation for cell fills.
-    ///     Stateless; all working buffers are passed in so callers can pool them across rebuilds.
+    ///     Builds a mitered triangle strip for a cell outline. Cell fills are triangulated with the
+    ///     shared <see cref="EarClipping" />. Stateless; working buffers are passed in by the caller.
     /// </summary>
     public static class GridMeshBuilder
     {
@@ -79,95 +78,6 @@ namespace Appegy.Tessera.Demo
                 indices.Add(c);
                 indices.Add(d);
             }
-        }
-
-        /// <summary>
-        ///     Ear-clipping triangulation of a simple CW polygon (Y-up). Handles concave cells such as
-        ///     puzzle pieces where neighbour tabs poke inward. O(n^2), fine for typical corner counts.
-        ///     Grows the caller's prev/next scratch arrays as needed so it allocates nothing after warm-up.
-        /// </summary>
-        public static void Triangulate(Vector2[] poly, int n, List<int> indices, int baseIdx, ref int[] prevBuf, ref int[] nextBuf)
-        {
-            if (n < 3) return;
-            if (n == 3)
-            {
-                indices.Add(baseIdx);
-                indices.Add(baseIdx + 1);
-                indices.Add(baseIdx + 2);
-                return;
-            }
-
-            if (prevBuf.Length < n) prevBuf = new int[n];
-            if (nextBuf.Length < n) nextBuf = new int[n];
-            var prev = prevBuf;
-            var next = nextBuf;
-            for (var i = 0; i < n; i++)
-            {
-                prev[i] = (i - 1 + n) % n;
-                next[i] = (i + 1) % n;
-            }
-
-            var remaining = n;
-            var head = 0;
-            var safety = n * 2;
-            while (remaining > 3 && safety-- > 0)
-            {
-                var earFound = false;
-                var v = head;
-                for (var iter = 0; iter < remaining; iter++)
-                {
-                    if (IsEar(poly, prev[v], v, next[v], next))
-                    {
-                        indices.Add(baseIdx + prev[v]);
-                        indices.Add(baseIdx + v);
-                        indices.Add(baseIdx + next[v]);
-                        next[prev[v]] = next[v];
-                        prev[next[v]] = prev[v];
-                        if (v == head) head = next[v];
-                        remaining--;
-                        earFound = true;
-                        break;
-                    }
-                    v = next[v];
-                }
-                if (!earFound) break;
-            }
-
-            if (remaining == 3)
-            {
-                indices.Add(baseIdx + prev[head]);
-                indices.Add(baseIdx + head);
-                indices.Add(baseIdx + next[head]);
-            }
-        }
-
-        private static bool IsEar(Vector2[] poly, int pi, int ci, int ni, int[] next)
-        {
-            var a = poly[pi];
-            var b = poly[ci];
-            var c = poly[ni];
-
-            // Convex check for CW input (Y-up): cross(ab, bc) < 0.
-            var cross = (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x);
-            if (cross >= 0f) return false;
-
-            var v = next[ni];
-            while (v != pi)
-            {
-                if (PointInTriangle(poly[v], a, b, c)) return false;
-                v = next[v];
-            }
-            return true;
-        }
-
-        private static bool PointInTriangle(Vector2 p, Vector2 a, Vector2 b, Vector2 c)
-        {
-            var d1 = (p.x - b.x) * (a.y - b.y) - (a.x - b.x) * (p.y - b.y);
-            var d2 = (p.x - c.x) * (b.y - c.y) - (b.x - c.x) * (p.y - c.y);
-            var d3 = (p.x - a.x) * (c.y - a.y) - (c.x - a.x) * (p.y - a.y);
-            var hasNeg = d1 < 0f || d2 < 0f || d3 < 0f;
-            var hasPos = d1 > 0f || d2 > 0f || d3 > 0f;
-            return !(hasNeg && hasPos);
         }
     }
 }
