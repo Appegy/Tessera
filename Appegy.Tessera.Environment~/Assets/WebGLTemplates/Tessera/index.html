@@ -12,38 +12,46 @@
   <style>
     /* ===== Theme tokens (default = DARK). setTesseraTheme() swaps the class. ===== */
     :root {
-      --bg:        #14151E;
-      --surface:   #1B1D27;
-      --text:      #E8EAF2;
-      --muted:     #8A90A6;
-      --accent:    #6C7CF0;
-      --accent-hi: #9AA6FF;
-      --grid:      rgba(108, 124, 240, 0.10);
-      --grid-bold: rgba(108, 124, 240, 0.20);
-      --glow:      rgba(108, 124, 240, 0.28);
-      --vignette:  rgba(0, 0, 0, 0.45);
-      --track:     rgba(255, 255, 255, 0.07);
-      --shimmer:   rgba(255, 255, 255, 0.55);
-      --chrome-bg: rgba(27, 29, 39, 0.55);
-      --chrome-br: rgba(255, 255, 255, 0.10);
-      --hairline:  rgba(255, 255, 255, 0.08);
+      --bg:         #14151E;
+      --surface:    #1B1D27;
+      --text:       #E8EAF2;
+      --muted:      #8A90A6;
+      --accent:     #6C7CF0;
+      --accent-hi:  #9AA6FF;
+      --grid:       rgba(108, 124, 240, 0.10);
+      --grid-bold:  rgba(108, 124, 240, 0.20);
+      --grid-line:  rgba(108, 124, 240, 0.055);
+      --glow:       rgba(108, 124, 240, 0.28);
+      --glow-soft:  rgba(108, 124, 240, 0.10);
+      --vignette:   rgba(0, 0, 0, 0.45);
+      --track:      rgba(255, 255, 255, 0.07);
+      --shimmer:    rgba(255, 255, 255, 0.55);
+      --chrome-bg:  rgba(27, 29, 39, 0.55);
+      --chrome-br:  rgba(255, 255, 255, 0.10);
+      --hairline:   rgba(255, 255, 255, 0.08);
+      --frame-br:   rgba(255, 255, 255, 0.08);
+      --stage-shadow: 0 30px 90px rgba(0, 0, 0, 0.50);
     }
     html.tessera-light {
-      --bg:        #EEF0F5;
-      --surface:   #FFFFFF;
-      --text:      #1A1E2C;
-      --muted:     #6E7488;
-      --accent:    #545EDE;
-      --accent-hi: #7C84F0;
-      --grid:      rgba(84, 94, 222, 0.08);
-      --grid-bold: rgba(84, 94, 222, 0.16);
-      --glow:      rgba(84, 94, 222, 0.18);
-      --vignette:  rgba(120, 130, 160, 0.16);
-      --track:     rgba(20, 24, 40, 0.08);
-      --shimmer:   rgba(255, 255, 255, 0.85);
-      --chrome-bg: rgba(255, 255, 255, 0.65);
-      --chrome-br: rgba(20, 24, 40, 0.10);
-      --hairline:  rgba(20, 24, 40, 0.08);
+      --bg:         #EEF0F5;
+      --surface:    #FFFFFF;
+      --text:       #1A1E2C;
+      --muted:      #6E7488;
+      --accent:     #545EDE;
+      --accent-hi:  #7C84F0;
+      --grid:       rgba(84, 94, 222, 0.08);
+      --grid-bold:  rgba(84, 94, 222, 0.16);
+      --grid-line:  rgba(84, 94, 222, 0.05);
+      --glow:       rgba(84, 94, 222, 0.18);
+      --glow-soft:  rgba(84, 94, 222, 0.08);
+      --vignette:   rgba(120, 130, 160, 0.16);
+      --track:      rgba(20, 24, 40, 0.08);
+      --shimmer:    rgba(255, 255, 255, 0.85);
+      --chrome-bg:  rgba(255, 255, 255, 0.65);
+      --chrome-br:  rgba(20, 24, 40, 0.10);
+      --hairline:   rgba(20, 24, 40, 0.08);
+      --frame-br:   rgba(20, 24, 40, 0.10);
+      --stage-shadow: 0 30px 90px rgba(40, 50, 90, 0.18);
     }
 
     * { box-sizing: border-box; }
@@ -54,19 +62,43 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background: var(--bg);
       color: var(--text);
       font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Inter", sans-serif;
       -webkit-font-smoothing: antialiased;
       -webkit-tap-highlight-color: transparent;
-      transition: background-color 0.55s cubic-bezier(0.4, 0, 0.2, 1), color 0.55s cubic-bezier(0.4, 0, 0.2, 1);
       touch-action: none;
     }
 
-    /* ===== Full-window canvas. Unity matches the GL render target to this
-       CSS box * devicePixelRatio, so it stays crisp and full-window on resize. ===== */
-    #unity-canvas {
+    /* ===== Themed surroundings: the frame area visible around the tool.
+       Solid base + a soft centred glow + a very faint static grid that
+       echoes the geometry theme. All driven by theme vars. ===== */
+    body {
+      background-color: var(--bg);
+      background-image:
+        radial-gradient(ellipse 72% 60% at 50% 38%, var(--glow-soft) 0%, transparent 72%),
+        linear-gradient(var(--grid-line) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+      background-size: 100% 100%, 46px 46px, 46px 46px;
+      background-position: center center;
+      transition: background-color 0.55s cubic-bezier(0.4, 0, 0.2, 1), color 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* ===== Stage: the rounded panel that frames the tool. Unity matches the
+       GL render target to this canvas box x devicePixelRatio. ===== */
+    #stage {
       position: fixed;
+      inset: clamp(12px, 2.2vw, 40px);
+      border-radius: 18px;
+      overflow: hidden;
+      background: var(--bg);
+      border: 1px solid var(--frame-br);
+      box-shadow: var(--stage-shadow);
+      transition: background-color 0.55s cubic-bezier(0.4, 0, 0.2, 1),
+                  border-color 0.55s cubic-bezier(0.4, 0, 0.2, 1),
+                  box-shadow 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    #unity-canvas {
+      position: absolute;
       inset: 0;
       width: 100%;
       height: 100%;
@@ -76,7 +108,41 @@
       outline: none;
     }
 
-    /* ===== Generative tessellation backdrop (runs during load only). ===== */
+    /* fullscreen toggle, pinned to the stage corner */
+    #tessera-chrome {
+      position: absolute;
+      z-index: 5;
+      right: 16px;
+      bottom: 16px;
+      display: flex;
+      gap: 10px;
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity 0.5s ease, transform 0.5s ease;
+      pointer-events: none;
+    }
+    #tessera-chrome.tessera-ready { opacity: 1; transform: translateY(0); pointer-events: auto; }
+    .chrome-btn {
+      width: 40px;
+      height: 40px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      border: 1px solid var(--chrome-br);
+      border-radius: 12px;
+      background: var(--chrome-bg);
+      color: var(--muted);
+      cursor: pointer;
+      backdrop-filter: blur(12px) saturate(140%);
+      -webkit-backdrop-filter: blur(12px) saturate(140%);
+      transition: color 0.2s ease, border-color 0.2s ease, background-color 0.55s ease, transform 0.12s ease;
+    }
+    .chrome-btn:hover  { color: var(--text); border-color: var(--accent); }
+    .chrome-btn:active { transform: scale(0.93); }
+    .chrome-btn svg { width: 18px; height: 18px; display: block; }
+
+    /* ===== Generative tessellation backdrop (full viewport, load only). ===== */
     #tessera-bg {
       position: fixed;
       inset: 0;
@@ -87,7 +153,7 @@
       pointer-events: none;
     }
 
-    /* ===== Loading curtain ===== */
+    /* ===== Loading curtain (full viewport, above everything during load). ===== */
     #tessera-loader {
       position: fixed;
       inset: 0;
@@ -104,7 +170,6 @@
     }
     #tessera-loader.tessera-hidden { opacity: 0; pointer-events: none; }
 
-    /* soft radial glow centred behind the wordmark */
     #tessera-glow {
       position: absolute;
       top: 44%;
@@ -136,7 +201,6 @@
       to   { opacity: 1; transform: translateY(-2vh) scale(1); }
     }
 
-    /* nested tessellating tiles mark */
     .brand-mark {
       width: 56px;
       height: 56px;
@@ -191,7 +255,6 @@
       user-select: none;
     }
 
-    /* ===== Progress ===== */
     .progress-wrap {
       margin-top: 42px;
       width: clamp(200px, 56vw, 320px);
@@ -215,7 +278,7 @@
       border-radius: 999px;
       background: linear-gradient(90deg, var(--accent), var(--accent-hi));
       box-shadow: 0 0 12px var(--accent);
-      transition: width 0.25s ease;
+      transition: width 0.18s ease;
       will-change: width;
     }
     .progress-fill::after {
@@ -241,40 +304,6 @@
       transition: color 0.55s ease;
     }
     .progress-meta .pct { font-variant-numeric: tabular-nums; }
-
-    /* ===== Chrome: fullscreen toggle ===== */
-    #tessera-chrome {
-      position: fixed;
-      z-index: 15;
-      right: max(16px, env(safe-area-inset-right));
-      bottom: max(16px, env(safe-area-inset-bottom));
-      display: flex;
-      gap: 10px;
-      opacity: 0;
-      transform: translateY(6px);
-      transition: opacity 0.5s ease, transform 0.5s ease;
-      pointer-events: none;
-    }
-    #tessera-chrome.tessera-ready { opacity: 1; transform: translateY(0); pointer-events: auto; }
-    .chrome-btn {
-      width: 40px;
-      height: 40px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0;
-      border: 1px solid var(--chrome-br);
-      border-radius: 12px;
-      background: var(--chrome-bg);
-      color: var(--muted);
-      cursor: pointer;
-      backdrop-filter: blur(12px) saturate(140%);
-      -webkit-backdrop-filter: blur(12px) saturate(140%);
-      transition: color 0.2s ease, border-color 0.2s ease, background-color 0.55s ease, transform 0.12s ease;
-    }
-    .chrome-btn:hover  { color: var(--text); border-color: var(--accent); }
-    .chrome-btn:active { transform: scale(0.93); }
-    .chrome-btn svg { width: 18px; height: 18px; display: block; }
 
     /* ===== Non-blocking message banner ===== */
     #tessera-banner {
@@ -303,13 +332,22 @@
 
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; }
-      html, body, #tessera-loader, #unity-canvas { transition-duration: 0.001ms !important; }
+      html, body, #tessera-loader, #unity-canvas, #stage { transition-duration: 0.001ms !important; }
     }
   </style>
 </head>
 <body>
-  <!-- Unity render target: fills the whole viewport -->
-  <canvas id="unity-canvas" tabindex="-1"></canvas>
+  <!-- The framed stage: Unity renders into the canvas inside it -->
+  <div id="stage">
+    <canvas id="unity-canvas" tabindex="-1"></canvas>
+    <div id="tessera-chrome">
+      <button class="chrome-btn" id="tessera-fullscreen" type="button" title="Toggle fullscreen" aria-label="Toggle fullscreen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 9V5a1 1 0 0 1 1-1h4M20 9V5a1 1 0 0 0-1-1h-4M4 15v4a1 1 0 0 0 1 1h4M20 15v4a1 1 0 0 1-1 1h-4"/>
+        </svg>
+      </button>
+    </div>
+  </div>
 
   <!-- Drifting tessellation backdrop, active only while loading -->
   <canvas id="tessera-bg"></canvas>
@@ -331,20 +369,14 @@
     </div>
   </div>
 
-  <!-- Minimal chrome -->
-  <div id="tessera-chrome">
-    <button class="chrome-btn" id="tessera-fullscreen" type="button" title="Toggle fullscreen" aria-label="Toggle fullscreen">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M4 9V5a1 1 0 0 1 1-1h4M20 9V5a1 1 0 0 0-1-1h-4M4 15v4a1 1 0 0 0 1 1h4M20 15v4a1 1 0 0 1-1 1h-4"/>
-      </svg>
-    </button>
-  </div>
-
   <!-- Non-critical warnings / errors -->
   <div id="tessera-banner"></div>
 
   <script>
     "use strict";
+
+    var bootStart = performance.now();
+    var MIN_LOADER_MS = 1800; // keep the branded landing up at least this long
 
     var canvas     = document.querySelector("#unity-canvas");
     var bgCanvas   = document.querySelector("#tessera-bg");
@@ -357,12 +389,17 @@
     var bannerEl   = document.querySelector("#tessera-banner");
 
     var unityInstance = null;
+    var instanceReady = false;
+    var realProgress = 0;
+    var finished = false;
 
     /* ---------------------------------------------------------------
        THEME SYNC: window.setTesseraTheme(isLight)
-       Boolean -> toggles the .tessera-light class on <html>; CSS custom
-       properties + transitions animate the swap. Default DARK. Defined
-       before the loader runs, so Unity can call it at any time.
+       Toggles the .tessera-light class on <html> (CSS-var palettes +
+       transitions animate the swap) and updates <meta theme-color>. It
+       also remembers the choice in localStorage, so the loading curtain
+       of a returning visitor opens in their last theme (no flash). The
+       Unity app calls this from its in-app theme toggle. Default DARK.
     --------------------------------------------------------------- */
     (function () {
       var META = { dark: "#14151E", light: "#EEF0F5" };
@@ -371,18 +408,19 @@
         var light = !!isLight;
         document.documentElement.classList.toggle("tessera-light", light);
         if (themeMeta) themeMeta.setAttribute("content", light ? META.light : META.dark);
+        try { localStorage.setItem("tessera_page_light", light ? "1" : "0"); } catch (e) {}
       };
-      window.setTesseraTheme(false);
+      var saved = "0";
+      try { saved = localStorage.getItem("tessera_page_light") || "0"; } catch (e) {}
+      window.setTesseraTheme(saved === "1");
     })();
 
     /* ---------------------------------------------------------------
-       GENERATIVE BACKDROP: a drifting grid with a few pulsing accent
-       tiles. Runs only while the curtain is up, then is cancelled to
-       free the main thread once the demo is interactive.
+       GENERATIVE BACKDROP: drifting grid with pulsing accent tiles.
+       Runs only while the curtain is up, then is cancelled.
     --------------------------------------------------------------- */
     var bgCtx = bgCanvas.getContext("2d");
     var bgRaf = 0;
-    var bgStart = performance.now();
     var bgDpr = 1;
 
     function cssVar(name) {
@@ -396,7 +434,7 @@
     sizeBgCanvas();
 
     function drawBg(now) {
-      var t = (now - bgStart) / 1000;
+      var t = (now - bootStart) / 1000;
       var w = bgCanvas.width, h = bgCanvas.height;
       bgCtx.clearRect(0, 0, w, h);
 
@@ -434,11 +472,8 @@
       bgCanvas.style.display = "none";
     }
 
-    /* Resize: the canvas is CSS-driven, so only the backdrop needs a nudge. */
-    var resizeRaf = 0;
     window.addEventListener("resize", function () {
-      if (resizeRaf) cancelAnimationFrame(resizeRaf);
-      resizeRaf = requestAnimationFrame(sizeBgCanvas);
+      requestAnimationFrame(sizeBgCanvas);
     });
     window.addEventListener("orientationchange", function () { setTimeout(sizeBgCanvas, 200); });
 
@@ -460,10 +495,15 @@
     }
 
     /* ---------------------------------------------------------------
-       PROGRESS + FADE
+       PROGRESS + MIN-TIME FADE
+       The displayed bar is min(realProgress, elapsed/MIN_LOADER_MS): if
+       the build loads faster than the minimum, the bar still fills over
+       MIN_LOADER_MS so the landing is seen; if it loads slower, real
+       progress drives the bar. The curtain fades only once the instance
+       is ready AND the minimum time has elapsed.
     --------------------------------------------------------------- */
-    function setProgress(p) {
-      var pct = Math.round(Math.max(0, Math.min(1, p || 0)) * 100);
+    function renderBar(frac) {
+      var pct = Math.round(Math.max(0, Math.min(1, frac)) * 100);
       progressEl.style.width = pct + "%";
       percentEl.textContent = pct + "%";
       if (pct < 25)      statusEl.textContent = "fetching build";
@@ -472,17 +512,38 @@
       else               statusEl.textContent = "ready";
     }
 
-    function onReady(instance) {
-      unityInstance = instance;
-      window.tesseraUnity = instance;
-      setProgress(1);
+    function tick(now) {
+      if (finished) return;
+      var timeFrac = Math.min(1, (now - bootStart) / MIN_LOADER_MS);
+      renderBar(Math.min(realProgress, timeFrac));
+      if (instanceReady && realProgress >= 1 && timeFrac >= 1) {
+        finishLoader();
+        return;
+      }
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+
+    function finishLoader() {
+      if (finished) return;
+      finished = true;
+      renderBar(1);
       loaderEl.classList.add("tessera-hidden");
       chromeEl.classList.add("tessera-ready");
-      fsBtn.onclick = function () { instance.SetFullscreen(1); };
       setTimeout(function () {
         if (loaderEl.parentNode) loaderEl.parentNode.removeChild(loaderEl);
         stopBg();
       }, 750);
+    }
+
+    function onProgress(p) { realProgress = p || 0; }
+
+    function onReady(instance) {
+      unityInstance = instance;
+      window.tesseraUnity = instance;
+      instanceReady = true;
+      realProgress = 1;
+      fsBtn.onclick = function () { instance.SetFullscreen(1); };
     }
 
     function onFail(message) {
@@ -510,7 +571,7 @@
     var script = document.createElement("script");
     script.src = buildUrl + "/{{{ LOADER_FILENAME }}}";
     script.onload = function () {
-      createUnityInstance(canvas, config, setProgress).then(onReady).catch(onFail);
+      createUnityInstance(canvas, config, onProgress).then(onReady).catch(onFail);
     };
     script.onerror = function () { onFail("Failed to load the Tessera engine. Please refresh."); };
     document.body.appendChild(script);
