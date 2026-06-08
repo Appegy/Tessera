@@ -43,6 +43,11 @@ jobs:
             Library-WebGL-
             Library-
 
+      - name: Free disk space for the Unity editor image
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup
+          df -h /
+
       - name: Build WebGL
         uses: game-ci/unity-builder@v4
         env:
