@@ -14,6 +14,7 @@ namespace Appegy.Tessera.Demo
     public static class DemoUrlState
     {
         private const string GridKey = "g";
+        private const string LineWidthKey = "lw";
 
         // Short, readable query keys per parameter Id (unique within a grid). Unmapped ids fall back to
         // the Id itself. Different grids may reuse a key (e.g. "w") since only one grid is in the URL.
@@ -30,13 +31,14 @@ namespace Appegy.Tessera.Demo
         private static string Key(DemoParameter p) => KeyById.TryGetValue(p.Id, out var k) ? k : p.Id;
 
         /// <summary>Builds the query body (no leading <c>?</c>) for the demo's current state.</summary>
-        public static string Encode(GridDemo demo)
+        public static string Encode(GridDemo demo, float lineWidthScale)
         {
             if (demo == null) return string.Empty;
             var sb = new StringBuilder();
             sb.Append(GridKey).Append('=').Append(demo.UrlId);
             foreach (var parameter in demo.Parameters)
                 sb.Append('&').Append(Key(parameter)).Append('=').Append(Format(parameter));
+            sb.Append('&').Append(LineWidthKey).Append('=').Append(lineWidthScale.ToString("0.###", CultureInfo.InvariantCulture));
             return sb.ToString();
         }
 
@@ -45,10 +47,14 @@ namespace Appegy.Tessera.Demo
         ///     returns that grid. Returns null when the grid token is absent or names an unknown grid, in
         ///     which case the caller falls back to its own defaults/prefs.
         /// </summary>
-        public static GridDemo TryDecode(string query, IReadOnlyList<GridDemo> demos)
+        public static GridDemo TryDecode(string query, IReadOnlyList<GridDemo> demos, out float lineWidthScale)
         {
+            lineWidthScale = 0.5f;
             if (demos == null) return null;
             var pairs = ParseQuery(query);
+            if (pairs.TryGetValue(LineWidthKey, out var lwStr) &&
+                float.TryParse(lwStr, NumberStyles.Float, CultureInfo.InvariantCulture, out var lw))
+                lineWidthScale = lw;
             if (!pairs.TryGetValue(GridKey, out var gridId)) return null;
 
             GridDemo target = null;
