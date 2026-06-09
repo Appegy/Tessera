@@ -1,0 +1,55 @@
+# Removes a PR's WebGL preview from the `demo` branch when the PR is merged or closed.
+# Shares the tessera-demo-write concurrency group with webgl-preview.yml so writes to
+# the demo branch are serialized across publish and cleanup.
+
+name: WebGL preview cleanup
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    name: Remove preview from demo
+    runs-on: ubuntu-latest
+    concurrency:
+      group: tessera-demo-write
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Remove /pr-<N>/ from the demo branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SLUG: pr-${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          REPO_URL="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+
+          WT="$(mktemp -d)"
+          if ! git clone --depth 1 --branch demo --single-branch "$REPO_URL" "$WT" 2>/dev/null; then
+            echo "No demo branch; nothing to clean."; exit 0
+          fi
+          cd "$WT"
+          rm -rf .git && git init -q
+          [ -f previews.json ] || echo '[]' > previews.json
+
+          rm -rf "$SLUG"
+          jq --arg slug "$SLUG" '[ .[] | select(.slug != $slug) ]' \
+            previews.json > previews.json.tmp && mv previews.json.tmp previews.json
+
+          KEEP="$(jq -r '.[].slug' previews.json)"
+          for dir in */; do dir="${dir%/}"; printf '%s\n' "$KEEP" | grep -qxF "$dir" || rm -rf "$dir"; done
+
+          cp "$GITHUB_WORKSPACE/.github/pages/index.html" index.html
+          touch .nojekyll
+
+          git add -A
+          git -c user.email=actions@github.com -c user.name="github-actions[bot]" \
+            commit -q -m "preview cleanup: ${SLUG}"
+          git push -f "$REPO_URL" HEAD:demo
+          echo "Removed /$SLUG/ from demo."
