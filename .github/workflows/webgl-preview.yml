@@ -140,15 +140,14 @@ jobs:
           rm -rf "$SLUG" && mkdir -p "$SLUG"
           cp -r "$GITHUB_WORKSPACE/artifact/." "$SLUG/"
 
-          # Headless: derive build.json (resolved hashed filenames) from the build's
-          # index.html, then drop index.html - the shell at the root is the only page.
-          if [ ! -f "$SLUG/build.json" ] && [ -f "$SLUG/index.html" ]; then
-            IDX="$SLUG/index.html"
+          # Headless: derive build.json from the files in Build/ (template-independent),
+          # then drop the build's own index.html - the shell at the root is the only page.
+          if [ ! -f "$SLUG/build.json" ] && [ -d "$SLUG/Build" ]; then
             jq -n \
-              --arg l "Build/$(grep -oE '[A-Za-z0-9]+\.loader\.js'   "$IDX" | head -1)" \
-              --arg d "Build/$(grep -oE '[A-Za-z0-9]+\.data'         "$IDX" | head -1)" \
-              --arg f "Build/$(grep -oE '[A-Za-z0-9]+\.framework\.js' "$IDX" | head -1)" \
-              --arg c "Build/$(grep -oE '[A-Za-z0-9]+\.wasm'         "$IDX" | head -1)" \
+              --arg l "Build/$(ls "$SLUG/Build" | grep -E '\.loader\.js$'    | head -1)" \
+              --arg d "Build/$(ls "$SLUG/Build" | grep -E '\.data$'          | head -1)" \
+              --arg f "Build/$(ls "$SLUG/Build" | grep -E '\.framework\.js$' | head -1)" \
+              --arg c "Build/$(ls "$SLUG/Build" | grep -E '\.wasm$'          | head -1)" \
               '{type:"unity",loaderUrl:$l,dataUrl:$d,frameworkUrl:$f,codeUrl:$c}' > "$SLUG/build.json"
           fi
           rm -f "$SLUG/index.html"
