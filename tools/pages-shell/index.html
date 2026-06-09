@@ -5,11 +5,24 @@
   <title>Tessera</title>
   <meta name="robots" content="noindex">
   <script>
-    // The site root is just a redirect into the default (main) preview build,
-    // preserving any deep-link query/hash so shared "/?s=..." links still land.
+    // The site root redirects into a preview build, preserving any deep-link
+    // query/hash so shared "/?s=..." links still land. Prefer main; if it isn't
+    // built yet, fall back to the first branch in the manifest so the root always
+    // resolves to something live.
     (function () {
       var tail = location.search + location.hash;
-      location.replace("./main/" + tail);
+      function go(slug) { location.replace("./" + slug + "/" + tail); }
+      fetch("./branches.json", { cache: "no-store" })
+        .then(function (r) { return r.ok ? r.json() : []; })
+        .then(function (list) {
+          if (list && list.length) {
+            var hasMain = list.some(function (e) { return e.slug === "main"; });
+            go(hasMain ? "main" : list[0].slug);
+          } else {
+            go("main");
+          }
+        })
+        .catch(function () { go("main"); });
     })();
   </script>
   <noscript><meta http-equiv="refresh" content="0; url=./main/"></noscript>
