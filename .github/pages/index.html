@@ -287,10 +287,17 @@
     /* ---- boot ---- */
     function getJSON(u){ return fetch(u,{cache:"no-store"}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}); }
     getJSON("previews.json").then(function(list){
+      var loaded = Array.isArray(list);
       list = list || [];
       var hasMain = list.some(function(e){ return e.slug==="main"; });
+      var fallback = hasMain ? "main" : (list[0] ? list[0].slug : "main");
       var hp = new URLSearchParams((location.hash || "").replace(/^#/, ""));
-      currentSlug = hp.get("b") || (hasMain ? "main" : (list[0] ? list[0].slug : "main"));
+      var want = hp.get("b");
+      var known = !!want && list.some(function(e){ return e.slug === want; });
+      currentSlug = (known || (want && !loaded)) ? want : fallback;
+      // A link to a removed/merged preview (its slug is gone from the manifest) falls back to the
+      // default, dropping the stale #b so the address bar matches - the ?query deep-link is kept.
+      if (want && loaded && !known) history.replaceState(null, "", location.pathname + location.search);
       initDropdown(list);
       return getJSON(currentSlug + "/build.json").then(function(build){
         if (!build) { fail("no build for '"+currentSlug+"'"); instanceReady=true; realProgress=1; return; }
