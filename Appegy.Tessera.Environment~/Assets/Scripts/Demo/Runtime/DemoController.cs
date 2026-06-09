@@ -111,7 +111,11 @@ namespace Appegy.Tessera.Demo
             _demos = GridDemoRegistry.CreateAll();
             foreach (var demo in _demos) DemoStatePrefs.LoadParams(demo);
             _enableHighlight = DemoStatePrefs.LoadHighlight(_enableHighlight);
-            Select(_demos[DemoStatePrefs.LoadGridIndex(_demos.Count)]);
+
+            // A shared deep-link (?s=...) wins over locally saved prefs so a copied link
+            // reproduces the exact example for whoever opens it.
+            var shared = DemoUrlState.TryDecode(TesseraWeb.GetQuery(), _demos);
+            Select(shared ?? _demos[DemoStatePrefs.LoadGridIndex(_demos.Count)]);
         }
 
         private void Start()
@@ -140,12 +144,21 @@ namespace Appegy.Tessera.Demo
             _current.Changed += SaveCurrentParams;
             DemoStatePrefs.SaveGridIndex(_demos.IndexOf(demo));
             Rebuild();
+            SyncUrl();
             CurrentChanged?.Invoke();
         }
 
         private void SaveCurrentParams()
         {
             if (_current != null) DemoStatePrefs.SaveParams(_current);
+            SyncUrl();
+        }
+
+        // Live-mirrors the current grid + parameters into the browser address bar so the URL is
+        // always a shareable link (no copy button needed). No-op outside WebGL.
+        private void SyncUrl()
+        {
+            if (_current != null) TesseraWeb.ReplaceQuery(DemoUrlState.Encode(_current));
         }
 
         /// <summary>Rerolls the first seed parameter of the active demo, if it has one.</summary>

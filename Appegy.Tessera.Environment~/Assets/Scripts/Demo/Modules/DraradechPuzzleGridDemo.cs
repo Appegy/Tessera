@@ -12,6 +12,7 @@ namespace Appegy.Tessera.Demo
         private FloatParameter _variation;
 
         public override string DisplayName => "Draradech Puzzle";
+        public override string UrlId => "draradech";
         public override string Icon => "extension";
 
         protected override void BuildParameters(List<DemoParameter> parameters)
