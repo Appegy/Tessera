@@ -2,30 +2,317 @@
 <html lang="en-us">
 <head>
   <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <title>Tessera</title>
+  <meta name="description" content="Tessera - a 2D grid-geometry playground.">
+  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#14151E">
   <meta name="robots" content="noindex">
-  <script>
-    // The site root redirects into a preview build, preserving any deep-link
-    // query/hash so shared "/?s=..." links still land. Prefer main; if it isn't
-    // built yet, fall back to the first branch in the manifest so the root always
-    // resolves to something live.
-    (function () {
-      var tail = location.search + location.hash;
-      function go(slug) { location.replace("./" + slug + "/" + tail); }
-      fetch("./branches.json", { cache: "no-store" })
-        .then(function (r) { return r.ok ? r.json() : []; })
-        .then(function (list) {
-          if (list && list.length) {
-            var hasMain = list.some(function (e) { return e.slug === "main"; });
-            go(hasMain ? "main" : list[0].slug);
-          } else {
-            go("main");
-          }
-        })
-        .catch(function () { go("main"); });
-    })();
-  </script>
-  <noscript><meta http-equiv="refresh" content="0; url=./main/"></noscript>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%2314151E'/><rect x='8.5' y='8.5' width='15' height='15' rx='3' fill='none' stroke='%236C7CF0' stroke-width='2'/><rect x='13' y='13' width='6' height='6' rx='1.5' fill='%236C7CF0'/></svg>">
+  <style>
+    /* ===== Theme tokens (default DARK). window.setTesseraTheme() swaps .tessera-light. ===== */
+    :root {
+      --bg: #14151E; --text: #E8EAF2; --muted: #8A90A6; --accent: #6C7CF0; --accent-hi: #9AA6FF;
+      --grid-line: rgba(108,124,240,.055); --grid: rgba(108,124,240,.10); --grid-bold: rgba(108,124,240,.20);
+      --glow: rgba(108,124,240,.28); --glow-soft: rgba(108,124,240,.10); --vignette: rgba(0,0,0,.45);
+      --track: rgba(255,255,255,.07); --shimmer: rgba(255,255,255,.55);
+      --chrome-bg: rgba(27,29,39,.62); --chrome-br: rgba(255,255,255,.12); --frame-br: rgba(255,255,255,.08);
+      --card: #252939; --card-hover: #2F3448; --field-border: rgba(255,255,255,.10);
+      --stage-shadow: 0 30px 90px rgba(0,0,0,.50);
+    }
+    html.tessera-light {
+      --bg: #EEF0F5; --text: #1A1E2C; --muted: #6E7488; --accent: #545EDE; --accent-hi: #7C84F0;
+      --grid-line: rgba(84,94,222,.05); --grid: rgba(84,94,222,.08); --grid-bold: rgba(84,94,222,.16);
+      --glow: rgba(84,94,222,.18); --glow-soft: rgba(84,94,222,.08); --vignette: rgba(120,130,160,.16);
+      --track: rgba(20,24,40,.08); --shimmer: rgba(255,255,255,.85);
+      --chrome-bg: rgba(255,255,255,.65); --chrome-br: rgba(20,24,40,.10); --frame-br: rgba(20,24,40,.10);
+      --card: #FFFFFF; --card-hover: #EEF0F7; --field-border: rgba(20,24,40,.10);
+      --stage-shadow: 0 30px 90px rgba(40,50,90,.18);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; color: var(--text);
+      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+      -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; touch-action: none; }
+    body {
+      background-color: var(--bg);
+      background-image:
+        radial-gradient(ellipse 72% 60% at 50% 38%, var(--glow-soft) 0%, transparent 72%),
+        linear-gradient(var(--grid-line) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+      background-size: 100% 100%, 46px 46px, 46px 46px;
+      transition: background-color .55s cubic-bezier(.4,0,.2,1), color .55s cubic-bezier(.4,0,.2,1);
+    }
+
+    #stage { position: fixed; inset: clamp(12px, 2.2vw, 40px); border-radius: 18px; overflow: hidden;
+      background: var(--bg); border: 1px solid var(--frame-br); box-shadow: var(--stage-shadow);
+      transition: background-color .55s cubic-bezier(.4,0,.2,1), border-color .55s cubic-bezier(.4,0,.2,1); }
+    #unity-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; background: var(--bg); outline: none;
+      transition: background-color .55s cubic-bezier(.4,0,.2,1); }
+
+    /* ===== Chrome row (preview switcher + fullscreen), pinned top-right ===== */
+    #chrome { position: absolute; z-index: 6; top: 16px; right: 16px; display: flex; align-items: center; gap: 10px;
+      opacity: 0; transform: translateY(-6px); transition: opacity .5s ease, transform .5s ease; pointer-events: none; }
+    #chrome.ready { opacity: 1; transform: translateY(0); pointer-events: auto; }
+    .glass { border: 1px solid var(--chrome-br); background: var(--chrome-bg);
+      backdrop-filter: blur(12px) saturate(140%); -webkit-backdrop-filter: blur(12px) saturate(140%); }
+
+    /* preview dropdown */
+    #dd { position: relative; }
+    .dd-field { display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 12px 0 14px; border-radius: 12px;
+      cursor: pointer; color: var(--text); font: 600 13px/1 inherit; transition: border-color .15s ease, background-color .55s ease; }
+    .dd-field:hover { border-color: var(--accent); }
+    .dd-lbl { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+    .dd-cur { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dd-chev { width: 7px; height: 7px; margin-left: 2px; border: 0 solid var(--muted); border-right-width: 2px; border-bottom-width: 2px;
+      transform: rotate(45deg) translateY(-2px); transition: transform .18s ease; }
+    .dd-field.open .dd-chev { transform: rotate(225deg) translateY(-1px); }
+    .dd-popup { position: fixed; z-index: 101; min-width: 220px; max-height: 60vh; overflow-y: auto;
+      padding: 5px; border-radius: 12px; border: 1px solid var(--chrome-br); background: var(--card); box-shadow: 0 18px 50px rgba(0,0,0,.4); }
+    .dd-item { display: flex; align-items: baseline; gap: 8px; padding: 9px 11px; border-radius: 8px; cursor: pointer;
+      color: var(--text); font-size: 13px; }
+    .dd-item:hover { background: var(--card-hover); }
+    .dd-item.on { color: var(--accent); font-weight: 600; }
+    .dd-item .pr { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px; color: var(--muted); }
+    .dd-blocker { position: fixed; inset: 0; z-index: 100; background: transparent; }
+
+    .chrome-btn { width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; border-radius: 12px;
+      color: var(--muted); cursor: pointer; transition: color .2s ease, border-color .2s ease, background-color .55s ease, transform .12s ease; }
+    .chrome-btn:hover { color: var(--text); border-color: var(--accent); }
+    .chrome-btn:active { transform: scale(.93); }
+    .chrome-btn svg { width: 18px; height: 18px; display: block; }
+
+    /* ===== Generative tessellation backdrop (load only) ===== */
+    #bg { position: fixed; inset: 0; width: 100%; height: 100%; display: block; z-index: 10; pointer-events: none; }
+
+    /* ===== Loading curtain ===== */
+    #loader { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center;
+      background: radial-gradient(ellipse 120% 90% at 50% 44%, transparent 38%, var(--vignette) 100%), var(--bg);
+      transition: opacity .7s cubic-bezier(.4,0,.2,1), background-color .55s cubic-bezier(.4,0,.2,1); }
+    #loader.hidden { opacity: 0; pointer-events: none; }
+    #glow { position: absolute; top: 44%; left: 50%; width: min(120vw,1000px); height: min(120vw,1000px); transform: translate(-50%,-50%);
+      background: radial-gradient(circle at center, var(--glow) 0%, rgba(0,0,0,0) 62%); filter: blur(6px); animation: breathe 6.5s ease-in-out infinite; }
+    @keyframes breathe { 0%,100%{opacity:.65;transform:translate(-50%,-50%) scale(1)} 50%{opacity:1;transform:translate(-50%,-50%) scale(1.06)} }
+    .brand { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; transform: translateY(-2vh);
+      animation: intro .9s cubic-bezier(.16,1,.3,1) both; }
+    @keyframes intro { from{opacity:0;transform:translateY(14px) scale(.985)} to{opacity:1;transform:translateY(-2vh) scale(1)} }
+    .mark { width: 56px; height: 56px; margin-bottom: 26px; position: relative; animation: markpulse 3.6s ease-in-out infinite; }
+    .mark span { position: absolute; inset: 0; border: 1.5px solid var(--accent); border-radius: 3px; }
+    .mark span:nth-child(1){opacity:.28} .mark span:nth-child(2){transform:rotate(15deg) scale(.74);opacity:.55}
+    .mark span:nth-child(3){transform:rotate(30deg) scale(.48);opacity:.85}
+    .mark span:nth-child(4){inset:42%;border:0;background:var(--accent);border-radius:2px}
+    @keyframes markpulse { 0%,100%{transform:translateY(0) rotate(0)} 50%{transform:translateY(-4px) rotate(45deg)} }
+    .word { font-size: clamp(34px,8vw,58px); font-weight: 700; letter-spacing: .42em; text-indent: .42em; line-height: 1; color: var(--text);
+      background: linear-gradient(180deg, var(--text) 0%, var(--muted) 165%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; user-select: none; }
+    .sub { margin-top: 14px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11.5px; letter-spacing: .34em; color: var(--muted); text-transform: lowercase; }
+    .pwrap { margin-top: 30px; width: min(60vw, 240px); }
+    .ptrack { position: relative; height: 3px; border-radius: 3px; background: var(--track); overflow: hidden; }
+    .pfill { position: absolute; inset: 0 auto 0 0; width: 0; background: linear-gradient(90deg, var(--accent), var(--accent-hi)); border-radius: 3px; transition: width .25s ease; }
+    .pfill::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, var(--shimmer), transparent); transform: translateX(-100%); animation: shimmer 1.5s ease-in-out infinite; }
+    @keyframes shimmer { to { transform: translateX(100%); } }
+    .pmeta { display: flex; justify-content: space-between; margin-top: 11px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 10.5px; letter-spacing: .08em; color: var(--muted); }
+
+    /* ===== Stub placeholder (no real build) ===== */
+    #stub { position: absolute; inset: 0; z-index: 4; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
+    #stub.show { display: flex; }
+    #stub .tag { font-size: 12px; letter-spacing: .25em; text-transform: uppercase; color: var(--muted); }
+    #stub .name { font-size: clamp(28px,5vw,46px); font-weight: 700; color: var(--accent); }
+    #stub .q { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; color: var(--muted); }
+    #stub button { margin-top: 8px; background: rgba(108,124,240,.16); color: var(--accent-hi); border: 1px solid var(--accent);
+      border-radius: 9px; padding: 8px 16px; font-size: 13px; cursor: pointer; }
+
+    #banner { position: fixed; left: 0; right: 0; bottom: 0; z-index: 25; display: none; flex-direction: column; align-items: center; }
+    #banner > div { margin: 6px; padding: 8px 14px; border-radius: 8px; background: #b91c1c; color: #fff; font-size: 13px; }
+  </style>
 </head>
-<body></body>
+<body>
+  <div id="stage">
+    <canvas id="unity-canvas" tabindex="-1"></canvas>
+
+    <div id="stub">
+      <div class="tag">stub build</div>
+      <div class="name" id="stub-name">?</div>
+      <div class="q" id="stub-q"></div>
+      <button id="stub-s">add ?s= (test deep-link survives switch)</button>
+    </div>
+
+    <div id="chrome">
+      <div id="dd">
+        <div class="dd-field glass" id="dd-field">
+          <span class="dd-lbl">preview</span>
+          <span class="dd-cur" id="dd-cur">main</span>
+          <span class="dd-chev"></span>
+        </div>
+      </div>
+      <button class="chrome-btn glass" id="fs" type="button" title="Toggle fullscreen" aria-label="Toggle fullscreen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 9V5a1 1 0 0 1 1-1h4M20 9V5a1 1 0 0 0-1-1h-4M4 15v4a1 1 0 0 0 1 1h4M20 15v4a1 1 0 0 1-1 1h-4"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <canvas id="bg"></canvas>
+
+  <div id="loader" role="status" aria-live="polite" aria-label="Loading Tessera">
+    <div id="glow"></div>
+    <div class="brand">
+      <div class="mark" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+      <div class="word">TESSERA</div>
+      <div class="sub">grid · geometry · playground</div>
+      <div class="pwrap">
+        <div class="ptrack"><div class="pfill" id="pfill"></div></div>
+        <div class="pmeta"><span id="status">initializing</span><span id="percent">0%</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="banner"></div>
+
+  <script>
+    "use strict";
+    var qs = new URLSearchParams(location.search);
+    var bootStart = performance.now();
+    var MIN_LOADER_MS = 1400;
+
+    var loaderEl = document.getElementById("loader");
+    var chromeEl = document.getElementById("chrome");
+    var pfill = document.getElementById("pfill");
+    var statusEl = document.getElementById("status");
+    var percentEl = document.getElementById("percent");
+    var bannerEl = document.getElementById("banner");
+
+    var realProgress = 0, instanceReady = false, finished = false;
+    var currentSlug = "main";
+
+    /* ---- theme sync (the Unity build calls window.setTesseraTheme; restore on boot) ---- */
+    (function () {
+      var META = { dark: "#14151E", light: "#EEF0F5" };
+      var meta = document.querySelector('meta[name="theme-color"]');
+      window.setTesseraTheme = function (isLight) {
+        var light = !!isLight;
+        document.documentElement.classList.toggle("tessera-light", light);
+        if (meta) meta.setAttribute("content", light ? META.light : META.dark);
+        try { localStorage.setItem("tessera_page_light", light ? "1" : "0"); } catch (e) {}
+      };
+      var saved = "0"; try { saved = localStorage.getItem("tessera_page_light") || "0"; } catch (e) {}
+      window.setTesseraTheme(saved === "1");
+    })();
+
+    /* ---- generative backdrop (runs during load, then stops) ---- */
+    var bg = document.getElementById("bg"), bgx = bg.getContext("2d"), bgRaf = 0, dpr = 1;
+    function cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+    function sizeBg() { dpr = Math.min(window.devicePixelRatio || 1, 2); bg.width = Math.floor(innerWidth*dpr); bg.height = Math.floor(innerHeight*dpr); }
+    sizeBg();
+    function drawBg(now) {
+      var t = (now - bootStart) / 1000, w = bg.width, h = bg.height, cell = 46*dpr;
+      bgx.clearRect(0,0,w,h);
+      var ox = (t*9*dpr)%cell, oy = (t*6*dpr)%cell;
+      bgx.lineWidth = 1; bgx.strokeStyle = cssVar("--grid") || "rgba(108,124,240,.10)"; bgx.beginPath();
+      for (var x=-ox; x<=w; x+=cell){ bgx.moveTo(x,0); bgx.lineTo(x,h); }
+      for (var y=-oy; y<=h; y+=cell){ bgx.moveTo(0,y); bgx.lineTo(w,y); }
+      bgx.stroke();
+      var cols = Math.ceil(w/cell)+1, rows = Math.ceil(h/cell)+1;
+      bgx.strokeStyle = cssVar("--grid-bold") || "rgba(108,124,240,.20)"; bgx.lineWidth = 1.5*dpr;
+      for (var i=0;i<7;i++){ var ph=t*.35+i*1.7; var gx=Math.floor((Math.sin(ph)*.5+.5)*cols)*cell-ox; var gy=Math.floor((Math.cos(ph*.8+i)*.5+.5)*rows)*cell-oy;
+        var pulse=.5+.5*Math.sin(t*2+i); bgx.globalAlpha=.25+pulse*.55; bgx.strokeRect(gx,gy,cell,cell); }
+      bgx.globalAlpha = 1; bgRaf = requestAnimationFrame(drawBg);
+    }
+    bgRaf = requestAnimationFrame(drawBg);
+    function stopBg(){ if(bgRaf) cancelAnimationFrame(bgRaf); bgRaf=0; bg.style.display="none"; }
+    addEventListener("resize", function(){ requestAnimationFrame(sizeBg); });
+
+    /* ---- loader progress + min display time ---- */
+    function renderBar(frac){ var p=Math.round(Math.max(0,Math.min(1,frac))*100); pfill.style.width=p+"%"; percentEl.textContent=p+"%";
+      statusEl.textContent = p<25?"fetching build":p<70?"decompressing":p<99?"warming up":"ready"; }
+    function tick(now){ if(finished) return; var tf=Math.min(1,(now-bootStart)/MIN_LOADER_MS); renderBar(Math.min(realProgress,tf));
+      if(instanceReady && realProgress>=1 && tf>=1){ finishLoader(); return; } requestAnimationFrame(tick); }
+    requestAnimationFrame(tick);
+    function finishLoader(){ if(finished) return; finished=true; renderBar(1); loaderEl.classList.add("hidden"); chromeEl.classList.add("ready");
+      setTimeout(function(){ if(loaderEl.parentNode) loaderEl.parentNode.removeChild(loaderEl); stopBg(); }, 750); }
+    function fail(msg){ statusEl.textContent="failed"; var d=document.createElement("div"); d.textContent=String(msg); bannerEl.appendChild(d); bannerEl.style.display="flex"; }
+
+    /* ---- fullscreen ---- */
+    document.getElementById("fs").onclick = function(){
+      if (window.tesseraUnity && window.tesseraUnity.SetFullscreen) { window.tesseraUnity.SetFullscreen(1); return; }
+      var s = document.getElementById("stage"); if (s.requestFullscreen) s.requestFullscreen();
+    };
+
+    /* ---- custom themed dropdown ---- */
+    function labelOf(list, slug){ for(var i=0;i<list.length;i++) if(list[i].slug===slug) return list[i].title||list[i].branch||slug; return slug; }
+    function switchTo(slug){
+      if (slug === currentSlug) return;
+      // Branch lives in the URL HASH (#b=slug), not the query. The hash is excluded from the
+      // HTTP cache key, so there is a single cached shell (/) rather than a stale copy per ?b.
+      // main stays clean (no hash); ?s= (deep-link state) is preserved in the query.
+      if (slug === "main") history.replaceState(null, "", location.pathname + location.search);
+      else location.hash = "b=" + slug;
+      location.reload();
+    }
+    function initDropdown(list){
+      var field = document.getElementById("dd-field"), cur = document.getElementById("dd-cur");
+      cur.textContent = labelOf(list, currentSlug);
+      if (!list.length) { document.getElementById("dd").style.display = "none"; return; }
+      var open = false, popup = null, blocker = null;
+      function close(){ open=false; field.classList.remove("open"); if(popup){popup.remove();popup=null;} if(blocker){blocker.remove();blocker=null;} }
+      function openIt(){
+        open=true; field.classList.add("open");
+        // Blocker + popup go on <body> (root stacking context). #chrome has a transform,
+        // so a popup inside it would be both z-index-capped under the blocker AND positioned
+        // relative to #chrome instead of the viewport. On body, popup(101) sits above blocker(100).
+        blocker=document.createElement("div"); blocker.className="dd-blocker"; blocker.onclick=close; document.body.appendChild(blocker);
+        popup=document.createElement("div"); popup.className="dd-popup";
+        list.forEach(function(e){
+          var it=document.createElement("div"); it.className="dd-item"+(e.slug===currentSlug?" on":"");
+          var name=document.createElement("span"); name.textContent=e.title||e.branch||e.slug; it.appendChild(name);
+          if(e.pr){ var pr=document.createElement("span"); pr.className="pr"; pr.textContent="#"+e.pr; it.appendChild(pr); }
+          it.onclick=function(){ close(); switchTo(e.slug); };
+          popup.appendChild(it);
+        });
+        document.body.appendChild(popup);
+        var r = field.getBoundingClientRect();
+        popup.style.top = (r.bottom + 8) + "px";
+        popup.style.right = Math.max(8, window.innerWidth - r.right) + "px";
+      }
+      field.onclick=function(){ open?close():openIt(); };
+    }
+
+    /* ---- stub placeholder ---- */
+    function renderStub(slug, build){
+      document.getElementById("stub-name").textContent = build.label || slug;
+      document.getElementById("stub-q").textContent = "query: " + (location.search || "(none)");
+      document.getElementById("stub").classList.add("show");
+      // add a fake ?s= (query) and keep the #b= hash, to show the deep-link survives a switch
+      document.getElementById("stub-s").onclick = function(){ location.href = location.pathname + "?s=demo" + Date.now() + (location.hash || ""); };
+      instanceReady = true; realProgress = 1;
+    }
+
+    /* ---- real Unity build ---- */
+    function loadUnity(slug, build){
+      var cfg = { dataUrl: slug+"/"+build.dataUrl, frameworkUrl: slug+"/"+build.frameworkUrl, codeUrl: slug+"/"+build.codeUrl,
+        streamingAssetsUrl: slug+"/StreamingAssets", companyName: build.companyName||"Appegy", productName: build.productName||"Tessera",
+        productVersion: build.productVersion||"0.0", showBanner: function(m){ fail(m); } };
+      var sc = document.createElement("script"); sc.src = slug+"/"+build.loaderUrl;
+      sc.onload = function(){ createUnityInstance(document.getElementById("unity-canvas"), cfg, function(p){ realProgress=p||0; })
+        .then(function(inst){ window.tesseraUnity=inst; instanceReady=true; realProgress=1; })
+        .catch(function(e){ fail(e); }); };
+      sc.onerror = function(){ fail("Failed to load the Tessera engine."); };
+      document.body.appendChild(sc);
+    }
+
+    /* ---- boot ---- */
+    function getJSON(u){ return fetch(u,{cache:"no-store"}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}); }
+    getJSON("previews.json").then(function(list){
+      list = list || [];
+      var hasMain = list.some(function(e){ return e.slug==="main"; });
+      var hp = new URLSearchParams((location.hash || "").replace(/^#/, ""));
+      currentSlug = hp.get("b") || (hasMain ? "main" : (list[0] ? list[0].slug : "main"));
+      initDropdown(list);
+      return getJSON(currentSlug + "/build.json").then(function(build){
+        if (!build) { fail("no build for '"+currentSlug+"'"); instanceReady=true; realProgress=1; return; }
+        if (build.type === "stub") renderStub(currentSlug, build); else loadUnity(currentSlug, build);
+      });
+    });
+  </script>
+</body>
 </html>

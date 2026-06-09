@@ -1,23 +1,21 @@
-# Per-branch WebGL preview environments on GitHub Pages.
+# Per-PR WebGL preview environments on GitHub Pages.
 #
-# Every PR (and main) is built with game-ci and published into the `demo` branch
-# under /<slug>/, where slug = branch name with non-[A-Za-z0-9._-] replaced by '-'.
-# GitHub Pages serves demo, so each branch is live at
-#   https://appegy.github.io/Tessera/<slug>/
-# The site root redirects to /main/, and each build's template carries a branch
-# switcher populated from /branches.json (see tools/pages-shell + the WebGL template).
+# One build-agnostic shell (tools/pages-shell/index.html) lives at the root of the
+# `demo` branch. Each PR (and main) is published as a HEADLESS build under
+# demo/<slug>/ (Build/* + build.json, no per-build index.html); the shell reads
+# previews.json, shows a dropdown, and loads the chosen build into its canvas.
+#   slug = "main" for main, "pr-<N>" for pull requests.
+#   The shell selects a build via the URL hash (/#b=<slug>); main is the clean root.
 #
 # Lifecycle:
-#   PR opened/reopened/synchronize -> build that branch -> publish /<slug>/
-#   push to main                   -> build main        -> publish /main/
-#   PR closed (merged or not)      -> remove /<slug>/
-# A new push to an open PR cancels its in-flight build (per-branch concurrency);
-# writes to demo are serialized (tessera-demo-write) and squashed to one orphan
-# commit so the branch never accumulates 32MB build blobs.
+#   PR opened/reopened/synchronize -> build PR head -> publish demo/pr-<N>/
+#   push to main                   -> build main    -> publish demo/main/
+#   PR closed (merged or not)      -> remove demo/pr-<N>/
+# A new push to a PR cancels its in-flight build (per-target concurrency); writes to
+# demo are serialized (tessera-demo-write) and squashed to one orphan commit.
 #
-# NOTE: pull_request-triggered runs use the workflow file from the BASE branch, so
-# the PR auto-triggers only take effect once this file is on main. Until then the
-# build/publish path can be exercised with workflow_dispatch on a feature branch.
+# NOTE: pull_request runs use the workflow file from the PR HEAD branch, so a PR
+# auto-previews as soon as its branch carries this workflow.
 #
 # Secrets (repo-level): UNITY_LICENSE (Personal .ulf contents), UNITY_EMAIL, UNITY_PASSWORD.
 
@@ -46,25 +44,39 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.action != 'closed'
     runs-on: ubuntu-latest
     concurrency:
-      group: tessera-build-${{ github.event.pull_request.head.ref || github.ref_name }}
+      group: tessera-build-${{ github.event.pull_request.number || github.ref_name }}
       cancel-in-progress: true
     outputs:
       slug: ${{ steps.id.outputs.slug }}
       branch: ${{ steps.id.outputs.branch }}
+      pr: ${{ steps.id.outputs.pr }}
+      title: ${{ steps.id.outputs.title }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           lfs: true
 
-      - name: Identify branch + slug
+      - name: Identify preview (slug / branch / pr / title)
         id: id
+        env:
+          PR_NUM: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          BRANCH="${{ github.event.pull_request.head.ref || github.ref_name }}"
-          SLUG="$(printf '%s' "$BRANCH" | sed 's#[^A-Za-z0-9._-]#-#g')"
-          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
-          echo "slug=$SLUG"     >> "$GITHUB_OUTPUT"
+          if [ -n "$PR_NUM" ]; then
+            SLUG="pr-$PR_NUM"; BRANCH="$HEAD_REF"; PR="$PR_NUM"; TITLE="$PR_TITLE"
+          elif [ "$REF_NAME" = "main" ]; then
+            SLUG="main"; BRANCH="main"; PR=""; TITLE="main"
+          else
+            SLUG="$(printf '%s' "$REF_NAME" | sed 's#[^A-Za-z0-9._-]#-#g')"; BRANCH="$REF_NAME"; PR=""; TITLE="$REF_NAME"
+          fi
           echo "Building $BRANCH -> /$SLUG/"
+          echo "slug=$SLUG"     >> "$GITHUB_OUTPUT"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          echo "pr=$PR"         >> "$GITHUB_OUTPUT"
+          { echo "title<<__TESSERA_EOF__"; echo "$TITLE"; echo "__TESSERA_EOF__"; } >> "$GITHUB_OUTPUT"
 
       - name: Cache Library
         uses: actions/cache@v4
@@ -97,9 +109,7 @@ jobs:
         run: |
           sudo chown -R "$(id -u):$(id -g)" build || true
           INDEX="$(find build -name index.html | head -1)"
-          if [ -z "$INDEX" ]; then
-            echo "No index.html under build/:"; find build -maxdepth 4 || true; exit 1
-          fi
+          if [ -z "$INDEX" ]; then echo "No index.html under build/:"; find build -maxdepth 4 || true; exit 1; fi
           SRC="$(dirname "$INDEX")"
           echo "WebGL build at: $SRC"
           rm -rf out && mkdir -p out
@@ -135,6 +145,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SLUG: ${{ needs.build.outputs.slug }}
           BRANCH: ${{ needs.build.outputs.branch }}
+          PR: ${{ needs.build.outputs.pr }}
+          TITLE: ${{ needs.build.outputs.title }}
         run: |
           chmod +x tools/demo-publish.sh
           tools/demo-publish.sh
@@ -150,18 +162,10 @@ jobs:
       - name: Checkout (scripts)
         uses: actions/checkout@v4
 
-      - name: Identify slug
-        id: id
-        run: |
-          BRANCH="${{ github.event.pull_request.head.ref }}"
-          SLUG="$(printf '%s' "$BRANCH" | sed 's#[^A-Za-z0-9._-]#-#g')"
-          echo "slug=$SLUG" >> "$GITHUB_OUTPUT"
-          echo "Removing preview for $BRANCH -> /$SLUG/"
-
       - name: Remove from demo branch
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SLUG: ${{ steps.id.outputs.slug }}
+          SLUG: pr-${{ github.event.pull_request.number }}
         run: |
           chmod +x tools/demo-cleanup.sh
           tools/demo-cleanup.sh

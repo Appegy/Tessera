@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Removes one branch's preview folder from the `demo` branch when its PR is merged
-# or closed, then regenerates branches.json. Same single-orphan-commit model and
-# `tessera-demo-write` serialization as demo-publish.sh.
+# Removes one preview folder from the `demo` branch when its PR is merged or closed,
+# then updates previews.json. Same single-orphan-commit model and tessera-demo-write
+# serialization as demo-publish.sh.
 #
-# Required env: GH_TOKEN, SLUG, GITHUB_REPOSITORY, GITHUB_WORKSPACE.
+# Env: GH_TOKEN, SLUG, GITHUB_REPOSITORY, GITHUB_WORKSPACE.
 set -euo pipefail
 shopt -s nullglob
 
@@ -19,13 +19,14 @@ fi
 cd "$WT"
 rm -rf .git
 git init -q
-[ -f branches.json ] || echo '[]' > branches.json
+[ -f previews.json ] || echo '[]' > previews.json
+rm -f branches.json
 
 rm -rf "$SLUG"
 jq --arg slug "$SLUG" '[ .[] | select(.slug != $slug) ]' \
-  branches.json > branches.json.tmp && mv branches.json.tmp branches.json
+  previews.json > previews.json.tmp && mv previews.json.tmp previews.json
 
-KEEP="$(jq -r '.[].slug' branches.json)"
+KEEP="$(jq -r '.[].slug' previews.json)"
 for d in */; do
   d="${d%/}"
   printf '%s\n' "$KEEP" | grep -qxF "$d" || rm -rf "$d"
