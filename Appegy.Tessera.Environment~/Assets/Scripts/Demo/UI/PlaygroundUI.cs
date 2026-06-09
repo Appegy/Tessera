@@ -14,7 +14,6 @@ namespace Appegy.Tessera.Demo
     [RequireComponent(typeof(UIDocument))]
     public sealed class PlaygroundUI : MonoBehaviour, IPointerOverUiProbe
     {
-        private const string ThemePrefKey = "tessera_theme_light";
         private const string ScalePrefKey = "tessera_ui_scale";
 
         [SerializeField] private UIDocument _document;
@@ -30,7 +29,18 @@ namespace Appegy.Tessera.Demo
 
 #if UNITY_WEBGL && !UNITY_EDITOR
         [System.Runtime.InteropServices.DllImport("__Internal")]
-        private static extern void TesseraSetTheme(int isLight);
+        private static extern int TesseraGetTheme();
+        [System.Runtime.InteropServices.DllImport("__Internal")]
+        private static extern void TesseraRegisterThemeTarget(string name);
+#endif
+
+#if UNITY_EDITOR
+        // Editor has no web page to drive the theme: press T to toggle dark/light for testing.
+        private void Update()
+        {
+            var kb = UnityEngine.InputSystem.Keyboard.current;
+            if (kb != null && kb.tKey.wasPressedThisFrame) ApplyTheme(!_isLight);
+        }
 #endif
 
         private void Awake()
@@ -63,7 +73,6 @@ namespace Appegy.Tessera.Demo
             _params = root.Q("params");
             _info = root.Q<Label>("info");
 
-            _isLight = PlayerPrefs.GetInt(ThemePrefKey, 0) == 1;
             _uiScaleIndex = PlayerPrefs.GetInt(ScalePrefKey, 1);
 
             BuildSelector();
@@ -74,7 +83,7 @@ namespace Appegy.Tessera.Demo
             _controller.SetOverUiProbe(this);
 
             OnCurrentChanged();
-            ApplyTheme(_isLight);
+            InitTheme();
             SetUiScale(_uiScaleIndex);
         }
 
@@ -112,36 +121,32 @@ namespace Appegy.Tessera.Demo
 
             container.Add(BuildLineWidth());
 
-            container.Add(BuildSegmented("Theme", new[] { "Dark", "Light" }, _isLight ? 1 : 0, i => ApplyTheme(i == 1)));
             container.Add(BuildSegmented("Text Size", new[] { "Small", "Medium", "Large" }, _uiScaleIndex, SetUiScale));
         }
 
-        // 1.0 keeps the current line width; 0 makes the outline thin. The [0, 1] slider maps onto
-        // [thin, current] so the default (1) leaves the look unchanged.
+        // Line width as a 0..1 scale bound to DemoController.LineWidthScale, which lives in the
+        // shareable URL (key "lw", default 0.5). Changing it live-syncs the link.
         private VisualElement BuildLineWidth()
         {
-            const float minWidth = 0.01f;
-            var maxWidth = _controller.LineWidth;
-            if (maxWidth <= minWidth) maxWidth = 0.05f;
-
             var row = new VisualElement();
             row.AddToClassList("param");
             var head = new VisualElement();
             head.AddToClassList("param-head");
             var caption = new Label("Line Width");
             caption.AddToClassList("param-label");
-            var value = new Label("100%");
+            var scale = _controller.LineWidthScale;
+            var value = new Label(Mathf.RoundToInt(scale * 100f) + "%");
             value.AddToClassList("param-value");
             head.Add(caption);
             head.Add(value);
             row.Add(head);
 
-            var slider = new Slider(0f, 1f) { value = 1f };
+            var slider = new Slider(0f, 1f) { value = scale };
             slider.AddToClassList("param-slider");
             slider.RegisterValueChangedCallback(e =>
             {
                 var t = Mathf.Clamp01(e.newValue);
-                _controller.LineWidth = Mathf.Lerp(minWidth, maxWidth, t);
+                _controller.LineWidthScale = t;
                 value.text = Mathf.RoundToInt(t * 100f) + "%";
             });
             row.Add(slider);
@@ -199,10 +204,20 @@ namespace Appegy.Tessera.Demo
                     new Color(0.40f, 0.47f, 0.95f, 0.55f),
                     new Color(0.40f, 0.47f, 0.95f, 0.26f));
 
-            PlayerPrefs.SetInt(ThemePrefKey, light ? 1 : 0);
+        }
 
+        /// <summary>Called by the web page (SendMessage) when the theme changes. 1 = light, 0 = dark.</summary>
+        public void ApplyPageTheme(int isLight) => ApplyTheme(isLight == 1);
+
+        // Theme is driven by the web page now. In WebGL: read the current page theme and register a
+        // target the page pushes changes to. In the editor: default to dark (press T to toggle).
+        private void InitTheme()
+        {
 #if UNITY_WEBGL && !UNITY_EDITOR
-            TesseraSetTheme(light ? 1 : 0);
+            TesseraRegisterThemeTarget(gameObject.name);
+            ApplyTheme(TesseraGetTheme() == 1);
+#else
+            ApplyTheme(false);
 #endif
         }
 

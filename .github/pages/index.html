@@ -87,6 +87,13 @@
     .chrome-btn:active { transform: scale(.93); }
     .chrome-btn svg { width: 15px; height: 15px; display: block; }
 
+    /* theme switch (light / dark / system) */
+    .seg3 { display: flex; align-items: center; height: 28px; padding: 2px; border-radius: 8px; border: 1px solid var(--field-border); }
+    .seg3 button { height: 22px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: var(--muted);
+      font: 600 11px/1 inherit; cursor: pointer; transition: color .15s ease, background-color .15s ease; }
+    .seg3 button:hover { color: var(--text); }
+    .seg3 button.on { background: var(--card-hover); color: var(--accent); }
+
     /* ===== Loading curtain: fills the stage BELOW the topbar (not the whole
        viewport), so the topbar with the branch switcher stays visible during load. ===== */
     #loader { position: absolute; left: 0; right: 0; top: 40px; bottom: 0; z-index: 5; display: flex; align-items: center; justify-content: center;
@@ -131,6 +138,11 @@
 <body>
   <div id="stage">
     <div id="chrome">
+      <div id="theme-seg" class="seg3" role="group" aria-label="Theme">
+        <button type="button" data-mode="light">Light</button>
+        <button type="button" data-mode="dark">Dark</button>
+        <button type="button" data-mode="system">System</button>
+      </div>
       <div id="dd">
         <div class="dd-field" id="dd-field">
           <span class="dd-lbl">preview</span>
@@ -186,18 +198,32 @@
     var realProgress = 0, instanceReady = false, finished = false;
     var currentSlug = "main";
 
-    /* ---- theme sync (the Unity build calls window.setTesseraTheme; restore on boot) ---- */
+    /* ---- theme control (page-driven: light / dark / system). The build reads the current page
+       theme at boot (TesseraGetTheme) and registers a SendMessage target; live changes are pushed
+       to the running build via ApplyPageTheme. ---- */
     (function () {
+      var KEY = "tessera_theme";
       var META = { dark: "#14151E", light: "#EEF0F5" };
       var meta = document.querySelector('meta[name="theme-color"]');
-      window.setTesseraTheme = function (isLight) {
-        var light = !!isLight;
+      var mql = window.matchMedia("(prefers-color-scheme: dark)");
+      var seg = document.getElementById("theme-seg");
+      function stored() { try { return localStorage.getItem(KEY); } catch (e) { return null; } }
+      function isLightFor(mode) { return mode === "system" ? !mql.matches : mode === "light"; }
+      function apply(mode, push) {
+        var light = isLightFor(mode);
         document.documentElement.classList.toggle("tessera-light", light);
         if (meta) meta.setAttribute("content", light ? META.light : META.dark);
-        try { localStorage.setItem("tessera_page_light", light ? "1" : "0"); } catch (e) {}
-      };
-      var saved = "0"; try { saved = localStorage.getItem("tessera_page_light") || "0"; } catch (e) {}
-      window.setTesseraTheme(saved === "1");
+        try { localStorage.setItem(KEY, mode); } catch (e) {}
+        if (seg) for (var i = 0; i < seg.children.length; i++)
+          seg.children[i].classList.toggle("on", seg.children[i].getAttribute("data-mode") === mode);
+        if (push && window.tesseraUnity && window.tesseraThemeTarget)
+          try { window.tesseraUnity.SendMessage(window.tesseraThemeTarget, "ApplyPageTheme", light ? 1 : 0); } catch (e) {}
+      }
+      window.tesseraApplyTheme = apply;
+      apply(stored() || "system", false);
+      if (seg) for (var j = 0; j < seg.children.length; j++)
+        seg.children[j].addEventListener("click", function () { apply(this.getAttribute("data-mode"), true); });
+      mql.addEventListener("change", function () { if ((stored() || "system") === "system") apply("system", true); });
     })();
 
     /* ---- loader progress + min display time ---- */

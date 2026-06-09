@@ -33,7 +33,10 @@ namespace Appegy.Tessera.Demo
         [SerializeField] [Range(0f, 0.6f)] private float _panelInset = 0.235f;
 
         [Header("Appearance")]
-        [SerializeField] private float _lineWidth = 0.05f;
+        private const float MinLineWidth = 0.01f;
+        private const float MaxLineWidth = 0.05f;
+        [SerializeField] private float _lineWidth = 0.03f;
+        private float _lineWidthScale = 0.5f;
         [SerializeField] private Color _lineColor = new(0.62f, 0.67f, 0.88f, 1f);
         [SerializeField] private Color _hoveredColor = new(0.40f, 0.47f, 0.95f, 0.55f);
         [SerializeField] private Color _neighborColor = new(0.40f, 0.47f, 0.95f, 0.26f);
@@ -55,13 +58,17 @@ namespace Appegy.Tessera.Demo
         /// <summary>Raised when the active demo changes. UI uses it to rebuild the parameter panel.</summary>
         public event Action CurrentChanged;
 
-        public float LineWidth
+        // Shareable line-width as a 0..1 scale mapped onto [MinLineWidth, MaxLineWidth]. Lives in the
+        // deep-link URL (key "lw"); default 0.5. Changing it live-syncs the URL like a grid parameter.
+        public float LineWidthScale
         {
-            get => _lineWidth;
+            get => _lineWidthScale;
             set
             {
-                _lineWidth = value;
-                if (_gridView != null) { _gridView.LineWidth = value; _gridView.RefreshAppearance(); }
+                _lineWidthScale = Mathf.Clamp01(value);
+                _lineWidth = Mathf.Lerp(MinLineWidth, MaxLineWidth, _lineWidthScale);
+                if (_gridView != null) { _gridView.LineWidth = _lineWidth; _gridView.RefreshAppearance(); }
+                SyncUrl();
             }
         }
 
@@ -114,7 +121,8 @@ namespace Appegy.Tessera.Demo
 
             // A shared deep-link (?s=...) wins over locally saved prefs so a copied link
             // reproduces the exact example for whoever opens it.
-            var shared = DemoUrlState.TryDecode(TesseraWeb.GetQuery(), _demos);
+            var shared = DemoUrlState.TryDecode(TesseraWeb.GetQuery(), _demos, out var lineWidthScale);
+            LineWidthScale = lineWidthScale;
             Select(shared ?? _demos[DemoStatePrefs.LoadGridIndex(_demos.Count)]);
         }
 
@@ -158,7 +166,7 @@ namespace Appegy.Tessera.Demo
         // always a shareable link (no copy button needed). No-op outside WebGL.
         private void SyncUrl()
         {
-            if (_current != null) TesseraWeb.ReplaceQuery(DemoUrlState.Encode(_current));
+            if (_current != null) TesseraWeb.ReplaceQuery(DemoUrlState.Encode(_current, _lineWidthScale));
         }
 
         /// <summary>Rerolls the first seed parameter of the active demo, if it has one.</summary>
