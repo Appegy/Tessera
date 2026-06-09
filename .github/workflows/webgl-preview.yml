@@ -1,25 +1,12 @@
-# Per-PR WebGL preview environments on GitHub Pages.
+# Builds a WebGL preview for each PR (and main) and publishes it to the `demo`
+# branch that GitHub Pages serves. One build-agnostic shell (.github/pages/index.html)
+# at the demo root loads the chosen build by URL hash (/#b=<slug>; main = clean /);
+# each preview is a HEADLESS build folder (Build/* + build.json, no index.html).
+# Cleanup on PR close lives in webgl-preview-cleanup.yml.
 #
-# One build-agnostic shell (tools/pages-shell/index.html) lives at the root of the
-# `demo` branch. Each PR (and main) is published as a HEADLESS build under
-# demo/<slug>/ (Build/* + build.json, no per-build index.html); the shell reads
-# previews.json, shows a dropdown, and loads the chosen build into its canvas.
-#   slug = "main" for main, "pr-<N>" for pull requests.
-#   The shell selects a build via the URL hash (/#b=<slug>); main is the clean root.
-#
-# Lifecycle:
-#   PR opened/reopened/synchronize -> build PR head -> publish demo/pr-<N>/
-#   push to main                   -> build main    -> publish demo/main/
-#   PR closed (merged or not)      -> remove demo/pr-<N>/
-# A new push to a PR cancels its in-flight build (per-target concurrency); writes to
-# demo are serialized (tessera-demo-write) and squashed to one orphan commit.
-#
-# NOTE: pull_request runs use the workflow file from the PR HEAD branch, so a PR
-# auto-previews as soon as its branch carries this workflow.
-#
-# Secrets (repo-level): UNITY_LICENSE (Personal .ulf contents), UNITY_EMAIL, UNITY_PASSWORD.
+# Secrets (repo-level): UNITY_LICENSE, UNITY_EMAIL, UNITY_PASSWORD.
 
-name: WebGL PR previews
+name: WebGL preview
 
 on:
   workflow_dispatch:
@@ -28,12 +15,10 @@ on:
     paths:
       - 'Appegy.Tessera.Environment~/**'
       - 'Runtime/**'
-      - '.github/workflows/deploy-pages.yml'
-      - 'tools/pages-shell/**'
-      - 'tools/demo-publish.sh'
-      - 'tools/demo-cleanup.sh'
+      - '.github/workflows/webgl-preview.yml'
+      - '.github/pages/**'
   pull_request:
-    types: [opened, reopened, synchronize, closed]
+    types: [opened, reopened, synchronize]
 
 permissions:
   contents: write
@@ -41,7 +26,6 @@ permissions:
 jobs:
   build:
     name: Build WebGL
-    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     runs-on: ubuntu-latest
     concurrency:
       group: tessera-build-${{ github.event.pull_request.number || github.ref_name }}
@@ -52,8 +36,7 @@ jobs:
       pr: ${{ steps.id.outputs.pr }}
       title: ${{ steps.id.outputs.title }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           lfs: true
 
@@ -76,7 +59,7 @@ jobs:
           echo "slug=$SLUG"     >> "$GITHUB_OUTPUT"
           echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
           echo "pr=$PR"         >> "$GITHUB_OUTPUT"
-          { echo "title<<__TESSERA_EOF__"; echo "$TITLE"; echo "__TESSERA_EOF__"; } >> "$GITHUB_OUTPUT"
+          { echo "title<<__T__"; echo "$TITLE"; echo "__T__"; } >> "$GITHUB_OUTPUT"
 
       - name: Cache Library
         uses: actions/cache@v4
@@ -110,13 +93,10 @@ jobs:
           sudo chown -R "$(id -u):$(id -g)" build || true
           INDEX="$(find build -name index.html | head -1)"
           if [ -z "$INDEX" ]; then echo "No index.html under build/:"; find build -maxdepth 4 || true; exit 1; fi
-          SRC="$(dirname "$INDEX")"
-          echo "WebGL build at: $SRC"
           rm -rf out && mkdir -p out
-          cp -r "$SRC"/. out/
+          cp -r "$(dirname "$INDEX")"/. out/
 
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: webgl-${{ steps.id.outputs.slug }}
           path: out
@@ -125,22 +105,19 @@ jobs:
   publish:
     name: Publish preview to demo
     needs: build
-    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     runs-on: ubuntu-latest
     concurrency:
       group: tessera-demo-write
       cancel-in-progress: false
     steps:
-      - name: Checkout (shell + scripts)
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Download build artifact
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           name: webgl-${{ needs.build.outputs.slug }}
           path: artifact
 
-      - name: Publish to demo branch
+      - name: Publish /<slug>/ to the demo branch
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SLUG: ${{ needs.build.outputs.slug }}
@@ -148,24 +125,50 @@ jobs:
           PR: ${{ needs.build.outputs.pr }}
           TITLE: ${{ needs.build.outputs.title }}
         run: |
-          chmod +x tools/demo-publish.sh
-          tools/demo-publish.sh
+          set -euo pipefail
+          shopt -s nullglob
+          REPO_URL="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
 
-  cleanup:
-    name: Remove preview from demo
-    if: github.event_name == 'pull_request' && github.event.action == 'closed'
-    runs-on: ubuntu-latest
-    concurrency:
-      group: tessera-demo-write
-      cancel-in-progress: false
-    steps:
-      - name: Checkout (scripts)
-        uses: actions/checkout@v4
+          # demo is kept as a single orphan commit (no 32MB build history); fetch it,
+          # swap in this preview's folder, regenerate previews.json, force-push.
+          WT="$(mktemp -d)"
+          git clone --depth 1 --branch demo --single-branch "$REPO_URL" "$WT" 2>/dev/null || true
+          cd "$WT"
+          rm -rf .git && git init -q
+          [ -f previews.json ] || echo '[]' > previews.json
 
-      - name: Remove from demo branch
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SLUG: pr-${{ github.event.pull_request.number }}
-        run: |
-          chmod +x tools/demo-cleanup.sh
-          tools/demo-cleanup.sh
+          rm -rf "$SLUG" && mkdir -p "$SLUG"
+          cp -r "$GITHUB_WORKSPACE/artifact/." "$SLUG/"
+
+          # Headless: derive build.json (resolved hashed filenames) from the build's
+          # index.html, then drop index.html - the shell at the root is the only page.
+          if [ ! -f "$SLUG/build.json" ] && [ -f "$SLUG/index.html" ]; then
+            IDX="$SLUG/index.html"
+            jq -n \
+              --arg l "Build/$(grep -oE '[A-Za-z0-9]+\.loader\.js'   "$IDX" | head -1)" \
+              --arg d "Build/$(grep -oE '[A-Za-z0-9]+\.data'         "$IDX" | head -1)" \
+              --arg f "Build/$(grep -oE '[A-Za-z0-9]+\.framework\.js' "$IDX" | head -1)" \
+              --arg c "Build/$(grep -oE '[A-Za-z0-9]+\.wasm'         "$IDX" | head -1)" \
+              '{type:"unity",loaderUrl:$l,dataUrl:$d,frameworkUrl:$f,codeUrl:$c}' > "$SLUG/build.json"
+          fi
+          rm -f "$SLUG/index.html"
+
+          # previews.json (dropdown source of truth): replace this slug; main first then by PR number.
+          jq --arg slug "$SLUG" --arg branch "$BRANCH" --arg pr "$PR" --arg title "$TITLE" \
+            '[ .[] | select(.slug != $slug) ]
+             + [ {slug:$slug, branch:$branch, pr:(try ($pr|tonumber) catch null), title:$title} ]
+             | sort_by(.slug != "main", ((.pr) // 0))' \
+            previews.json > previews.json.tmp && mv previews.json.tmp previews.json
+
+          # Drop any folder not in the manifest (old layout / closed previews).
+          KEEP="$(jq -r '.[].slug' previews.json)"
+          for dir in */; do dir="${dir%/}"; printf '%s\n' "$KEEP" | grep -qxF "$dir" || rm -rf "$dir"; done
+
+          cp "$GITHUB_WORKSPACE/.github/pages/index.html" index.html
+          touch .nojekyll
+
+          git add -A
+          git -c user.email=actions@github.com -c user.name="github-actions[bot]" \
+            commit -q -m "preview: ${SLUG} (${GITHUB_SHA::7})"
+          git push -f "$REPO_URL" HEAD:demo
+          echo "Published /$SLUG/ to demo."
