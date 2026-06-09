@@ -16,6 +16,9 @@ namespace Appegy.Tessera.Demo
         /// <summary>Human-readable name shown in the grid selector.</summary>
         public abstract string DisplayName { get; }
 
+        /// <summary>Stable short id used in shareable URLs. Decoupled from DisplayName so links survive renames.</summary>
+        public abstract string UrlId { get; }
+
         /// <summary>Icon id resolved by the UI layer (e.g. a Material Symbols name). Null = no icon.</summary>
         public virtual string Icon => null;
 

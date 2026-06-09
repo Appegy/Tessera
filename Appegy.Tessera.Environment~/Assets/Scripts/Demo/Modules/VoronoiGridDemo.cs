@@ -12,6 +12,7 @@ namespace Appegy.Tessera.Demo
         private SeedParameter _seed;
 
         public override string DisplayName => "Voronoi";
+        public override string UrlId => "voronoi";
         public override string Icon => "scatter_plot";
 
         protected override void BuildParameters(List<DemoParameter> parameters)
