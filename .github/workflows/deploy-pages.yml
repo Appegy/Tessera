@@ -1,12 +1,27 @@
-# Builds the Tessera playground (WebGL) with game-ci and publishes it to the
-# `demo` branch, which GitHub Pages serves (https://appegy.github.io/Tessera/).
-# Nothing is committed to the source branch; the build lives only on demo.
+# Per-branch WebGL preview environments on GitHub Pages.
+#
+# Every PR (and main) is built with game-ci and published into the `demo` branch
+# under /<slug>/, where slug = branch name with non-[A-Za-z0-9._-] replaced by '-'.
+# GitHub Pages serves demo, so each branch is live at
+#   https://appegy.github.io/Tessera/<slug>/
+# The site root redirects to /main/, and each build's template carries a branch
+# switcher populated from /branches.json (see tools/pages-shell + the WebGL template).
+#
+# Lifecycle:
+#   PR opened/reopened/synchronize -> build that branch -> publish /<slug>/
+#   push to main                   -> build main        -> publish /main/
+#   PR closed (merged or not)      -> remove /<slug>/
+# A new push to an open PR cancels its in-flight build (per-branch concurrency);
+# writes to demo are serialized (tessera-demo-write) and squashed to one orphan
+# commit so the branch never accumulates 32MB build blobs.
+#
+# NOTE: pull_request-triggered runs use the workflow file from the BASE branch, so
+# the PR auto-triggers only take effect once this file is on main. Until then the
+# build/publish path can be exercised with workflow_dispatch on a feature branch.
 #
 # Secrets (repo-level): UNITY_LICENSE (Personal .ulf contents), UNITY_EMAIL, UNITY_PASSWORD.
-# CI builds with Unity 6000.4.8f1 (newest game-ci WebGL image in the 6000.4 line);
-# the project is authored in 6000.4.10f1 — same-minor patch builds are compatible.
 
-name: Build & publish WebGL
+name: WebGL PR previews
 
 on:
   workflow_dispatch:
@@ -16,23 +31,40 @@ on:
       - 'Appegy.Tessera.Environment~/**'
       - 'Runtime/**'
       - '.github/workflows/deploy-pages.yml'
+      - 'tools/pages-shell/**'
+      - 'tools/demo-publish.sh'
+      - 'tools/demo-cleanup.sh'
+  pull_request:
+    types: [opened, reopened, synchronize, closed]
 
 permissions:
   contents: write
 
-concurrency:
-  group: webgl-publish
-  cancel-in-progress: true
-
 jobs:
   build:
-    name: Build WebGL & publish to demo
+    name: Build WebGL
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     runs-on: ubuntu-latest
+    concurrency:
+      group: tessera-build-${{ github.event.pull_request.head.ref || github.ref_name }}
+      cancel-in-progress: true
+    outputs:
+      slug: ${{ steps.id.outputs.slug }}
+      branch: ${{ steps.id.outputs.branch }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           lfs: true
+
+      - name: Identify branch + slug
+        id: id
+        run: |
+          BRANCH="${{ github.event.pull_request.head.ref || github.ref_name }}"
+          SLUG="$(printf '%s' "$BRANCH" | sed 's#[^A-Za-z0-9._-]#-#g')"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          echo "slug=$SLUG"     >> "$GITHUB_OUTPUT"
+          echo "Building $BRANCH -> /$SLUG/"
 
       - name: Cache Library
         uses: actions/cache@v4
@@ -61,26 +93,75 @@ jobs:
           buildName: Tessera
           allowDirtyBuild: true
 
-      - name: Publish build to demo branch
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Normalize build output
         run: |
-          set -e
           sudo chown -R "$(id -u):$(id -g)" build || true
           INDEX="$(find build -name index.html | head -1)"
           if [ -z "$INDEX" ]; then
-            echo "No index.html found under build/:"; find build -maxdepth 4 || true; exit 1
+            echo "No index.html under build/:"; find build -maxdepth 4 || true; exit 1
           fi
           SRC="$(dirname "$INDEX")"
           echo "WebGL build at: $SRC"
-          SITE="$RUNNER_TEMP/site"
-          rm -rf "$SITE"; mkdir -p "$SITE"
-          cp -r "$SRC"/. "$SITE/"
-          touch "$SITE/.nojekyll"
-          cd "$SITE"
-          git init -q
-          git checkout -q -b demo
-          git add -A
-          git -c user.email=actions@github.com -c user.name="github-actions[bot]" commit -q -m "WebGL build (${GITHUB_SHA::7})"
-          git push -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" demo
-          echo "Published to demo -> Pages will redeploy."
+          rm -rf out && mkdir -p out
+          cp -r "$SRC"/. out/
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: webgl-${{ steps.id.outputs.slug }}
+          path: out
+          retention-days: 1
+
+  publish:
+    name: Publish preview to demo
+    needs: build
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: tessera-demo-write
+      cancel-in-progress: false
+    steps:
+      - name: Checkout (shell + scripts)
+        uses: actions/checkout@v4
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: webgl-${{ needs.build.outputs.slug }}
+          path: artifact
+
+      - name: Publish to demo branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SLUG: ${{ needs.build.outputs.slug }}
+          BRANCH: ${{ needs.build.outputs.branch }}
+        run: |
+          chmod +x tools/demo-publish.sh
+          tools/demo-publish.sh
+
+  cleanup:
+    name: Remove preview from demo
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: tessera-demo-write
+      cancel-in-progress: false
+    steps:
+      - name: Checkout (scripts)
+        uses: actions/checkout@v4
+
+      - name: Identify slug
+        id: id
+        run: |
+          BRANCH="${{ github.event.pull_request.head.ref }}"
+          SLUG="$(printf '%s' "$BRANCH" | sed 's#[^A-Za-z0-9._-]#-#g')"
+          echo "slug=$SLUG" >> "$GITHUB_OUTPUT"
+          echo "Removing preview for $BRANCH -> /$SLUG/"
+
+      - name: Remove from demo branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SLUG: ${{ steps.id.outputs.slug }}
+        run: |
+          chmod +x tools/demo-cleanup.sh
+          tools/demo-cleanup.sh

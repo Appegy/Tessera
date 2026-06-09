@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+  <meta charset="utf-8">
+  <title>Tessera</title>
+  <meta name="robots" content="noindex">
+  <script>
+    // The site root is just a redirect into the default (main) preview build,
+    // preserving any deep-link query/hash so shared "/?s=..." links still land.
+    (function () {
+      var tail = location.search + location.hash;
+      location.replace("./main/" + tail);
+    })();
+  </script>
+  <noscript><meta http-equiv="refresh" content="0; url=./main/"></noscript>
+</head>
+<body></body>
+</html>

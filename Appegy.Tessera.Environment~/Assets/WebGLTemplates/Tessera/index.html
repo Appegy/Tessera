@@ -142,6 +142,59 @@
     .chrome-btn:active { transform: scale(0.93); }
     .chrome-btn svg { width: 18px; height: 18px; display: block; }
 
+    /* ===== Branch preview switcher: pinned top-right of the stage, shown only
+       when /branches.json exists (the multi-branch demo deploy). ===== */
+    #tessera-branchbar {
+      position: absolute;
+      z-index: 6;
+      top: 16px;
+      right: 16px;
+      display: none;
+      align-items: center;
+      gap: 9px;
+      padding: 6px 8px 6px 13px;
+      border: 1px solid var(--chrome-br);
+      border-radius: 12px;
+      background: var(--chrome-bg);
+      backdrop-filter: blur(12px) saturate(140%);
+      -webkit-backdrop-filter: blur(12px) saturate(140%);
+      opacity: 0;
+      transform: translateY(-6px);
+      transition: opacity 0.5s ease, transform 0.5s ease, background-color 0.55s ease, border-color 0.2s ease;
+      pointer-events: none;
+    }
+    #tessera-branchbar.tessera-ready { opacity: 1; transform: translateY(0); pointer-events: auto; }
+    #tessera-branchbar:hover { border-color: var(--accent); }
+    .bb-label {
+      font-family: ui-monospace, "SF Mono", "JetBrains Mono", "Fira Code", Menlo, Consolas, monospace;
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      user-select: none;
+    }
+    #tessera-branch {
+      appearance: none;
+      -webkit-appearance: none;
+      margin: 0;
+      border: 0;
+      background-color: transparent;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 2px 17px 2px 2px;
+      cursor: pointer;
+      outline: none;
+      background-image:
+        linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+        linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+      background-position: right 6px center, right 2px center;
+      background-size: 5px 5px, 5px 5px;
+      background-repeat: no-repeat;
+    }
+    #tessera-branch option { color: #1A1E2C; background: #fff; }
+
     /* ===== Generative tessellation backdrop (full viewport, load only). ===== */
     #tessera-bg {
       position: fixed;
@@ -347,6 +400,10 @@
         </svg>
       </button>
     </div>
+    <div id="tessera-branchbar" aria-label="Branch preview switcher">
+      <span class="bb-label">preview</span>
+      <select id="tessera-branch" title="Switch branch preview" aria-label="Switch branch preview"></select>
+    </div>
   </div>
 
   <!-- Drifting tessellation backdrop, active only while loading -->
@@ -413,6 +470,43 @@
       var saved = "0";
       try { saved = localStorage.getItem("tessera_page_light") || "0"; } catch (e) {}
       window.setTesseraTheme(saved === "1");
+    })();
+
+    /* ---------------------------------------------------------------
+       BRANCH PREVIEW SWITCHER
+       On the multi-branch demo deploy each build is served from /<slug>/
+       and /branches.json lists the available branches. Populate the dropdown
+       and navigate to the sibling folder on change, carrying the deep-link
+       query so a shared "?s=..." survives the switch. Stays hidden when
+       branches.json is absent (single-build deploy / local run).
+    --------------------------------------------------------------- */
+    (function () {
+      var bar = document.querySelector("#tessera-branchbar");
+      var sel = document.querySelector("#tessera-branch");
+      if (!bar || !sel) return;
+      var segs = location.pathname.replace(/\/[^\/]*\.html?$/, "/").split("/").filter(Boolean);
+      var current = segs.length ? segs[segs.length - 1] : "";
+      fetch("../branches.json", { cache: "no-store" })
+        .then(function (r) { return r.ok ? r.json() : []; })
+        .then(function (list) {
+          if (!list || !list.length) return;
+          sel.innerHTML = "";
+          list.forEach(function (e) {
+            var o = document.createElement("option");
+            o.value = e.slug;
+            o.textContent = e.branch;
+            if (e.slug === current) o.selected = true;
+            sel.appendChild(o);
+          });
+          bar.style.display = "flex";
+          bar.classList.add("tessera-ready");
+        })
+        .catch(function () {});
+      sel.addEventListener("change", function () {
+        if (sel.value && sel.value !== current) {
+          location.href = "../" + sel.value + "/" + location.search + location.hash;
+        }
+      });
     })();
 
     /* ---------------------------------------------------------------
