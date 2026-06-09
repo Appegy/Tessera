@@ -47,24 +47,28 @@
     #stage { position: fixed; inset: clamp(12px, 2.2vw, 40px); border-radius: 18px; overflow: hidden;
       background: var(--bg); border: 1px solid var(--frame-br); box-shadow: var(--stage-shadow);
       transition: background-color .55s cubic-bezier(.4,0,.2,1), border-color .55s cubic-bezier(.4,0,.2,1); }
-    #unity-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; background: var(--bg); outline: none;
+    #unity-canvas { position: absolute; left: 0; right: 0; top: 40px; bottom: 0; display: block; background: var(--bg); outline: none;
       transition: background-color .55s cubic-bezier(.4,0,.2,1); }
 
     /* ===== Chrome row (preview switcher + fullscreen), pinned top-right ===== */
-    #chrome { position: absolute; z-index: 6; top: 16px; right: 16px; display: flex; align-items: center; gap: 10px;
-      opacity: 0; transform: translateY(-6px); transition: opacity .5s ease, transform .5s ease; pointer-events: none; }
-    #chrome.ready { opacity: 1; transform: translateY(0); pointer-events: auto; }
+    /* Top bar inside the stage (like a window titlebar): controls live here, the
+       canvas starts below it, so nothing overlaps the grid at any window size. */
+    #chrome { position: absolute; z-index: 6; top: 0; left: 0; right: 0; height: 40px;
+      display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 0 10px;
+      background: var(--bg); border-bottom: 1px solid var(--frame-br);
+      transition: background-color .55s ease, border-color .55s ease; }
     .glass { border: 1px solid var(--chrome-br); background: var(--chrome-bg);
       backdrop-filter: blur(12px) saturate(140%); -webkit-backdrop-filter: blur(12px) saturate(140%); }
 
     /* preview dropdown */
     #dd { position: relative; }
-    .dd-field { display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 12px 0 14px; border-radius: 12px;
-      cursor: pointer; color: var(--text); font: 600 13px/1 inherit; transition: border-color .15s ease, background-color .55s ease; }
+    .dd-field { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 9px 0 11px; border-radius: 8px;
+      border: 1px solid var(--field-border); background: transparent;
+      cursor: pointer; color: var(--text); font: 600 12px/1 inherit; transition: border-color .15s ease; }
     .dd-field:hover { border-color: var(--accent); }
-    .dd-lbl { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
-    .dd-cur { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .dd-chev { width: 7px; height: 7px; margin-left: 2px; border: 0 solid var(--muted); border-right-width: 2px; border-bottom-width: 2px;
+    .dd-lbl { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 9px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+    .dd-cur { max-width: 175px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dd-chev { width: 6px; height: 6px; margin-left: 1px; border: 0 solid var(--muted); border-right-width: 2px; border-bottom-width: 2px;
       transform: rotate(45deg) translateY(-2px); transition: transform .18s ease; }
     .dd-field.open .dd-chev { transform: rotate(225deg) translateY(-1px); }
     .dd-popup { position: fixed; z-index: 101; min-width: 220px; max-height: 60vh; overflow-y: auto;
@@ -76,17 +80,16 @@
     .dd-item .pr { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px; color: var(--muted); }
     .dd-blocker { position: fixed; inset: 0; z-index: 100; background: transparent; }
 
-    .chrome-btn { width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; border-radius: 12px;
-      color: var(--muted); cursor: pointer; transition: color .2s ease, border-color .2s ease, background-color .55s ease, transform .12s ease; }
+    .chrome-btn { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px;
+      border: 1px solid var(--field-border); background: transparent;
+      color: var(--muted); cursor: pointer; transition: color .2s ease, border-color .2s ease, transform .12s ease; }
     .chrome-btn:hover { color: var(--text); border-color: var(--accent); }
     .chrome-btn:active { transform: scale(.93); }
-    .chrome-btn svg { width: 18px; height: 18px; display: block; }
+    .chrome-btn svg { width: 15px; height: 15px; display: block; }
 
-    /* ===== Generative tessellation backdrop (load only) ===== */
-    #bg { position: fixed; inset: 0; width: 100%; height: 100%; display: block; z-index: 10; pointer-events: none; }
-
-    /* ===== Loading curtain ===== */
-    #loader { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center;
+    /* ===== Loading curtain: fills the stage BELOW the topbar (not the whole
+       viewport), so the topbar with the branch switcher stays visible during load. ===== */
+    #loader { position: absolute; left: 0; right: 0; top: 40px; bottom: 0; z-index: 5; display: flex; align-items: center; justify-content: center;
       background: radial-gradient(ellipse 120% 90% at 50% 44%, transparent 38%, var(--vignette) 100%), var(--bg);
       transition: opacity .7s cubic-bezier(.4,0,.2,1), background-color .55s cubic-bezier(.4,0,.2,1); }
     #loader.hidden { opacity: 0; pointer-events: none; }
@@ -127,6 +130,21 @@
 </head>
 <body>
   <div id="stage">
+    <div id="chrome">
+      <div id="dd">
+        <div class="dd-field" id="dd-field">
+          <span class="dd-lbl">preview</span>
+          <span class="dd-cur" id="dd-cur">main</span>
+          <span class="dd-chev"></span>
+        </div>
+      </div>
+      <button class="chrome-btn" id="fs" type="button" title="Toggle fullscreen" aria-label="Toggle fullscreen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 9V5a1 1 0 0 1 1-1h4M20 9V5a1 1 0 0 0-1-1h-4M4 15v4a1 1 0 0 0 1 1h4M20 15v4a1 1 0 0 1-1 1h-4"/>
+        </svg>
+      </button>
+    </div>
+
     <canvas id="unity-canvas" tabindex="-1"></canvas>
 
     <div id="stub">
@@ -136,33 +154,16 @@
       <button id="stub-s">add ?s= (test deep-link survives switch)</button>
     </div>
 
-    <div id="chrome">
-      <div id="dd">
-        <div class="dd-field glass" id="dd-field">
-          <span class="dd-lbl">preview</span>
-          <span class="dd-cur" id="dd-cur">main</span>
-          <span class="dd-chev"></span>
+    <div id="loader" role="status" aria-live="polite" aria-label="Loading Tessera">
+      <div id="glow"></div>
+      <div class="brand">
+        <div class="mark" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+        <div class="word">TESSERA</div>
+        <div class="sub">grid · geometry · playground</div>
+        <div class="pwrap">
+          <div class="ptrack"><div class="pfill" id="pfill"></div></div>
+          <div class="pmeta"><span id="status">initializing</span><span id="percent">0%</span></div>
         </div>
-      </div>
-      <button class="chrome-btn glass" id="fs" type="button" title="Toggle fullscreen" aria-label="Toggle fullscreen">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M4 9V5a1 1 0 0 1 1-1h4M20 9V5a1 1 0 0 0-1-1h-4M4 15v4a1 1 0 0 0 1 1h4M20 15v4a1 1 0 0 1-1 1h-4"/>
-        </svg>
-      </button>
-    </div>
-  </div>
-
-  <canvas id="bg"></canvas>
-
-  <div id="loader" role="status" aria-live="polite" aria-label="Loading Tessera">
-    <div id="glow"></div>
-    <div class="brand">
-      <div class="mark" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
-      <div class="word">TESSERA</div>
-      <div class="sub">grid · geometry · playground</div>
-      <div class="pwrap">
-        <div class="ptrack"><div class="pfill" id="pfill"></div></div>
-        <div class="pmeta"><span id="status">initializing</span><span id="percent">0%</span></div>
       </div>
     </div>
   </div>
@@ -199,37 +200,14 @@
       window.setTesseraTheme(saved === "1");
     })();
 
-    /* ---- generative backdrop (runs during load, then stops) ---- */
-    var bg = document.getElementById("bg"), bgx = bg.getContext("2d"), bgRaf = 0, dpr = 1;
-    function cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
-    function sizeBg() { dpr = Math.min(window.devicePixelRatio || 1, 2); bg.width = Math.floor(innerWidth*dpr); bg.height = Math.floor(innerHeight*dpr); }
-    sizeBg();
-    function drawBg(now) {
-      var t = (now - bootStart) / 1000, w = bg.width, h = bg.height, cell = 46*dpr;
-      bgx.clearRect(0,0,w,h);
-      var ox = (t*9*dpr)%cell, oy = (t*6*dpr)%cell;
-      bgx.lineWidth = 1; bgx.strokeStyle = cssVar("--grid") || "rgba(108,124,240,.10)"; bgx.beginPath();
-      for (var x=-ox; x<=w; x+=cell){ bgx.moveTo(x,0); bgx.lineTo(x,h); }
-      for (var y=-oy; y<=h; y+=cell){ bgx.moveTo(0,y); bgx.lineTo(w,y); }
-      bgx.stroke();
-      var cols = Math.ceil(w/cell)+1, rows = Math.ceil(h/cell)+1;
-      bgx.strokeStyle = cssVar("--grid-bold") || "rgba(108,124,240,.20)"; bgx.lineWidth = 1.5*dpr;
-      for (var i=0;i<7;i++){ var ph=t*.35+i*1.7; var gx=Math.floor((Math.sin(ph)*.5+.5)*cols)*cell-ox; var gy=Math.floor((Math.cos(ph*.8+i)*.5+.5)*rows)*cell-oy;
-        var pulse=.5+.5*Math.sin(t*2+i); bgx.globalAlpha=.25+pulse*.55; bgx.strokeRect(gx,gy,cell,cell); }
-      bgx.globalAlpha = 1; bgRaf = requestAnimationFrame(drawBg);
-    }
-    bgRaf = requestAnimationFrame(drawBg);
-    function stopBg(){ if(bgRaf) cancelAnimationFrame(bgRaf); bgRaf=0; bg.style.display="none"; }
-    addEventListener("resize", function(){ requestAnimationFrame(sizeBg); });
-
     /* ---- loader progress + min display time ---- */
     function renderBar(frac){ var p=Math.round(Math.max(0,Math.min(1,frac))*100); pfill.style.width=p+"%"; percentEl.textContent=p+"%";
       statusEl.textContent = p<25?"fetching build":p<70?"decompressing":p<99?"warming up":"ready"; }
     function tick(now){ if(finished) return; var tf=Math.min(1,(now-bootStart)/MIN_LOADER_MS); renderBar(Math.min(realProgress,tf));
       if(instanceReady && realProgress>=1 && tf>=1){ finishLoader(); return; } requestAnimationFrame(tick); }
     requestAnimationFrame(tick);
-    function finishLoader(){ if(finished) return; finished=true; renderBar(1); loaderEl.classList.add("hidden"); chromeEl.classList.add("ready");
-      setTimeout(function(){ if(loaderEl.parentNode) loaderEl.parentNode.removeChild(loaderEl); stopBg(); }, 750); }
+    function finishLoader(){ if(finished) return; finished=true; renderBar(1); loaderEl.classList.add("hidden");
+      setTimeout(function(){ if(loaderEl.parentNode) loaderEl.parentNode.removeChild(loaderEl); }, 750); }
     function fail(msg){ statusEl.textContent="failed"; var d=document.createElement("div"); d.textContent=String(msg); bannerEl.appendChild(d); bannerEl.style.display="flex"; }
 
     /* ---- fullscreen ---- */
@@ -257,9 +235,8 @@
       function close(){ open=false; field.classList.remove("open"); if(popup){popup.remove();popup=null;} if(blocker){blocker.remove();blocker=null;} }
       function openIt(){
         open=true; field.classList.add("open");
-        // Blocker + popup go on <body> (root stacking context). #chrome has a transform,
-        // so a popup inside it would be both z-index-capped under the blocker AND positioned
-        // relative to #chrome instead of the viewport. On body, popup(101) sits above blocker(100).
+        // Blocker + popup go on <body>: #stage has overflow:hidden, so a popup inside the
+        // topbar would be clipped to the stage. On body, popup(101) sits above blocker(100).
         blocker=document.createElement("div"); blocker.className="dd-blocker"; blocker.onclick=close; document.body.appendChild(blocker);
         popup=document.createElement("div"); popup.className="dd-popup";
         list.forEach(function(e){
@@ -289,11 +266,18 @@
 
     /* ---- real Unity build ---- */
     function loadUnity(slug, build){
+      var canvas = document.getElementById("unity-canvas");
+      var stage = document.getElementById("stage");
+      // Give Unity an explicit canvas size (container minus the 40px topbar). Without this the
+      // build falls back to the default 300x150 canvas and renders in a tiny top-left corner.
+      function fit(){ canvas.style.width = stage.clientWidth + "px"; canvas.style.height = Math.max(1, stage.clientHeight - 40) + "px"; }
+      fit();
+      window.addEventListener("resize", fit);
       var cfg = { dataUrl: slug+"/"+build.dataUrl, frameworkUrl: slug+"/"+build.frameworkUrl, codeUrl: slug+"/"+build.codeUrl,
         streamingAssetsUrl: slug+"/StreamingAssets", companyName: build.companyName||"Appegy", productName: build.productName||"Tessera",
         productVersion: build.productVersion||"0.0", showBanner: function(m){ fail(m); } };
       var sc = document.createElement("script"); sc.src = slug+"/"+build.loaderUrl;
-      sc.onload = function(){ createUnityInstance(document.getElementById("unity-canvas"), cfg, function(p){ realProgress=p||0; })
+      sc.onload = function(){ createUnityInstance(canvas, cfg, function(p){ realProgress=p||0; })
         .then(function(inst){ window.tesseraUnity=inst; instanceReady=true; realProgress=1; })
         .catch(function(e){ fail(e); }); };
       sc.onerror = function(){ fail("Failed to load the Tessera engine."); };
