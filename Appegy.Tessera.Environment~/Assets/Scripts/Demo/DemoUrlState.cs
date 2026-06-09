@@ -15,6 +15,7 @@ namespace Appegy.Tessera.Demo
     {
         private const string GridKey = "g";
         private const string LineWidthKey = "lw";
+        private const float DefaultLineWidth = 0.5f;
 
         // Short, readable query keys per parameter Id (unique within a grid). Unmapped ids fall back to
         // the Id itself. Different grids may reuse a key (e.g. "w") since only one grid is in the URL.
@@ -36,9 +37,14 @@ namespace Appegy.Tessera.Demo
             if (demo == null) return string.Empty;
             var sb = new StringBuilder();
             sb.Append(GridKey).Append('=').Append(demo.UrlId);
+            // Only non-default values are written, so a link is short and carries just the delta from
+            // defaults (e.g. ?g=voronoi&n=200). TryDecode resets the grid to defaults before applying,
+            // so an omitted key means "default", never the viewer's saved value.
             foreach (var parameter in demo.Parameters)
-                sb.Append('&').Append(Key(parameter)).Append('=').Append(Format(parameter));
-            sb.Append('&').Append(LineWidthKey).Append('=').Append(lineWidthScale.ToString("0.###", CultureInfo.InvariantCulture));
+                if (!parameter.IsAtDefault)
+                    sb.Append('&').Append(Key(parameter)).Append('=').Append(Format(parameter));
+            if (System.Math.Abs(lineWidthScale - DefaultLineWidth) > 0.001f)
+                sb.Append('&').Append(LineWidthKey).Append('=').Append(lineWidthScale.ToString("0.###", CultureInfo.InvariantCulture));
             return sb.ToString();
         }
 
@@ -49,7 +55,7 @@ namespace Appegy.Tessera.Demo
         /// </summary>
         public static GridDemo TryDecode(string query, IReadOnlyList<GridDemo> demos, out float lineWidthScale)
         {
-            lineWidthScale = 0.5f;
+            lineWidthScale = DefaultLineWidth;
             if (demos == null) return null;
             var pairs = ParseQuery(query);
             if (pairs.TryGetValue(LineWidthKey, out var lwStr) &&
@@ -62,6 +68,10 @@ namespace Appegy.Tessera.Demo
                 if (demo.UrlId == gridId) { target = demo; break; }
             if (target == null) return null;
 
+            // A shared link is a snapshot relative to defaults: reset the grid to defaults, then apply
+            // only the keys present, so omitted (default) params don't inherit the viewer's saved prefs.
+            foreach (var parameter in target.Parameters)
+                parameter.ResetToDefault();
             foreach (var parameter in target.Parameters)
                 if (pairs.TryGetValue(Key(parameter), out var value)) Apply(parameter, value);
             return target;
