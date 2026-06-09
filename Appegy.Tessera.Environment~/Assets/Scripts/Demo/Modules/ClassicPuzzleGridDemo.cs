@@ -13,6 +13,7 @@ namespace Appegy.Tessera.Demo
         private FloatParameter _tabDeform;
 
         public override string DisplayName => "Classic Puzzle";
+        public override string UrlId => "classic";
         public override string Icon => "extension";
 
         protected override void BuildParameters(List<DemoParameter> parameters)

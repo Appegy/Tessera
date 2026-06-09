@@ -178,13 +178,13 @@ namespace Appegy.Tessera
 
         private static float2[] SampleSeeds(Bounds2 bounds, int cellCount, int seed)
         {
-            var random = new System.Random(seed);
+            var random = new Mulberry32((uint)seed);
             var seeds = new float2[cellCount];
             for (var i = 0; i < seeds.Length; i++)
             {
                 seeds[i] = new float2(
-                    bounds.Min.x + (float)random.NextDouble() * bounds.Size.x,
-                    bounds.Min.y + (float)random.NextDouble() * bounds.Size.y);
+                    bounds.Min.x + random.NextFloat() * bounds.Size.x,
+                    bounds.Min.y + random.NextFloat() * bounds.Size.y);
             }
 
             return seeds;

@@ -8,6 +8,7 @@ namespace Appegy.Tessera.Demo
         private IntParameter _width;
 
         public override string DisplayName => "Square";
+        public override string UrlId => "square";
         public override string Icon => "grid_view";
 
         protected override void BuildParameters(List<DemoParameter> parameters)

@@ -11,6 +11,7 @@ namespace Appegy.Tessera.Demo
         private IntParameter _width;
 
         public override string DisplayName => "Hexagonal";
+        public override string UrlId => "hex";
         public override string Icon => "hexagon";
 
         protected override void BuildParameters(List<DemoParameter> parameters)
