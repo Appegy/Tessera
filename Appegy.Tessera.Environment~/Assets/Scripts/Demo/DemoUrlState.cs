@@ -24,7 +24,7 @@ namespace Appegy.Tessera.Demo
             { "regionWidth", "w" }, { "regionHeight", "h" }, { "cellCount", "n" }, { "relaxation", "relax" },
             { "width", "w" }, { "height", "h" }, { "layout", "layout" },
             { "columns", "cols" }, { "rows", "rows" }, { "roundness", "round" },
-            { "tabRadius", "trad" }, { "tabOffset", "toff" }, { "tabDeform", "tdef" },
+            { "tabRadius", "trad" }, { "tabOffset", "toff" }, { "tabDeform", "tdef" }, { "tabNeck", "neck" },
             { "tabSize", "tab" }, { "variation", "var" }, { "smoothness", "smooth" },
             { "seed", "seed" },
         };
