@@ -48,6 +48,10 @@ namespace Appegy.Tessera.Demo
         private IPointerOverUiProbe _overUi;
         private float _targetOrtho;
 
+        private GameObject _backdropGo;
+        private Material _backdropMat;
+        private static Mesh _quadMesh;
+
         public IReadOnlyList<GridDemo> Demos => _demos;
         public GridDemo Current => _current;
         public int CellCount => _gridView != null && _gridView.Grid != null ? _gridView.Grid.CellCount : 0;
@@ -184,6 +188,77 @@ namespace Appegy.Tessera.Demo
             return false;
         }
 
+        // ---- Background image (web build): a textured quad centred on the grid, behind its lines,
+        // scaled to COVER the grid bounds (an image with the grid's aspect fits exactly; otherwise one
+        // axis overflows). Runtime-only: never persisted, never shared, never in the URL. ----
+
+        public bool HasBackdrop => _backdropGo != null && _backdropGo.activeSelf;
+
+        public void SetBackdrop(Texture2D texture)
+        {
+            if (texture == null || _gridView == null || _gridView.Material == null) return;
+            if (_backdropGo == null)
+            {
+                if (_quadMesh == null) _quadMesh = CreateQuad();
+                _backdropGo = new GameObject("Backdrop") { hideFlags = HideFlags.DontSave };
+                _backdropGo.transform.SetParent(_gridView.transform, false);
+                _backdropGo.AddComponent<MeshFilter>().sharedMesh = _quadMesh;
+                var renderer = _backdropGo.AddComponent<MeshRenderer>();
+                _backdropMat = new Material(_gridView.Material);
+                renderer.sharedMaterial = _backdropMat;
+                renderer.sortingOrder = -1; // behind the highlight fill (0) and edges (1)
+                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                renderer.receiveShadows = false;
+            }
+            var previous = _backdropMat.mainTexture;
+            _backdropMat.mainTexture = texture;
+            if (previous != null && previous != texture) Destroy(previous);
+            _backdropGo.SetActive(true);
+            FitBackdrop();
+        }
+
+        public void ClearBackdrop()
+        {
+            if (_backdropGo != null) _backdropGo.SetActive(false);
+            if (_backdropMat != null && _backdropMat.mainTexture != null)
+            {
+                var tex = _backdropMat.mainTexture;
+                _backdropMat.mainTexture = null;
+                Destroy(tex);
+            }
+        }
+
+        private void FitBackdrop()
+        {
+            if (!HasBackdrop || _gridView == null || _gridView.Grid == null || _backdropMat == null) return;
+            var tex = _backdropMat.mainTexture;
+            if (tex == null) return;
+            var size = _gridView.Grid.Bounds.Size;
+            var gridW = math.max(0.0001f, size.x);
+            var gridH = math.max(0.0001f, size.y);
+            var imgAspect = (float)tex.width / math.max(1, tex.height);
+            float w, h;
+            if (imgAspect > gridW / gridH) { h = gridH; w = gridH * imgAspect; }
+            else { w = gridW; h = gridW / imgAspect; }
+            _backdropGo.transform.localPosition = new Vector3(0f, 0f, 0.02f);
+            _backdropGo.transform.localScale = new Vector3(w, h, 1f);
+        }
+
+        private static Mesh CreateQuad()
+        {
+            var m = new Mesh { name = "BackdropQuad" };
+            m.vertices = new[]
+            {
+                new Vector3(-0.5f, -0.5f, 0f), new Vector3(0.5f, -0.5f, 0f),
+                new Vector3(0.5f, 0.5f, 0f), new Vector3(-0.5f, 0.5f, 0f)
+            };
+            m.uv = new[] { new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(0f, 1f) };
+            m.colors = new[] { Color.white, Color.white, Color.white, Color.white };
+            m.triangles = new[] { 0, 2, 1, 0, 3, 2 };
+            m.RecalculateBounds();
+            return m;
+        }
+
         private void Rebuild()
         {
             if (_gridView == null || _current == null) return;
@@ -205,6 +280,7 @@ namespace Appegy.Tessera.Demo
             _gridView.LineColor = _lineColor;
             _gridView.SetGrid(grid);
             _lastHovered = -1;
+            FitBackdrop();
             RecomputeTargetOrtho();
             GridRebuilt?.Invoke();
         }

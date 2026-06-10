@@ -26,12 +26,17 @@ namespace Appegy.Tessera.Demo
         private VisualElement _themeRoot;
         private bool _isLight;
         private int _uiScaleIndex = 1;
+        private Button _bgClearBtn;
 
 #if UNITY_WEBGL && !UNITY_EDITOR
         [System.Runtime.InteropServices.DllImport("__Internal")]
         private static extern int TesseraGetTheme();
         [System.Runtime.InteropServices.DllImport("__Internal")]
         private static extern void TesseraRegisterThemeTarget(string name);
+        [System.Runtime.InteropServices.DllImport("__Internal")]
+        private static extern void TesseraPickImage(string target);
+        [System.Runtime.InteropServices.DllImport("__Internal")]
+        private static extern void TesseraRevokeUrl(string url);
 #endif
 
 #if UNITY_EDITOR
@@ -120,8 +125,76 @@ namespace Appegy.Tessera.Demo
             container.Add(highlightRow);
 
             container.Add(BuildLineWidth());
+            container.Add(BuildBackground());
 
             container.Add(BuildSegmented("Text Size", new[] { "Small", "Medium", "Large" }, _uiScaleIndex, SetUiScale));
+        }
+
+        // ---- Background image (web build): pick an image and drop it under the grid. The chosen
+        // image is centred and scaled to cover the grid (it overflows on one axis unless its aspect
+        // matches). Runtime-only: not persisted, not shared, not in the URL. ----
+        private VisualElement BuildBackground()
+        {
+            var row = new VisualElement();
+            row.AddToClassList("param");
+            var caption = new Label("Background");
+            caption.AddToClassList("param-label");
+            row.Add(caption);
+
+            var btnRow = new VisualElement();
+            btnRow.AddToClassList("bg-row");
+            var choose = new Button(ChooseBackground) { text = "Choose image" };
+            choose.AddToClassList("bg-btn");
+            _bgClearBtn = new Button(ClearBackground) { text = "Clear" };
+            _bgClearBtn.AddToClassList("bg-clear");
+            _bgClearBtn.style.display = _controller.HasBackdrop ? DisplayStyle.Flex : DisplayStyle.None;
+            btnRow.Add(choose);
+            btnRow.Add(_bgClearBtn);
+            row.Add(btnRow);
+            return row;
+        }
+
+        private void ChooseBackground()
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            TesseraPickImage(gameObject.name);
+#elif UNITY_EDITOR
+            var path = UnityEditor.EditorUtility.OpenFilePanel("Choose background image", "", "png,jpg,jpeg");
+            if (string.IsNullOrEmpty(path)) return;
+            var tex = new Texture2D(2, 2);
+            if (tex.LoadImage(System.IO.File.ReadAllBytes(path))) ApplyBackdrop(tex);
+#endif
+        }
+
+        /// <summary>Called by the web picker (SendMessage) with a blob URL for the chosen image.</summary>
+        public void OnImagePicked(string url)
+        {
+            if (!string.IsNullOrEmpty(url)) StartCoroutine(LoadBackdrop(url));
+        }
+
+        private System.Collections.IEnumerator LoadBackdrop(string url)
+        {
+            using (var req = UnityEngine.Networking.UnityWebRequestTexture.GetTexture(url))
+            {
+                yield return req.SendWebRequest();
+#if UNITY_WEBGL && !UNITY_EDITOR
+                TesseraRevokeUrl(url);
+#endif
+                if (req.result == UnityEngine.Networking.UnityWebRequest.Result.Success)
+                    ApplyBackdrop(UnityEngine.Networking.DownloadHandlerTexture.GetContent(req));
+            }
+        }
+
+        private void ApplyBackdrop(Texture2D tex)
+        {
+            _controller.SetBackdrop(tex);
+            if (_bgClearBtn != null) _bgClearBtn.style.display = DisplayStyle.Flex;
+        }
+
+        private void ClearBackground()
+        {
+            _controller.ClearBackdrop();
+            if (_bgClearBtn != null) _bgClearBtn.style.display = DisplayStyle.None;
         }
 
         // Line width as a 0..1 scale bound to DemoController.LineWidthScale, which lives in the
