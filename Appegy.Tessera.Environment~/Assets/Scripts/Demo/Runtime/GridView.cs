@@ -43,6 +43,10 @@ namespace Appegy.Tessera.Demo
         public ITessellation Grid => _grid;
         public Vector2 GridCenter => _center;
 
+        /// <summary>The shared grid material (Sprites/Default), reused to instance a backdrop material
+        /// without Shader.Find (which WebGL would strip).</summary>
+        public Material Material => _material;
+
         private void Awake() => EnsureChildren();
 
         private void OnDestroy()
