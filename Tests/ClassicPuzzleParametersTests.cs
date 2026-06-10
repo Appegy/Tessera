@@ -14,6 +14,7 @@ namespace Appegy.Tessera.Tests
             Assert.AreEqual(0.5f, p.TabRadius);
             Assert.AreEqual(0.5f, p.TabOffset);
             Assert.AreEqual(0f, p.TabDeform);
+            Assert.AreEqual(0f, p.TabNeck);
         }
 
         [Test]
@@ -37,20 +38,23 @@ namespace Appegy.Tessera.Tests
             var pRad = new ClassicPuzzleParameters(0.5f, input, 0.5f);
             var pOff = new ClassicPuzzleParameters(0.5f, 0.5f, input);
             var pDef = new ClassicPuzzleParameters(0.5f, 0.5f, 0.5f, input);
+            var pNeck = new ClassicPuzzleParameters(0.5f, 0.5f, 0.5f, 0.5f, input);
             Assert.AreEqual(expected, pR.Roundness);
             Assert.AreEqual(expected, pRad.TabRadius);
             Assert.AreEqual(expected, pOff.TabOffset);
             Assert.AreEqual(expected, pDef.TabDeform);
+            Assert.AreEqual(expected, pNeck.TabNeck);
         }
 
         [Test]
         public void Construct_NaN_FallsBackToZero()
         {
-            var p = new ClassicPuzzleParameters(float.NaN, float.NaN, float.NaN, float.NaN);
+            var p = new ClassicPuzzleParameters(float.NaN, float.NaN, float.NaN, float.NaN, float.NaN);
             Assert.AreEqual(0f, p.Roundness);
             Assert.AreEqual(0f, p.TabRadius);
             Assert.AreEqual(0f, p.TabOffset);
             Assert.AreEqual(0f, p.TabDeform);
+            Assert.AreEqual(0f, p.TabNeck);
         }
 
         [Test]
@@ -69,7 +73,7 @@ namespace Appegy.Tessera.Tests
             for (var i = 0; i <= 20; i++)
             {
                 var t = i / 20f;
-                var p = new ClassicPuzzleParameters(t, t, t, t);
+                var p = new ClassicPuzzleParameters(t, t, t, t, t);
                 Assert.GreaterOrEqual(p.ResolvedRadius, ClassicPuzzleParameters.MinRadius - Eps);
                 Assert.LessOrEqual(p.ResolvedRadius, ClassicPuzzleParameters.MaxRadius + Eps);
                 Assert.GreaterOrEqual(p.ResolvedHeadHeight, -Eps);
@@ -96,10 +100,32 @@ namespace Appegy.Tessera.Tests
         [Test]
         public void NeckRatios_AreSane()
         {
-            // The head must overhang the neck (waist < head radius), and the floor must be positive.
+            // The head must overhang the neck (waist < head radius) across the whole TabNeck range,
+            // and the floor must be positive.
             Assert.Greater(ClassicPuzzleParameters.NeckWidth, 0f);
-            Assert.Less(ClassicPuzzleParameters.NeckWidth, 1f);
+            Assert.Less(ClassicPuzzleParameters.NeckWidth, ClassicPuzzleParameters.NeckWidthMax);
+            Assert.Less(ClassicPuzzleParameters.NeckWidthMax, 1f);
             Assert.Greater(ClassicPuzzleParameters.FilletMin, 0f);
+        }
+
+        [Test]
+        public void TabNeck_OpensWaistFromBaseToMax()
+        {
+            var min = new ClassicPuzzleParameters(0.5f, 0.5f, 0.5f, 0f, 0f);
+            var max = new ClassicPuzzleParameters(0.5f, 0.5f, 0.5f, 0f, 1f);
+            Assert.AreEqual(ClassicPuzzleParameters.NeckWidth, min.ResolvedNeckWidth, Eps);
+            Assert.AreEqual(ClassicPuzzleParameters.NeckWidthMax, max.ResolvedNeckWidth, Eps);
+        }
+
+        [Test]
+        public void TabNeck_GrowsFilletWhenNotFloored()
+        {
+            // At a high TabOffset the fillet is well above its floor, so a wider neck must round the
+            // base more (larger fillet) without the head ever losing its overhang.
+            var min = new ClassicPuzzleParameters(0.5f, 0.5f, 1f, 0f, 0f);
+            var max = new ClassicPuzzleParameters(0.5f, 0.5f, 1f, 0f, 1f);
+            Assert.Greater(max.ResolvedFillet, min.ResolvedFillet);
+            Assert.LessOrEqual(max.ResolvedFillet, max.ResolvedRadius + Eps);
         }
 
         [Test]
