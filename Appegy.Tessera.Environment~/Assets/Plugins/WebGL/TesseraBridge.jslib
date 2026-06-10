@@ -18,5 +18,29 @@ mergeInto(LibraryManager.library, {
   },
   TesseraRegisterThemeTarget: function (namePtr) {
     try { window.tesseraThemeTarget = UTF8ToString(namePtr); } catch (e) {}
+  },
+
+  // Background image: open a native file picker, hand the chosen image to the build as a blob URL
+  // (loaded with UnityWebRequestTexture). Runtime-only; never persisted or shared.
+  TesseraPickImage: function (targetPtr) {
+    try {
+      var target = UTF8ToString(targetPtr);
+      var input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.style.display = 'none';
+      input.addEventListener('change', function () {
+        if (input.files && input.files[0] && window.tesseraUnity) {
+          var url = URL.createObjectURL(input.files[0]);
+          window.tesseraUnity.SendMessage(target, 'OnImagePicked', url);
+        }
+        if (input.parentNode) input.parentNode.removeChild(input);
+      });
+      document.body.appendChild(input);
+      input.click();
+    } catch (e) {}
+  },
+  TesseraRevokeUrl: function (urlPtr) {
+    try { URL.revokeObjectURL(UTF8ToString(urlPtr)); } catch (e) {}
   }
 });
