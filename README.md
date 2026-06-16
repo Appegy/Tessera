@@ -189,15 +189,15 @@ var grid = new VoronoiGrid(bounds, cellCount: 120, seed: 1337, relaxationIterati
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="images/classic-puzzle-dark.webp">
-  <img alt="Classic puzzle grid" src="images/classic-puzzle-light.webp" width="380">
+  <img alt="Classic puzzle grid" src="images/classic-puzzle-light.webp" width="480">
 </picture>
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="images/draradech-puzzle-dark.webp">
-  <img alt="Draradech puzzle grid" src="images/draradech-puzzle-light.webp" width="380">
+  <img alt="Draradech puzzle grid" src="images/draradech-puzzle-light.webp" width="480">
 </picture>
 
 Jigsaw grids lay out a `width × height` tile field where adjacent tiles interlock via tabs and blanks.
-Two tab styles are available (`ClassicPuzzleGrid` left, `DraradechPuzzleGrid` right); both accept a
+Two tab styles are available (`ClassicPuzzleGrid` and `DraradechPuzzleGrid`); both accept a
 parameters struct (or `Default`) to tune the tab shape.
 
 ```csharp
@@ -215,11 +215,6 @@ var draradech = new DraradechPuzzleGrid(width: 8, height: 6, cellSize: 1f, seed:
 
 Puzzle cells expose extra per-side outline detail via `GetSidePolylineLength(id, side)` and
 `CopySidePolyline(id, side, dest)`, which is useful for rendering the curved tab edges.
-
-## Requirements
-
-- Unity **6000.0** or newer.
-- `com.unity.mathematics` (installed automatically as a dependency).
 
 ## License
 
