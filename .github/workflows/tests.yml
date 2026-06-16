@@ -24,8 +24,8 @@ jobs:
       - name: Cache Library
         uses: actions/cache@v4
         with:
-          path: Appegy.Tessera.Environment~/Library
-          key: Library-Tests-${{ hashFiles('Appegy.Tessera.Environment~/Assets/**', 'Appegy.Tessera.Environment~/Packages/**', 'Appegy.Tessera.Environment~/ProjectSettings/**', 'Runtime/**', 'Tests/**') }}
+          path: Library
+          key: Library-Tests-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
           restore-keys: |
             Library-Tests-
             Library-
@@ -38,7 +38,7 @@ jobs:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
-          projectPath: Appegy.Tessera.Environment~
+          projectPath: .
           unityVersion: 6000.4.8f1
           testMode: EditMode
 

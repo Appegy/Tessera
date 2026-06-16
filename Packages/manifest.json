@@ -1,6 +1,5 @@
 {
   "dependencies": {
-    "com.appegy.tessera": "file:../..",
     "com.coplaydev.unity-mcp": "9.7.1",
     "com.unity.ide.rider": "3.0.40",
     "com.unity.inputsystem": "1.19.0",
