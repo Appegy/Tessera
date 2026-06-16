@@ -13,9 +13,8 @@ on:
   push:
     branches: [main]
     paths:
-      - 'Assets/**'
-      - 'ProjectSettings/**'
-      - 'Packages/**'
+      - 'lab/**'
+      - 'src/**'
       - '.github/workflows/webgl-preview.yml'
       - '.github/pages/**'
   pull_request:
@@ -65,8 +64,8 @@ jobs:
       - name: Cache Library
         uses: actions/cache@v4
         with:
-          path: Library
-          key: Library-WebGL-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          path: lab/Library
+          key: Library-WebGL-${{ hashFiles('lab/Assets/**', 'lab/Packages/**', 'lab/ProjectSettings/**', 'src/**') }}
           restore-keys: |
             Library-WebGL-
             Library-
@@ -83,7 +82,7 @@ jobs:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
-          projectPath: .
+          projectPath: lab
           unityVersion: 6000.4.8f1
           targetPlatform: WebGL
           buildName: Tessera
