@@ -33,12 +33,6 @@ jobs:
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
-          # A '-' in the semver (e.g. 1.2.0-pre.1) marks a prerelease.
-          if [[ "$VERSION" == *-* ]]; then
-            echo "prerelease=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "prerelease=false" >> "$GITHUB_OUTPUT"
-          fi
           echo "Releasing v$VERSION"
 
       - name: Ensure tag does not already exist
@@ -74,9 +68,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          FLAGS=()
-          [ "${{ steps.pkg.outputs.prerelease }}" = "true" ] && FLAGS+=(--prerelease)
           gh release create "${{ steps.pkg.outputs.tag }}" "${{ steps.pack.outputs.tgz }}" \
             --title "${{ steps.pkg.outputs.tag }}" \
-            --generate-notes \
-            "${FLAGS[@]}"
+            --generate-notes

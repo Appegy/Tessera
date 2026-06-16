@@ -16,7 +16,6 @@ on:
           - patch
           - minor
           - major
-          - prerelease
         default: patch
 
 permissions:
@@ -32,9 +31,8 @@ jobs:
 
       - name: Bump and sync version
         run: |
-          # npm version increments from the current value (patch/minor/major/prerelease).
-          # --preid pre -> prerelease tags look like 1.2.4-pre.0; --no-git-tag-version: no commit/tag here.
-          ( cd src && npm version "${{ inputs.type }}" --preid pre --no-git-tag-version >/dev/null )
+          # npm version increments from the current value; --no-git-tag-version: no commit/tag here.
+          ( cd src && npm version "${{ inputs.type }}" --no-git-tag-version >/dev/null )
           NEW="$(jq -r .version src/package.json)"
           echo "Bumped to $NEW"
           # keep the same version everywhere it lives
