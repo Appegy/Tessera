@@ -42,7 +42,7 @@ Add the package to your `Packages/manifest.json`:
 Pin a specific version by appending a tag:
 
 ```json
-"com.appegy.tessera": "https://github.com/Appegy/Tessera.git?path=/src#1.0.1"
+"com.appegy.tessera": "https://github.com/Appegy/Tessera.git?path=/src#1.1.1"
 ```
 
 ## Usage
@@ -53,7 +53,7 @@ The construction differs per type; everything after that is identical.
 - [Square](#square) - regular row/column lattice, 4 neighbours.
 - [Hexagonal](#hexagonal) - honeycomb, pointy or flat top, 6 neighbours.
 - [Voronoi](#voronoi) - organic, irregular cells from scattered sites.
-- [Classic Puzzle](#classic-puzzle) / [Draradech Puzzle](#draradech-puzzle) - interlocking jigsaw tiles.
+- [Classic Puzzle](#classic-puzzle) / [Draradech Puzzle](#draradech-puzzle) / [Geometric](#geometric) - interlocking jigsaw tiles.
 
 ```csharp
 using Appegy.Tessera;
@@ -283,8 +283,47 @@ var custom = new DraradechPuzzleGrid(
     new DraradechPuzzleParameters(tabSize: 0.5f, variation: 0.5f, smoothness: 0.5f));
 ```
 
-> Both puzzle grids expose extra per-side outline detail via `GetSidePolylineLength(id, side)` and
-> `CopySidePolyline(id, side, dest)`, useful for rendering the curved tab edges at full fidelity.
+### Geometric
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/geometric-dark.webp">
+  <img alt="Geometric grid" src="images/geometric-light.webp" width="420">
+</picture>
+
+A polygonal jigsaw style: each tab is a fixed 10-vertex polyline with no curves, so it is the cheapest tab
+style to mesh and a good fit for low-poly. The head is wider than the neck, so pieces lock mechanically
+(dovetail). Tuned through `GeometricParameters`.
+
+| Parameter | Type | Description |
+| --- | --- | --- |
+| `width` | `int` | Number of tile columns (> 0). |
+| `height` | `int` | Number of tile rows (> 0). |
+| `cellSize` | `float` | Base tile size in world units, before tabs (> 0). |
+| `seed` | `int` | Decides tab/blank orientation per edge; reproducible. |
+| `parameters` | `GeometricParameters` | Optional tab shape (defaults to `GeometricParameters.Default`). |
+
+`GeometricParameters` - all values are normalized to `[0, 1]` (clamped; default `0.5` each). Each knob drives
+exactly one visual quantity, independently:
+
+| Field | Description |
+| --- | --- |
+| `headDepth` | How far the tab head sticks out from the edge. |
+| `headWidth` | Width of the locking head - wider reads as a stronger interlock. |
+| `neckWidth` | Width of the neck waist below the head. |
+| `variation` | Per-edge random jitter of depth, width, and neck - higher is more irregular. |
+
+```csharp
+// Default tabs.
+var geometric = new GeometricGrid(width: 8, height: 6, cellSize: 1f, seed: 7);
+
+// Custom tab shape.
+var custom = new GeometricGrid(
+    width: 8, height: 6, cellSize: 1f, seed: 7,
+    new GeometricParameters(headDepth: 0.5f, headWidth: 0.5f, neckWidth: 0.5f, variation: 0.5f));
+```
+
+> The puzzle grids expose extra per-side outline detail via `GetSidePolylineLength(id, side)` and
+> `CopySidePolyline(id, side, dest)`, useful for rendering the tab edges at full fidelity.
 
 ## License
 
