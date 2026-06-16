@@ -7,6 +7,6 @@ namespace Appegy.Tessera
     public static class PackageInfo
     {
         public const string Name = "com.appegy.tessera";
-        public const string Version = "1.0.1";
+        public const string Version = "1.0.2";
     }
 }
