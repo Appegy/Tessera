@@ -15,7 +15,7 @@ namespace Appegy.Tessera
     //
     // The head spans [inset, 1 - inset] and the neck opening spans [0.5 - neckHalf, 0.5 + neckHalf];
     // inset < 0.5 - neckHalf makes the head overhang the neck on both sides, so pieces lock. All
-    // bounds and the per-edge jitter come pre-resolved from GeometricPuzzleParameters so any value
+    // bounds and the per-edge jitter come pre-resolved from GeometricParameters so any value
     // here already keeps the polygon simple and lockable.
     internal static class GeometricTab
     {
@@ -31,10 +31,10 @@ namespace Appegy.Tessera
             float neckJitter,
             Span<float2> dest)
         {
-            if (dest.Length != GeometricPuzzleParameters.VertexCount)
+            if (dest.Length != GeometricParameters.VertexCount)
             {
                 throw new ArgumentException(
-                    $"dest length must equal {GeometricPuzzleParameters.VertexCount}.", nameof(dest));
+                    $"dest length must equal {GeometricParameters.VertexCount}.", nameof(dest));
             }
 
             // Local frame: u along edge, w perpendicular (+90deg, Y-up). For a CW-traversed cell
@@ -51,7 +51,7 @@ namespace Appegy.Tessera
             var a = inset + rng.Range(-insetJitter, insetJitter);
             var nh = neckHalf + rng.Range(-neckJitter, neckJitter);
 
-            var shoulder = s * d * GeometricPuzzleParameters.ShoulderFraction;
+            var shoulder = s * d * GeometricParameters.ShoulderFraction;
             var head = s * d;
 
             dest[0] = At(p0, tangent, perp, 0f, 0f);

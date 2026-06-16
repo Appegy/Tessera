@@ -11,7 +11,7 @@ namespace Appegy.Tessera
     /// <c>[x*S, (x+1)*S] x [y*S, (y+1)*S]</c> but the actual polygon extends past it wherever a head
     /// pokes into a neighbour. The low vertex count makes this the cheapest puzzle style to mesh.
     /// </summary>
-    public sealed class GeometricPuzzleGrid : ITessellation
+    public sealed class GeometricGrid : ITessellation
     {
         // 0=right, 1=bottom, 2=left, 3=top.
         private static readonly int[] _sideDx = { +1, 0, -1, 0 };
@@ -25,12 +25,12 @@ namespace Appegy.Tessera
         private readonly int _samplesPerEdge;
         private readonly int _interiorN;
 
-        public GeometricPuzzleGrid(int width, int height, float cellSize, int seed)
-            : this(width, height, cellSize, seed, GeometricPuzzleParameters.Default)
+        public GeometricGrid(int width, int height, float cellSize, int seed)
+            : this(width, height, cellSize, seed, GeometricParameters.Default)
         {
         }
 
-        public GeometricPuzzleGrid(int width, int height, float cellSize, int seed, GeometricPuzzleParameters parameters)
+        public GeometricGrid(int width, int height, float cellSize, int seed, GeometricParameters parameters)
         {
             if (width <= 0) throw new ArgumentOutOfRangeException(nameof(width), "Width must be positive.");
             if (height <= 0) throw new ArgumentOutOfRangeException(nameof(height), "Height must be positive.");
@@ -86,7 +86,7 @@ namespace Appegy.Tessera
         public int Height { get; }
         public float CellSize { get; }
         public int Seed { get; }
-        public GeometricPuzzleParameters Parameters { get; }
+        public GeometricParameters Parameters { get; }
 
         public int CellCount { get; }
         public Bounds2 Bounds => _bounds;

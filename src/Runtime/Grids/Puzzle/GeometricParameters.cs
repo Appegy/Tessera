@@ -3,7 +3,7 @@ using Unity.Mathematics;
 namespace Appegy.Tessera
 {
     /// <summary>
-    /// Tab shape parameters for <see cref="GeometricPuzzleGrid"/>. All inputs are normalized to
+    /// Tab shape parameters for <see cref="GeometricGrid"/>. All inputs are normalized to
     /// [0, 1] (clamped; NaN falls back to 0.5); internal physical ranges are fractions of the edge
     /// length. The tab is a 10-vertex polyline with a dovetail head: no curves, so it is the
     /// cheapest puzzle silhouette to mesh.
@@ -22,7 +22,7 @@ namespace Appegy.Tessera
     /// <see cref="Variation"/> drives independent per-edge jitter on depth, inset, and neck, so the
     /// pieces look randomized while neighbours still stitch (jitter is deterministic per edge id).
     /// </summary>
-    public readonly struct GeometricPuzzleParameters
+    public readonly struct GeometricParameters
     {
         internal const float MinDepth = 0.05f;       // head protrusion at HeadDepth = 0
         internal const float MaxDepth = 0.14f;       // ...at HeadDepth = 1
@@ -48,7 +48,7 @@ namespace Appegy.Tessera
         public float NeckWidth { get; }
         public float Variation { get; }
 
-        public GeometricPuzzleParameters(float headDepth, float headWidth, float neckWidth, float variation)
+        public GeometricParameters(float headDepth, float headWidth, float neckWidth, float variation)
         {
             HeadDepth = Normalize(headDepth);
             HeadWidth = Normalize(headWidth);
@@ -56,7 +56,7 @@ namespace Appegy.Tessera
             Variation = Normalize(variation);
         }
 
-        public static GeometricPuzzleParameters Default => new GeometricPuzzleParameters(0.5f, 0.5f, 0.5f, 0.5f);
+        public static GeometricParameters Default => new GeometricParameters(0.5f, 0.5f, 0.5f, 0.5f);
 
         public int SamplesPerEdge => VertexCount;
 

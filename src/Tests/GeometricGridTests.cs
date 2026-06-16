@@ -4,32 +4,32 @@ using Unity.Mathematics;
 
 namespace Appegy.Tessera.Tests
 {
-    public class GeometricPuzzleGridTests
+    public class GeometricGridTests
     {
         private const float Eps = 1e-5f;
 
         [Test]
         public void Construct_NegativeWidth_Throws()
         {
-            Assert.Throws<ArgumentOutOfRangeException>(() => new GeometricPuzzleGrid(0, 4, 1f, 0));
+            Assert.Throws<ArgumentOutOfRangeException>(() => new GeometricGrid(0, 4, 1f, 0));
         }
 
         [Test]
         public void Construct_NegativeHeight_Throws()
         {
-            Assert.Throws<ArgumentOutOfRangeException>(() => new GeometricPuzzleGrid(4, 0, 1f, 0));
+            Assert.Throws<ArgumentOutOfRangeException>(() => new GeometricGrid(4, 0, 1f, 0));
         }
 
         [Test]
         public void Construct_NegativeCellSize_Throws()
         {
-            Assert.Throws<ArgumentOutOfRangeException>(() => new GeometricPuzzleGrid(4, 4, 0f, 0));
+            Assert.Throws<ArgumentOutOfRangeException>(() => new GeometricGrid(4, 4, 0f, 0));
         }
 
         [Test]
         public void Construct_StoresParameters()
         {
-            var g = new GeometricPuzzleGrid(4, 3, 2f, 7);
+            var g = new GeometricGrid(4, 3, 2f, 7);
             Assert.AreEqual(4, g.Width);
             Assert.AreEqual(3, g.Height);
             Assert.AreEqual(2f, g.CellSize);
@@ -46,7 +46,7 @@ namespace Appegy.Tessera.Tests
         [Test]
         public void Bounds_AnchoredAtOriginExtendsToWidthHeight()
         {
-            var g = new GeometricPuzzleGrid(4, 3, 2f, 0);
+            var g = new GeometricGrid(4, 3, 2f, 0);
             Assert.AreEqual(new float2(0, 0), g.Bounds.Min);
             Assert.AreEqual(new float2(8, 6), g.Bounds.Max);
         }
@@ -54,7 +54,7 @@ namespace Appegy.Tessera.Tests
         [Test]
         public void GetCenter_IsHalfCellOffset()
         {
-            var g = new GeometricPuzzleGrid(4, 3, 2f, 0);
+            var g = new GeometricGrid(4, 3, 2f, 0);
             Assert.AreEqual(new float2(1f, 1f), g.GetCenter(g.IdOf(0, 0)));
             Assert.AreEqual(new float2(3f, 3f), g.GetCenter(g.IdOf(1, 1)));
             Assert.AreEqual(new float2(7f, 5f), g.GetCenter(g.IdOf(3, 2)));
@@ -63,14 +63,14 @@ namespace Appegy.Tessera.Tests
         [Test]
         public void GetNeighborCount_IsFour()
         {
-            var g = new GeometricPuzzleGrid(4, 3, 1f, 0);
+            var g = new GeometricGrid(4, 3, 1f, 0);
             for (var id = 0; id < g.CellCount; id++) Assert.AreEqual(4, g.GetNeighborCount(id));
         }
 
         [Test]
         public void GetNeighbor_OnBoundary_ReturnsMinusOne()
         {
-            var g = new GeometricPuzzleGrid(3, 3, 1f, 0);
+            var g = new GeometricGrid(3, 3, 1f, 0);
             var id = g.IdOf(0, 0);
             Assert.AreEqual(-1, g.GetNeighbor(id, 1)); // bottom
             Assert.AreEqual(-1, g.GetNeighbor(id, 2)); // left
@@ -81,7 +81,7 @@ namespace Appegy.Tessera.Tests
         [Test]
         public void GetNeighbor_WrapsIndex()
         {
-            var g = new GeometricPuzzleGrid(3, 3, 1f, 0);
+            var g = new GeometricGrid(3, 3, 1f, 0);
             var id = g.IdOf(1, 1);
             Assert.AreEqual(g.GetNeighbor(id, 0), g.GetNeighbor(id, 4));
             Assert.AreEqual(g.GetNeighbor(id, 0), g.GetNeighbor(id, -4));
@@ -90,7 +90,7 @@ namespace Appegy.Tessera.Tests
         [Test]
         public void AreNeighbors_AgreesWithGetNeighbor()
         {
-            var g = new GeometricPuzzleGrid(4, 4, 1f, 0);
+            var g = new GeometricGrid(4, 4, 1f, 0);
             for (var id = 0; id < g.CellCount; id++)
             {
                 for (var k = 0; k < 4; k++)
@@ -107,14 +107,14 @@ namespace Appegy.Tessera.Tests
         [Test]
         public void AreNeighbors_SelfReturnsFalse()
         {
-            var g = new GeometricPuzzleGrid(3, 3, 1f, 0);
+            var g = new GeometricGrid(3, 3, 1f, 0);
             for (var id = 0; id < g.CellCount; id++) Assert.IsFalse(g.AreNeighbors(id, id));
         }
 
         [Test]
         public void AreNeighbors_OutOfRangeReturnsFalse()
         {
-            var g = new GeometricPuzzleGrid(3, 3, 1f, 0);
+            var g = new GeometricGrid(3, 3, 1f, 0);
             Assert.IsFalse(g.AreNeighbors(-1, 0));
             Assert.IsFalse(g.AreNeighbors(0, g.CellCount));
             Assert.IsFalse(g.AreNeighbors(g.CellCount, 0));
@@ -123,7 +123,7 @@ namespace Appegy.Tessera.Tests
         [Test]
         public void GetNeighborIndex_OutOfRangeReturnsMinusOne()
         {
-            var g = new GeometricPuzzleGrid(3, 3, 1f, 0);
+            var g = new GeometricGrid(3, 3, 1f, 0);
             Assert.AreEqual(-1, g.GetNeighborIndex(-1, 0));
             Assert.AreEqual(-1, g.GetNeighborIndex(g.CellCount, 0));
             Assert.AreEqual(-1, g.GetNeighborIndex(0, 0));
@@ -132,7 +132,7 @@ namespace Appegy.Tessera.Tests
         [Test]
         public void Distance_IsManhattan()
         {
-            var g = new GeometricPuzzleGrid(4, 4, 1f, 0);
+            var g = new GeometricGrid(4, 4, 1f, 0);
             Assert.AreEqual(0, g.Distance(g.IdOf(1, 1), g.IdOf(1, 1)));
             Assert.AreEqual(1, g.Distance(g.IdOf(1, 1), g.IdOf(2, 1)));
             Assert.AreEqual(2, g.Distance(g.IdOf(1, 1), g.IdOf(2, 2)));
@@ -142,14 +142,14 @@ namespace Appegy.Tessera.Tests
         [Test]
         public void GetCornersCount_OneByOne_IsFour()
         {
-            var g = new GeometricPuzzleGrid(1, 1, 1f, 0);
+            var g = new GeometricGrid(1, 1, 1f, 0);
             Assert.AreEqual(4, g.GetCornersCount(0));
         }
 
         [Test]
         public void GetCornersCount_InteriorCellHasFourFullSides()
         {
-            var g = new GeometricPuzzleGrid(3, 3, 1f, 0);
+            var g = new GeometricGrid(3, 3, 1f, 0);
             var n = g.Parameters.SamplesPerEdge - 2;
             Assert.AreEqual(4 + 4 * n, g.GetCornersCount(g.IdOf(1, 1)));
         }
@@ -157,7 +157,7 @@ namespace Appegy.Tessera.Tests
         [Test]
         public void GetCornersCount_BoundaryCells_HaveFewerCorners()
         {
-            var g = new GeometricPuzzleGrid(3, 3, 1f, 0);
+            var g = new GeometricGrid(3, 3, 1f, 0);
             var n = g.Parameters.SamplesPerEdge - 2;
             Assert.AreEqual(4 + 2 * n, g.GetCornersCount(g.IdOf(0, 0)));
             Assert.AreEqual(4 + 3 * n, g.GetCornersCount(g.IdOf(1, 0)));
@@ -166,7 +166,7 @@ namespace Appegy.Tessera.Tests
         [Test]
         public void GetCorner_AtRectCornersMatchesRectLayout()
         {
-            var g = new GeometricPuzzleGrid(1, 1, 2f, 0);
+            var g = new GeometricGrid(1, 1, 2f, 0);
             Assert.AreEqual(new float2(2, 2), g.GetCorner(0, 0)); // TR
             Assert.AreEqual(new float2(2, 0), g.GetCorner(0, 1)); // BR
             Assert.AreEqual(new float2(0, 0), g.GetCorner(0, 2)); // BL
@@ -176,7 +176,7 @@ namespace Appegy.Tessera.Tests
         [Test]
         public void GetCorner_WrapsIndex()
         {
-            var g = new GeometricPuzzleGrid(3, 3, 1f, 0);
+            var g = new GeometricGrid(3, 3, 1f, 0);
             var id = g.IdOf(1, 1);
             var n = g.GetCornersCount(id);
             Assert.AreEqual(g.GetCorner(id, 0), g.GetCorner(id, n));
@@ -187,7 +187,7 @@ namespace Appegy.Tessera.Tests
         [Test]
         public void CopyCorners_FillsDestination()
         {
-            var g = new GeometricPuzzleGrid(3, 3, 1f, 0);
+            var g = new GeometricGrid(3, 3, 1f, 0);
             var id = g.IdOf(1, 1);
             var n = g.GetCornersCount(id);
             var dest = new float2[n];
@@ -198,7 +198,7 @@ namespace Appegy.Tessera.Tests
         [Test]
         public void CopyCorners_ThrowsIfDestinationTooSmall()
         {
-            var g = new GeometricPuzzleGrid(3, 3, 1f, 0);
+            var g = new GeometricGrid(3, 3, 1f, 0);
             var id = g.IdOf(1, 1);
             var n = g.GetCornersCount(id);
             var dest = new float2[n - 1];
@@ -212,7 +212,7 @@ namespace Appegy.Tessera.Tests
         [TestCase(-7)]
         public void Corners_AreClockwise(int seed)
         {
-            var g = new GeometricPuzzleGrid(4, 4, 1f, seed);
+            var g = new GeometricGrid(4, 4, 1f, seed);
             AssertAllCellsCw(g, seed);
         }
 
@@ -222,7 +222,7 @@ namespace Appegy.Tessera.Tests
         [TestCase(123)]
         public void SharedEdge_NeighboursAgreeOnPolylineExactly(int seed)
         {
-            var g = new GeometricPuzzleGrid(4, 4, 1f, seed);
+            var g = new GeometricGrid(4, 4, 1f, seed);
             AssertSharedEdgesAgree(g, seed);
         }
 
@@ -233,7 +233,7 @@ namespace Appegy.Tessera.Tests
         [TestCase(42)]
         public void Polygon_HasNoSelfIntersection_Defaults(int seed)
         {
-            var g = new GeometricPuzzleGrid(4, 4, 1f, seed);
+            var g = new GeometricGrid(4, 4, 1f, seed);
             AssertNoCellSelfIntersection(g, seed.ToString());
         }
 
@@ -249,9 +249,9 @@ namespace Appegy.Tessera.Tests
             for (var k = 0; k <= steps; k++)
             for (var m = 0; m <= steps; m++)
             {
-                var p = new GeometricPuzzleParameters(
+                var p = new GeometricParameters(
                     (float)i / steps, (float)j / steps, (float)k / steps, (float)m / steps);
-                var g = new GeometricPuzzleGrid(3, 3, 1f, 0, p);
+                var g = new GeometricGrid(3, 3, 1f, 0, p);
                 var label = $"D={i / (float)steps:F2} W={j / (float)steps:F2} N={k / (float)steps:F2} V={m / (float)steps:F2}";
                 AssertNoCellSelfIntersection(g, label);
                 AssertAllCellsCw(g, 0);
@@ -280,8 +280,8 @@ namespace Appegy.Tessera.Tests
         {
             for (var seed = 0; seed < 8; seed++)
             {
-                var p = new GeometricPuzzleParameters(depth, width, neck, variation);
-                var g = new GeometricPuzzleGrid(3, 3, 1f, seed, p);
+                var p = new GeometricParameters(depth, width, neck, variation);
+                var g = new GeometricGrid(3, 3, 1f, seed, p);
                 AssertNoCellSelfIntersection(g, $"D={depth} W={width} N={neck} V={variation} seed={seed}");
                 AssertSharedEdgesAgree(g, seed);
                 AssertAllCellsCw(g, seed);
@@ -301,8 +301,8 @@ namespace Appegy.Tessera.Tests
                 var n = (float)rng.NextDouble();
                 var v = (float)rng.NextDouble();
                 var seed = rng.Next();
-                var p = new GeometricPuzzleParameters(d, w, n, v);
-                var g = new GeometricPuzzleGrid(3, 3, 1f, seed, p);
+                var p = new GeometricParameters(d, w, n, v);
+                var g = new GeometricGrid(3, 3, 1f, seed, p);
                 AssertNoCellSelfIntersection(g, $"trial={trial} D={d:F3} W={w:F3} N={n:F3} V={v:F3} seed={seed}");
             }
         }
@@ -324,8 +324,8 @@ namespace Appegy.Tessera.Tests
             };
             foreach (var (d, w, n, v) in combos)
             {
-                var p = new GeometricPuzzleParameters(d, w, n, v);
-                var g = new GeometricPuzzleGrid(3, 3, 1f, 42, p);
+                var p = new GeometricParameters(d, w, n, v);
+                var g = new GeometricGrid(3, 3, 1f, 42, p);
                 AssertNoCellSelfIntersection(g, $"D={d} W={w} N={n} V={v}");
                 AssertPolygonsTileRectangle(g, $"D={d} W={w} N={n} V={v}");
             }
@@ -338,8 +338,8 @@ namespace Appegy.Tessera.Tests
         [TestCase(1f, 1f, 1f, 1f)]
         public void Corners_AreAlwaysFinite(float depth, float width, float neck, float variation)
         {
-            var p = new GeometricPuzzleParameters(depth, width, neck, variation);
-            var g = new GeometricPuzzleGrid(4, 4, 1f, 42, p);
+            var p = new GeometricParameters(depth, width, neck, variation);
+            var g = new GeometricGrid(4, 4, 1f, 42, p);
             for (var id = 0; id < g.CellCount; id++)
             {
                 var n = g.GetCornersCount(id);
@@ -363,8 +363,8 @@ namespace Appegy.Tessera.Tests
                 var n = (float)rng.NextDouble();
                 var v = (float)rng.NextDouble();
                 var seed = rng.Next();
-                var p = new GeometricPuzzleParameters(d, w, n, v);
-                var g = new GeometricPuzzleGrid(3, 3, 1f, seed, p);
+                var p = new GeometricParameters(d, w, n, v);
+                var g = new GeometricGrid(3, 3, 1f, seed, p);
                 AssertPolygonsTileRectangle(g, $"trial={trial} D={d:F3} W={w:F3} N={n:F3} V={v:F3} seed={seed}");
             }
         }
@@ -376,8 +376,8 @@ namespace Appegy.Tessera.Tests
         [TestCase(1f, 1f, 1f, 1f)]
         public void Polygon_TilesRectangle_ParameterExtremes(float depth, float width, float neck, float variation)
         {
-            var p = new GeometricPuzzleParameters(depth, width, neck, variation);
-            var g = new GeometricPuzzleGrid(4, 3, 1f, 5, p);
+            var p = new GeometricParameters(depth, width, neck, variation);
+            var g = new GeometricGrid(4, 3, 1f, 5, p);
             AssertPolygonsTileRectangle(g, $"D={depth} W={width} N={neck} V={variation}");
         }
 
@@ -386,7 +386,7 @@ namespace Appegy.Tessera.Tests
         [TestCase(7)]
         public void GetCellAt_OutsideBounds_ReturnsMinusOne(int seed)
         {
-            var g = new GeometricPuzzleGrid(3, 3, 1f, seed);
+            var g = new GeometricGrid(3, 3, 1f, seed);
             Assert.AreEqual(-1, g.GetCellAt(new float2(-0.5f, 0.5f)));
             Assert.AreEqual(-1, g.GetCellAt(new float2(0.5f, -0.5f)));
             Assert.AreEqual(-1, g.GetCellAt(new float2(3.5f, 1f)));
@@ -398,7 +398,7 @@ namespace Appegy.Tessera.Tests
         [TestCase(13)]
         public void GetCellAt_AtCenter_ReturnsCellId(int seed)
         {
-            var g = new GeometricPuzzleGrid(4, 4, 1f, seed);
+            var g = new GeometricGrid(4, 4, 1f, seed);
             for (var id = 0; id < g.CellCount; id++)
             {
                 Assert.AreEqual(id, g.GetCellAt(g.GetCenter(id)), $"seed={seed} round-trip failed for cell {id}");
@@ -410,7 +410,7 @@ namespace Appegy.Tessera.Tests
         [TestCase(5)]
         public void GetCellAt_TilesTheRectangle(int seed)
         {
-            var g = new GeometricPuzzleGrid(3, 3, 1f, seed);
+            var g = new GeometricGrid(3, 3, 1f, seed);
             const int samplesPerCellSide = 17;
             var n = g.Width * samplesPerCellSide;
             var m = g.Height * samplesPerCellSide;
@@ -430,8 +430,8 @@ namespace Appegy.Tessera.Tests
         [Test]
         public void Construction_IsDeterministicForSameSeed()
         {
-            var g1 = new GeometricPuzzleGrid(4, 4, 1f, 42);
-            var g2 = new GeometricPuzzleGrid(4, 4, 1f, 42);
+            var g1 = new GeometricGrid(4, 4, 1f, 42);
+            var g2 = new GeometricGrid(4, 4, 1f, 42);
             for (var id = 0; id < g1.CellCount; id++)
             {
                 var n = g1.GetCornersCount(id);
@@ -443,8 +443,8 @@ namespace Appegy.Tessera.Tests
         [Test]
         public void DifferentSeeds_ProduceDifferentCorners()
         {
-            var g1 = new GeometricPuzzleGrid(4, 4, 1f, 1);
-            var g2 = new GeometricPuzzleGrid(4, 4, 1f, 2);
+            var g1 = new GeometricGrid(4, 4, 1f, 1);
+            var g2 = new GeometricGrid(4, 4, 1f, 2);
             var anyDifferent = false;
             for (var id = 0; id < g1.CellCount && !anyDifferent; id++)
             {
@@ -460,7 +460,7 @@ namespace Appegy.Tessera.Tests
         [Test]
         public void GetSidePolylineLength_MatchesContract()
         {
-            var g = new GeometricPuzzleGrid(3, 3, 1f, 0);
+            var g = new GeometricGrid(3, 3, 1f, 0);
             var n = g.Parameters.SamplesPerEdge;
             var idInterior = g.IdOf(1, 1);
             for (var s = 0; s < 4; s++) Assert.AreEqual(n, g.GetSidePolylineLength(idInterior, s));
@@ -474,7 +474,7 @@ namespace Appegy.Tessera.Tests
         [Test]
         public void CopySidePolyline_BoundarySideIsStraightLine()
         {
-            var g = new GeometricPuzzleGrid(3, 3, 2f, 0);
+            var g = new GeometricGrid(3, 3, 2f, 0);
             var dest = new float2[2];
             g.CopySidePolyline(g.IdOf(0, 0), 1, dest);
             Assert.AreEqual(new float2(2, 0), dest[0]);
@@ -496,10 +496,10 @@ namespace Appegy.Tessera.Tests
             };
             foreach (var (d, w, n, v) in combos)
             {
-                var p = new GeometricPuzzleParameters(d, w, n, v);
+                var p = new GeometricParameters(d, w, n, v);
                 for (var seed = 0; seed < 6; seed++)
                 {
-                    var g = new GeometricPuzzleGrid(4, 4, 1f, seed, p);
+                    var g = new GeometricGrid(4, 4, 1f, seed, p);
                     AssertHeadWiderThanNeck(g, $"D={d} W={w} N={n} V={v} seed={seed}");
                 }
             }
@@ -508,7 +508,7 @@ namespace Appegy.Tessera.Tests
         [TestCase(2, 2)] [TestCase(3, 1)] [TestCase(1, 3)] [TestCase(5, 4)]
         public void Polygon_Stitches_PiecesCoverRectangleArea(int width, int height)
         {
-            var g = new GeometricPuzzleGrid(width, height, 1f, 11);
+            var g = new GeometricGrid(width, height, 1f, 11);
             AssertPolygonsTileRectangle(g, $"{width}x{height}");
         }
 
@@ -521,8 +521,8 @@ namespace Appegy.Tessera.Tests
         {
             // With Variation = 1 the tabs must look randomized, not stamped: depth, inset, and the
             // poke direction should all vary across the interior edges.
-            var p = new GeometricPuzzleParameters(0.5f, 0.5f, 0.5f, 1f);
-            var g = new GeometricPuzzleGrid(6, 6, 1f, seed, p);
+            var p = new GeometricParameters(0.5f, 0.5f, 0.5f, 1f);
+            var g = new GeometricGrid(6, 6, 1f, seed, p);
 
             var depths = new System.Collections.Generic.HashSet<int>();
             var insets = new System.Collections.Generic.HashSet<int>();
@@ -549,8 +549,8 @@ namespace Appegy.Tessera.Tests
         {
             // With Variation = 0 every interior tab is the same silhouette (only the random poke
             // direction differs), so depth and inset are identical to within float tolerance.
-            var p = new GeometricPuzzleParameters(0.5f, 0.5f, 0.5f, 0f);
-            var g = new GeometricPuzzleGrid(6, 6, 1f, 7, p);
+            var p = new GeometricParameters(0.5f, 0.5f, 0.5f, 0f);
+            var g = new GeometricGrid(6, 6, 1f, 7, p);
 
             float? depth0 = null;
             float? inset0 = null;
@@ -570,7 +570,7 @@ namespace Appegy.Tessera.Tests
 
         // Depth (perpendicular reach of the head apex), inset (along-edge position of the apex), and
         // signed perpendicular (poke direction) for a cell's right-side interior edge polyline.
-        private static (float depth, float inset, float signed) RightEdgeTabMetrics(GeometricPuzzleGrid g, int id)
+        private static (float depth, float inset, float signed) RightEdgeTabMetrics(GeometricGrid g, int id)
         {
             var len = g.GetSidePolylineLength(id, 0);
             var poly = new float2[len];
@@ -586,7 +586,7 @@ namespace Appegy.Tessera.Tests
 
         private static int Quantize(float v) => (int)math.round(v * 1000f);
 
-        private static void AssertNoCellSelfIntersection(GeometricPuzzleGrid g, string label)
+        private static void AssertNoCellSelfIntersection(GeometricGrid g, string label)
         {
             for (var id = 0; id < g.CellCount; id++)
             {
@@ -609,7 +609,7 @@ namespace Appegy.Tessera.Tests
             }
         }
 
-        private static void AssertAllCellsCw(GeometricPuzzleGrid g, int seed)
+        private static void AssertAllCellsCw(GeometricGrid g, int seed)
         {
             for (var id = 0; id < g.CellCount; id++)
             {
@@ -621,7 +621,7 @@ namespace Appegy.Tessera.Tests
             }
         }
 
-        private static void AssertSharedEdgesAgree(GeometricPuzzleGrid g, int seed)
+        private static void AssertSharedEdgesAgree(GeometricGrid g, int seed)
         {
             for (var id = 0; id < g.CellCount; id++)
             {
@@ -650,7 +650,7 @@ namespace Appegy.Tessera.Tests
             }
         }
 
-        private static void AssertPolygonsTileRectangle(GeometricPuzzleGrid g, string label)
+        private static void AssertPolygonsTileRectangle(GeometricGrid g, string label)
         {
             var totalArea = 0f;
             for (var id = 0; id < g.CellCount; id++)
@@ -667,7 +667,7 @@ namespace Appegy.Tessera.Tests
         // For each interior vertical edge, the head (the two vertices at full depth) must span a
         // strictly wider along-edge range than the neck opening (the two baseline neck vertices).
         // The polyline order is fixed: [0]=start, [1]/[8]=neck mouth, [3..6]=head, [9]=end.
-        private static void AssertHeadWiderThanNeck(GeometricPuzzleGrid g, string label)
+        private static void AssertHeadWiderThanNeck(GeometricGrid g, string label)
         {
             for (var id = 0; id < g.CellCount; id++)
             {

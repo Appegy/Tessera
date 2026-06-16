@@ -17,7 +17,7 @@ namespace Appegy.Tessera.Demo
                 new VoronoiGridDemo(),
                 new ClassicPuzzleGridDemo(),
                 new DraradechPuzzleGridDemo(),
-                new GeometricPuzzleGridDemo()
+                new GeometricGridDemo()
             };
     }
 }

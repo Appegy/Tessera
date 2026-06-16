@@ -3,7 +3,7 @@ using Unity.Mathematics;
 
 namespace Appegy.Tessera.Tests
 {
-    public class GeometricPuzzleParametersTests
+    public class GeometricParametersTests
     {
         private const float Eps = 1e-5f;
 
@@ -12,7 +12,7 @@ namespace Appegy.Tessera.Tests
         [Test]
         public void Default_HasMidNormalizedValues()
         {
-            var p = GeometricPuzzleParameters.Default;
+            var p = GeometricParameters.Default;
             Assert.AreEqual(0.5f, p.HeadDepth);
             Assert.AreEqual(0.5f, p.HeadWidth);
             Assert.AreEqual(0.5f, p.NeckWidth);
@@ -22,14 +22,14 @@ namespace Appegy.Tessera.Tests
         [Test]
         public void Default_ResolvesToMidOfEveryRange()
         {
-            var p = GeometricPuzzleParameters.Default;
+            var p = GeometricParameters.Default;
             Assert.AreEqual(0.095f, p.ResolvedDepth, Eps);   // mid of [0.05, 0.14]
             Assert.AreEqual(0.265f, p.ResolvedInset, Eps);   // mid of [0.22, 0.31]
             Assert.AreEqual(0.065f, p.ResolvedNeckHalf, Eps);// mid of [0.04, 0.09]
             Assert.AreEqual(0.0125f, p.ResolvedDepthJitter, Eps);
             Assert.AreEqual(0.0125f, p.ResolvedInsetJitter, Eps);
             Assert.AreEqual(0.01f, p.ResolvedNeckJitter, Eps);
-            Assert.AreEqual(GeometricPuzzleParameters.VertexCount, p.SamplesPerEdge);
+            Assert.AreEqual(GeometricParameters.VertexCount, p.SamplesPerEdge);
         }
 
         // ---- In-range inputs are stored verbatim ----
@@ -37,7 +37,7 @@ namespace Appegy.Tessera.Tests
         [Test]
         public void Construct_InRangeInputs_StoredVerbatim()
         {
-            var p = new GeometricPuzzleParameters(0.3f, 0.7f, 0.2f, 0.9f);
+            var p = new GeometricParameters(0.3f, 0.7f, 0.2f, 0.9f);
             Assert.AreEqual(0.3f, p.HeadDepth);
             Assert.AreEqual(0.7f, p.HeadWidth);
             Assert.AreEqual(0.2f, p.NeckWidth);
@@ -47,11 +47,11 @@ namespace Appegy.Tessera.Tests
         [Test]
         public void Construct_Zeroes_ResolveToShallowNarrowHeadPinchedNeckNoJitter()
         {
-            var p = new GeometricPuzzleParameters(0f, 0f, 0f, 0f);
-            Assert.AreEqual(GeometricPuzzleParameters.MinDepth, p.ResolvedDepth, Eps);
+            var p = new GeometricParameters(0f, 0f, 0f, 0f);
+            Assert.AreEqual(GeometricParameters.MinDepth, p.ResolvedDepth, Eps);
             // HeadWidth = 0 -> narrowest head -> largest inset.
-            Assert.AreEqual(GeometricPuzzleParameters.InsetMax, p.ResolvedInset, Eps);
-            Assert.AreEqual(GeometricPuzzleParameters.NeckMin, p.ResolvedNeckHalf, Eps);
+            Assert.AreEqual(GeometricParameters.InsetMax, p.ResolvedInset, Eps);
+            Assert.AreEqual(GeometricParameters.NeckMin, p.ResolvedNeckHalf, Eps);
             Assert.AreEqual(0f, p.ResolvedDepthJitter, Eps);
             Assert.AreEqual(0f, p.ResolvedInsetJitter, Eps);
             Assert.AreEqual(0f, p.ResolvedNeckJitter, Eps);
@@ -60,14 +60,14 @@ namespace Appegy.Tessera.Tests
         [Test]
         public void Construct_Ones_ResolveToDeepWideHeadOpenNeckMaxJitter()
         {
-            var p = new GeometricPuzzleParameters(1f, 1f, 1f, 1f);
-            Assert.AreEqual(GeometricPuzzleParameters.MaxDepth, p.ResolvedDepth, Eps);
+            var p = new GeometricParameters(1f, 1f, 1f, 1f);
+            Assert.AreEqual(GeometricParameters.MaxDepth, p.ResolvedDepth, Eps);
             // HeadWidth = 1 -> widest head -> smallest inset.
-            Assert.AreEqual(GeometricPuzzleParameters.InsetMin, p.ResolvedInset, Eps);
-            Assert.AreEqual(GeometricPuzzleParameters.NeckMax, p.ResolvedNeckHalf, Eps);
-            Assert.AreEqual(GeometricPuzzleParameters.MaxDepthJitter, p.ResolvedDepthJitter, Eps);
-            Assert.AreEqual(GeometricPuzzleParameters.MaxInsetJitter, p.ResolvedInsetJitter, Eps);
-            Assert.AreEqual(GeometricPuzzleParameters.MaxNeckJitter, p.ResolvedNeckJitter, Eps);
+            Assert.AreEqual(GeometricParameters.InsetMin, p.ResolvedInset, Eps);
+            Assert.AreEqual(GeometricParameters.NeckMax, p.ResolvedNeckHalf, Eps);
+            Assert.AreEqual(GeometricParameters.MaxDepthJitter, p.ResolvedDepthJitter, Eps);
+            Assert.AreEqual(GeometricParameters.MaxInsetJitter, p.ResolvedInsetJitter, Eps);
+            Assert.AreEqual(GeometricParameters.MaxNeckJitter, p.ResolvedNeckJitter, Eps);
         }
 
         // ---- Orthogonality: each knob moves exactly one resolved quantity ----
@@ -78,10 +78,10 @@ namespace Appegy.Tessera.Tests
         [Test]
         public void HeadDepth_AffectsOnlyDepth()
         {
-            var reference = new GeometricPuzzleParameters(0f, 0.3f, 0.7f, 0.4f);
+            var reference = new GeometricParameters(0f, 0.3f, 0.7f, 0.4f);
             for (var i = 0; i <= 20; i++)
             {
-                var p = new GeometricPuzzleParameters(i / 20f, 0.3f, 0.7f, 0.4f);
+                var p = new GeometricParameters(i / 20f, 0.3f, 0.7f, 0.4f);
                 Assert.AreEqual(reference.ResolvedInset, p.ResolvedInset, Eps);
                 Assert.AreEqual(reference.ResolvedNeckHalf, p.ResolvedNeckHalf, Eps);
                 Assert.AreEqual(reference.ResolvedDepthJitter, p.ResolvedDepthJitter, Eps);
@@ -93,10 +93,10 @@ namespace Appegy.Tessera.Tests
         [Test]
         public void HeadWidth_AffectsOnlyInset()
         {
-            var reference = new GeometricPuzzleParameters(0.3f, 0f, 0.7f, 0.4f);
+            var reference = new GeometricParameters(0.3f, 0f, 0.7f, 0.4f);
             for (var i = 0; i <= 20; i++)
             {
-                var p = new GeometricPuzzleParameters(0.3f, i / 20f, 0.7f, 0.4f);
+                var p = new GeometricParameters(0.3f, i / 20f, 0.7f, 0.4f);
                 Assert.AreEqual(reference.ResolvedDepth, p.ResolvedDepth, Eps);
                 Assert.AreEqual(reference.ResolvedNeckHalf, p.ResolvedNeckHalf, Eps);
                 Assert.AreEqual(reference.ResolvedDepthJitter, p.ResolvedDepthJitter, Eps);
@@ -108,10 +108,10 @@ namespace Appegy.Tessera.Tests
         [Test]
         public void NeckWidth_AffectsOnlyNeck()
         {
-            var reference = new GeometricPuzzleParameters(0.3f, 0.7f, 0f, 0.4f);
+            var reference = new GeometricParameters(0.3f, 0.7f, 0f, 0.4f);
             for (var i = 0; i <= 20; i++)
             {
-                var p = new GeometricPuzzleParameters(0.3f, 0.7f, i / 20f, 0.4f);
+                var p = new GeometricParameters(0.3f, 0.7f, i / 20f, 0.4f);
                 Assert.AreEqual(reference.ResolvedDepth, p.ResolvedDepth, Eps);
                 Assert.AreEqual(reference.ResolvedInset, p.ResolvedInset, Eps);
                 Assert.AreEqual(reference.ResolvedDepthJitter, p.ResolvedDepthJitter, Eps);
@@ -123,10 +123,10 @@ namespace Appegy.Tessera.Tests
         [Test]
         public void Variation_AffectsOnlyJitter()
         {
-            var reference = new GeometricPuzzleParameters(0.3f, 0.7f, 0.4f, 0f);
+            var reference = new GeometricParameters(0.3f, 0.7f, 0.4f, 0f);
             for (var i = 0; i <= 20; i++)
             {
-                var p = new GeometricPuzzleParameters(0.3f, 0.7f, 0.4f, i / 20f);
+                var p = new GeometricParameters(0.3f, 0.7f, 0.4f, i / 20f);
                 Assert.AreEqual(reference.ResolvedDepth, p.ResolvedDepth, Eps);
                 Assert.AreEqual(reference.ResolvedInset, p.ResolvedInset, Eps);
                 Assert.AreEqual(reference.ResolvedNeckHalf, p.ResolvedNeckHalf, Eps);
@@ -143,10 +143,10 @@ namespace Appegy.Tessera.Tests
         [TestCase(float.PositiveInfinity, 1f)]
         public void Construct_OutOfRangeInputs_AreClampedToUnitInterval(float input, float expected)
         {
-            var pDepth = new GeometricPuzzleParameters(input, 0.5f, 0.5f, 0.5f);
-            var pWidth = new GeometricPuzzleParameters(0.5f, input, 0.5f, 0.5f);
-            var pNeck = new GeometricPuzzleParameters(0.5f, 0.5f, input, 0.5f);
-            var pVar = new GeometricPuzzleParameters(0.5f, 0.5f, 0.5f, input);
+            var pDepth = new GeometricParameters(input, 0.5f, 0.5f, 0.5f);
+            var pWidth = new GeometricParameters(0.5f, input, 0.5f, 0.5f);
+            var pNeck = new GeometricParameters(0.5f, 0.5f, input, 0.5f);
+            var pVar = new GeometricParameters(0.5f, 0.5f, 0.5f, input);
             Assert.AreEqual(expected, pDepth.HeadDepth);
             Assert.AreEqual(expected, pWidth.HeadWidth);
             Assert.AreEqual(expected, pNeck.NeckWidth);
@@ -158,7 +158,7 @@ namespace Appegy.Tessera.Tests
         [Test]
         public void Construct_NaNInputs_FallbackToMidpoint()
         {
-            var p = new GeometricPuzzleParameters(float.NaN, float.NaN, float.NaN, float.NaN);
+            var p = new GeometricParameters(float.NaN, float.NaN, float.NaN, float.NaN);
             Assert.AreEqual(0.5f, p.HeadDepth);
             Assert.AreEqual(0.5f, p.HeadWidth);
             Assert.AreEqual(0.5f, p.NeckWidth);
@@ -168,7 +168,7 @@ namespace Appegy.Tessera.Tests
         [Test]
         public void Construct_OnlySomeNaNInputs_ReplacesOnlyNaNs()
         {
-            var p = new GeometricPuzzleParameters(float.NaN, 0.3f, 0.7f, float.NaN);
+            var p = new GeometricParameters(float.NaN, 0.3f, 0.7f, float.NaN);
             Assert.AreEqual(0.5f, p.HeadDepth);
             Assert.AreEqual(0.3f, p.HeadWidth);
             Assert.AreEqual(0.7f, p.NeckWidth);
@@ -183,7 +183,7 @@ namespace Appegy.Tessera.Tests
             var prev = float.NegativeInfinity;
             for (var i = 0; i <= 20; i++)
             {
-                var p = new GeometricPuzzleParameters(i / 20f, 0.5f, 0.5f, 0.5f);
+                var p = new GeometricParameters(i / 20f, 0.5f, 0.5f, 0.5f);
                 Assert.GreaterOrEqual(p.ResolvedDepth, prev - Eps);
                 prev = p.ResolvedDepth;
             }
@@ -196,7 +196,7 @@ namespace Appegy.Tessera.Tests
             var prev = float.PositiveInfinity;
             for (var i = 0; i <= 20; i++)
             {
-                var p = new GeometricPuzzleParameters(0.5f, i / 20f, 0.5f, 0.5f);
+                var p = new GeometricParameters(0.5f, i / 20f, 0.5f, 0.5f);
                 Assert.LessOrEqual(p.ResolvedInset, prev + Eps);
                 prev = p.ResolvedInset;
             }
@@ -208,7 +208,7 @@ namespace Appegy.Tessera.Tests
             var prev = float.NegativeInfinity;
             for (var i = 0; i <= 20; i++)
             {
-                var p = new GeometricPuzzleParameters(0.5f, 0.5f, i / 20f, 0.5f);
+                var p = new GeometricParameters(0.5f, 0.5f, i / 20f, 0.5f);
                 Assert.GreaterOrEqual(p.ResolvedNeckHalf, prev - Eps);
                 prev = p.ResolvedNeckHalf;
             }
@@ -222,7 +222,7 @@ namespace Appegy.Tessera.Tests
             var prevN = float.NegativeInfinity;
             for (var i = 0; i <= 20; i++)
             {
-                var p = new GeometricPuzzleParameters(0.5f, 0.5f, 0.5f, i / 20f);
+                var p = new GeometricParameters(0.5f, 0.5f, 0.5f, i / 20f);
                 Assert.GreaterOrEqual(p.ResolvedDepthJitter, prevD - Eps);
                 Assert.GreaterOrEqual(p.ResolvedInsetJitter, prevI - Eps);
                 Assert.GreaterOrEqual(p.ResolvedNeckJitter, prevN - Eps);
@@ -242,7 +242,7 @@ namespace Appegy.Tessera.Tests
         [TestCase(float.NaN, float.NaN, float.NaN, float.NaN)]
         public void Construct_DoesNotThrow(float headDepth, float headWidth, float neckWidth, float variation)
         {
-            Assert.DoesNotThrow(() => new GeometricPuzzleParameters(headDepth, headWidth, neckWidth, variation));
+            Assert.DoesNotThrow(() => new GeometricParameters(headDepth, headWidth, neckWidth, variation));
         }
 
         // ---- Always-valid cube: the geometric constraints hold across the whole input cube ----
@@ -250,7 +250,7 @@ namespace Appegy.Tessera.Tests
         // The fixed independent ranges were tuned so even the worst-case corner (widest head +
         // deepest tab + widest neck + max per-edge jitter) stays valid. Checking against the worst
         // jitter draw here means no edge seed can produce a degenerate tab. The grid-level self-
-        // intersection sweep in GeometricPuzzleGridTests is the geometric counterpart.
+        // intersection sweep in GeometricGridTests is the geometric counterpart.
 
         [Test]
         public void Invariants_HoldAcrossFullParameterCube()
@@ -261,7 +261,7 @@ namespace Appegy.Tessera.Tests
             for (var k = 0; k <= steps; k++)
             for (var m = 0; m <= steps; m++)
             {
-                var p = new GeometricPuzzleParameters(
+                var p = new GeometricParameters(
                     (float)i / steps, (float)j / steps, (float)k / steps, (float)m / steps);
 
                 var depth = p.ResolvedDepth;
@@ -280,8 +280,8 @@ namespace Appegy.Tessera.Tests
                 // the head still clears the perpendicular edge's head by at least CornerMargin.
                 var minInset = inset - iJit;
                 var maxDepth = depth + dJit;
-                Assert.GreaterOrEqual(minInset, maxDepth + GeometricPuzzleParameters.CornerMargin - Eps,
-                    $"{label}: min inset {minInset} < max depth+margin {maxDepth + GeometricPuzzleParameters.CornerMargin}");
+                Assert.GreaterOrEqual(minInset, maxDepth + GeometricParameters.CornerMargin - Eps,
+                    $"{label}: min inset {minInset} < max depth+margin {maxDepth + GeometricParameters.CornerMargin}");
 
                 // Neck never closes, even at the lowest jittered neck.
                 Assert.Greater(neckHalf - nJit, 0f, $"{label}: min neck-half {neckHalf - nJit} <= 0");
@@ -289,8 +289,8 @@ namespace Appegy.Tessera.Tests
                 // Dovetail/overhang: at the highest jittered inset+neck the locking shelf on each
                 // side stays at least MinShelf wide (so the head is always wider than the neck).
                 var minShelf = 0.5f - (inset + iJit) - (neckHalf + nJit);
-                Assert.GreaterOrEqual(minShelf, GeometricPuzzleParameters.MinShelf - Eps,
-                    $"{label}: min shelf {minShelf} < {GeometricPuzzleParameters.MinShelf}");
+                Assert.GreaterOrEqual(minShelf, GeometricParameters.MinShelf - Eps,
+                    $"{label}: min shelf {minShelf} < {GeometricParameters.MinShelf}");
             }
         }
 
@@ -303,7 +303,7 @@ namespace Appegy.Tessera.Tests
             for (var k = 0; k <= steps; k++)
             for (var m = 0; m <= steps; m++)
             {
-                var p = new GeometricPuzzleParameters(
+                var p = new GeometricParameters(
                     (float)i / steps, (float)j / steps, (float)k / steps, (float)m / steps);
                 Assert.IsTrue(math.isfinite(p.ResolvedDepth));
                 Assert.IsTrue(math.isfinite(p.ResolvedInset));

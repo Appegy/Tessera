@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 namespace Appegy.Tessera.Demo
 {
-    public sealed class GeometricPuzzleGridDemo : GridDemo<GeometricPuzzleGrid>
+    public sealed class GeometricGridDemo : GridDemo<GeometricGrid>
     {
         private IntParameter _columns;
         private IntParameter _rows;
@@ -12,7 +12,7 @@ namespace Appegy.Tessera.Demo
         private FloatParameter _neckWidth;
         private FloatParameter _variation;
 
-        public override string DisplayName => "Geometric Puzzle";
+        public override string DisplayName => "Geometric";
         public override string UrlId => "geometric";
         public override string Icon => "extension";
 
@@ -34,10 +34,10 @@ namespace Appegy.Tessera.Demo
             parameters.Add(_variation);
         }
 
-        protected override GeometricPuzzleGrid Build()
+        protected override GeometricGrid Build()
         {
-            var parameters = new GeometricPuzzleParameters(_headDepth.Value, _headWidth.Value, _neckWidth.Value, _variation.Value);
-            return new GeometricPuzzleGrid(_columns.Value, _rows.Value, 1f, _seed.Value, parameters);
+            var parameters = new GeometricParameters(_headDepth.Value, _headWidth.Value, _neckWidth.Value, _variation.Value);
+            return new GeometricGrid(_columns.Value, _rows.Value, 1f, _seed.Value, parameters);
         }
     }
 }
