@@ -13,8 +13,8 @@ on:
   push:
     branches: [main]
     paths:
-      - 'Appegy.Tessera.Environment~/**'
-      - 'Runtime/**'
+      - 'Appegy.Tessera.Lab/**'
+      - 'src/**'
       - '.github/workflows/webgl-preview.yml'
       - '.github/pages/**'
   pull_request:
@@ -64,8 +64,8 @@ jobs:
       - name: Cache Library
         uses: actions/cache@v4
         with:
-          path: Appegy.Tessera.Environment~/Library
-          key: Library-WebGL-${{ hashFiles('Appegy.Tessera.Environment~/Assets/**', 'Appegy.Tessera.Environment~/Packages/**', 'Appegy.Tessera.Environment~/ProjectSettings/**') }}
+          path: Appegy.Tessera.Lab/Library
+          key: Library-WebGL-${{ hashFiles('Appegy.Tessera.Lab/Assets/**', 'Appegy.Tessera.Lab/Packages/**', 'Appegy.Tessera.Lab/ProjectSettings/**', 'src/**') }}
           restore-keys: |
             Library-WebGL-
             Library-
@@ -82,7 +82,7 @@ jobs:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
-          projectPath: Appegy.Tessera.Environment~
+          projectPath: Appegy.Tessera.Lab
           unityVersion: 6000.4.8f1
           targetPlatform: WebGL
           buildName: Tessera
