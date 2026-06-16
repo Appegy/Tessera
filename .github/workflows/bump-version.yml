@@ -1,55 +1,52 @@
-# Manual version bump: sets the package version in every place it lives and commits to the
-# branch it runs on. Run it after a release to set the next version (model A: release.yml
-# tags whatever version is currently in src/package.json).
-# The commit is authored by whoever triggers the workflow.
+# Manual version bump: pick a bump type, the new version is computed from the current one
+# (so it is always valid semver and strictly greater - it can't jump or go backwards).
+# Sets the version in every place it lives, then commits to the branch it runs on.
+# Run it after a release to set the next version (model A: release.yml tags whatever
+# version is currently in src/package.json). The commit is authored by whoever triggers it.
 
 name: Bump version
 
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: "New package version, e.g. 1.0.1 or 1.1.0-pre.1"
-        required: true
-        type: string
+      type:
+        description: "Version bump"
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+          - prerelease
+        default: patch
 
 permissions:
   contents: write
 
 jobs:
   bump:
-    name: Set version
+    name: Bump version
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Validate version (semver)
+      - name: Bump and sync version
         run: |
-          echo "${{ inputs.version }}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$' \
-            || { echo "::error::'${{ inputs.version }}' is not a valid semver"; exit 1; }
-
-      - name: Apply version everywhere
-        env:
-          V: ${{ inputs.version }}
-        run: |
-          # 1) package manifest (source of truth the release reads)
-          jq --arg v "$V" '.version = $v' src/package.json > src/package.json.tmp
-          mv src/package.json.tmp src/package.json
-          # 2) PackageInfo.cs constant
-          sed -i -E "s/(public const string Version = \")[^\"]*(\";)/\1$V\2/" src/Runtime/PackageInfo.cs
-          # 3) dev/demo project version (kept in step with the package)
-          sed -i -E "s/^(  bundleVersion: ).*/\1$V/" "Appegy.Tessera.Lab/ProjectSettings/ProjectSettings.asset"
-          echo "Set version to $V in:"; git diff --name-only
+          # npm version increments from the current value (patch/minor/major/prerelease).
+          # --preid pre -> prerelease tags look like 1.2.4-pre.0; --no-git-tag-version: no commit/tag here.
+          ( cd src && npm version "${{ inputs.type }}" --preid pre --no-git-tag-version >/dev/null )
+          NEW="$(jq -r .version src/package.json)"
+          echo "Bumped to $NEW"
+          # keep the same version everywhere it lives
+          sed -i -E "s/(public const string Version = \")[^\"]*(\";)/\1$NEW\2/" src/Runtime/PackageInfo.cs
+          sed -i -E "s/^(  bundleVersion: ).*/\1$NEW/" "Appegy.Tessera.Lab/ProjectSettings/ProjectSettings.asset"
+          echo "VERSION=$NEW" >> "$GITHUB_ENV"
+          git diff --name-only
 
       - name: Commit and push (authored by whoever ran this)
         run: |
           git config user.name "${{ github.actor }}"
           git config user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
-          if git diff --quiet; then
-            echo "Already at ${{ inputs.version }} - nothing to commit."
-            exit 0
-          fi
           git add -A
-          git commit -m "Set version to ${{ inputs.version }}"
+          git commit -m "Bump version to $VERSION"
           git push
