@@ -1,8 +1,8 @@
 # Manual version bump: pick a bump type, the new version is computed from the current one
-# (so it is always valid semver and strictly greater - it can't jump or go backwards).
-# Sets the version in every place it lives, then commits to the branch it runs on.
-# Run it after a release to set the next version (model A: release.yml tags whatever
-# version is currently in src/package.json). The commit is authored by whoever triggers it.
+# (always valid semver, strictly greater, can't jump). Sets the version in every place it
+# lives and opens a PR - main is protected, so no direct pushes. Merge the PR, then run
+# Release (model A: release.yml tags whatever version is on main). The commit is authored
+# by whoever triggers the workflow.
 
 name: Bump version
 
@@ -20,6 +20,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
   bump:
@@ -30,6 +31,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Bump and sync version
+        id: bump
         run: |
           # npm version increments from the current value; --no-git-tag-version: no commit/tag here.
           ( cd src && npm version "${{ inputs.type }}" --no-git-tag-version >/dev/null )
@@ -38,13 +40,19 @@ jobs:
           # keep the same version everywhere it lives
           sed -i -E "s/(public const string Version = \")[^\"]*(\";)/\1$NEW\2/" src/Runtime/PackageInfo.cs
           sed -i -E "s/^(  bundleVersion: ).*/\1$NEW/" "Appegy.Tessera.Lab/ProjectSettings/ProjectSettings.asset"
-          echo "VERSION=$NEW" >> "$GITHUB_ENV"
-          git diff --name-only
+          echo "version=$NEW" >> "$GITHUB_OUTPUT"
 
-      - name: Commit and push (authored by whoever ran this)
+      - name: Open version-bump PR (authored by whoever ran this)
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
+          NEW="${{ steps.bump.outputs.version }}"
+          BRANCH="bump/v$NEW"
           git config user.name "${{ github.actor }}"
           git config user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
-          git add -A
-          git commit -m "Bump version to $VERSION"
-          git push
+          git switch -c "$BRANCH"
+          git commit -am "Bump version to $NEW"
+          git push -u origin "$BRANCH"
+          gh pr create --base main --head "$BRANCH" \
+            --title "Bump version to $NEW" \
+            --body "Sets the package version to \`$NEW\` in src/package.json, src/Runtime/PackageInfo.cs, and the dev project's bundleVersion. Merge, then run Release."
