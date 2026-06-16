@@ -10,6 +10,7 @@ namespace Appegy.Tessera.Demo
         private FloatParameter _roundness;
         private FloatParameter _tabRadius;
         private FloatParameter _tabOffset;
+        private FloatParameter _tabNeck;
         private FloatParameter _tabDeform;
 
         public override string DisplayName => "Classic Puzzle";
@@ -24,6 +25,7 @@ namespace Appegy.Tessera.Demo
             _roundness = new FloatParameter("roundness", "Roundness", 0f, 1f, 0.5f);
             _tabRadius = new FloatParameter("tabRadius", "Tab Radius", 0f, 1f, 0.5f);
             _tabOffset = new FloatParameter("tabOffset", "Tab Offset", 0f, 1f, 0.5f);
+            _tabNeck = new FloatParameter("tabNeck", "Neck", 0f, 1f, 0f);
             _tabDeform = new FloatParameter("tabDeform", "Tab Deform", 0f, 1f, 0.4f);
             parameters.Add(_columns);
             parameters.Add(_rows);
@@ -31,12 +33,13 @@ namespace Appegy.Tessera.Demo
             parameters.Add(_roundness);
             parameters.Add(_tabRadius);
             parameters.Add(_tabOffset);
+            parameters.Add(_tabNeck);
             parameters.Add(_tabDeform);
         }
 
         protected override ClassicPuzzleGrid Build()
         {
-            var parameters = new ClassicPuzzleParameters(_roundness.Value, _tabRadius.Value, _tabOffset.Value, _tabDeform.Value);
+            var parameters = new ClassicPuzzleParameters(_roundness.Value, _tabRadius.Value, _tabOffset.Value, _tabDeform.Value, _tabNeck.Value);
             return new ClassicPuzzleGrid(_columns.Value, _rows.Value, 1f, _seed.Value, parameters);
         }
     }
