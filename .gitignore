@@ -2,7 +2,9 @@
 .codex/
 .agents/
 .DS_Store
+.idea/
+.vs/
 opencode.json
 
-# Local WebGL build output (published to the web-build branch, never committed to source)
-Documentation~/webgl/
+# Local WebGL build output (published to the demo branch, never committed)
+docs/webgl/
