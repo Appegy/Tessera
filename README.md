@@ -46,7 +46,7 @@ Add the package to your `Packages/manifest.json`:
 Pin a specific version by appending a tag:
 
 ```json
-"com.appegy.tessera": "https://github.com/Appegy/Tessera.git?path=/src#1.0.0"
+"com.appegy.tessera": "https://github.com/Appegy/Tessera.git?path=/src#1.0.1"
 ```
 
 ## Quick start
