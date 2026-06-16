@@ -53,8 +53,8 @@ jobs:
           git config user.name "${{ github.actor }}"
           git config user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
           git switch -c "$BRANCH"
-          git commit -am "chore(release): v$NEW"
+          git commit -am "chore: bump version to v$NEW"
           git push -u origin "$BRANCH"
           gh pr create --base main --head "$BRANCH" \
-            --title "chore(release): v$NEW" \
+            --title "chore: bump version to v$NEW" \
             --body "Sets the package version to \`$NEW\` in src/package.json, src/Runtime/PackageInfo.cs, README.md, and the dev project's bundleVersion. Merge, then run Release."
