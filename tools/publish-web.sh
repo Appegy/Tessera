@@ -5,19 +5,19 @@
 #
 # Flow:
 #   1. In Unity (the env project), build the "Tessera Playground" scene for WebGL
-#      into Documentation~/webgl  (File > Build Settings/Profiles > WebGL > Build,
-#      target folder = Documentation~/webgl). Compression is set to Disabled so
+#      into docs/webgl  (File > Build Settings/Profiles > WebGL > Build,
+#      target folder = docs/webgl). Compression is set to Disabled so
 #      GitHub Pages serves it without Content-Encoding headers.
 #   2. Run this script. It force-pushes the build to `demo`; GitHub Pages
 #      redeploys automatically within ~1 minute.
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-BUILD="$REPO/Documentation~/webgl"
+BUILD="$REPO/docs/webgl"
 
 if [ ! -f "$BUILD/index.html" ]; then
   echo "No WebGL build found at $BUILD"
-  echo "Build it first in Unity (WebGL target, output folder Documentation~/webgl)."
+  echo "Build it first in Unity (WebGL target, output folder docs/webgl)."
   exit 1
 fi
 
