@@ -83,6 +83,64 @@ int picked = grid.GetCellAt(new float2(3.2f, 4.7f));
 int hops = grid.Distance(0, grid.CellCount - 1);
 ```
 
+## Common usage
+
+Once you have an `ITessellation` (any grid type - see [Quick start](#quick-start)), everything below works
+the same way. Coordinates are in tessellation-local space (`grid.Bounds`).
+
+**Draw or spawn something per cell** - iterate the dense id range and read each cell's centre and outline:
+
+```csharp
+for (var id = 0; id < grid.CellCount; id++)
+{
+    float2 center = grid.GetCenter(id);
+    Span<float2> corners = stackalloc float2[grid.GetCornersCount(id)];
+    grid.CopyCorners(id, corners); // clockwise polygon, ready to triangulate or stroke
+}
+```
+
+**Find the cell under a point** (mouse, touch, projectile) - `GetCellAt` returns `-1` when the point is outside:
+
+```csharp
+int id = grid.GetCellAt(localPoint);
+if (id != -1)
+{
+    // hit cell `id`
+}
+```
+
+**Visit a cell's neighbours** - the `Neighbors` extension yields only real neighbours (edge slots are skipped):
+
+```csharp
+foreach (var neighbor in grid.Neighbors(id))
+{
+    // adjacent cell across each shared edge
+}
+```
+
+**Measure distance / range** - `Distance` is the minimum number of cell-to-cell hops:
+
+```csharp
+bool inRange = grid.Distance(from, to) <= moveBudget;
+bool touching = grid.AreNeighbors(a, b);
+```
+
+**Flood-fill within N steps** (movement range, blast radius, region select) - a breadth-first walk over neighbours:
+
+```csharp
+var reachable = new HashSet<int> { start };
+var frontier = new Queue<int>();
+frontier.Enqueue(start);
+while (frontier.Count > 0)
+{
+    var cell = frontier.Dequeue();
+    if (grid.Distance(start, cell) >= maxSteps) continue;
+    foreach (var next in grid.Neighbors(cell))
+        if (reachable.Add(next))
+            frontier.Enqueue(next);
+}
+```
+
 ## Grid types overview
 
 ### Square
