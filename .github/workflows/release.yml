@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Read package version
         id: pkg
@@ -52,9 +52,8 @@ jobs:
         run: |
           rm -rf pack && mkdir -p pack out
           cp -R src/. pack/
-          # README/LICENSE/CHANGELOG live at the repo root - fold them into the package
-          # so the published tarball is complete.
-          for f in README.md LICENSE CHANGELOG.md; do
+          # README/LICENSE live at the repo root - fold them into the package.
+          for f in README.md LICENSE; do
             [ -f "$f" ] && cp "$f" pack/
           done
 
@@ -79,5 +78,5 @@ jobs:
           [ "${{ steps.pkg.outputs.prerelease }}" = "true" ] && FLAGS+=(--prerelease)
           gh release create "${{ steps.pkg.outputs.tag }}" "${{ steps.pack.outputs.tgz }}" \
             --title "${{ steps.pkg.outputs.tag }}" \
-            --notes "Automated release of ${{ steps.pkg.outputs.tag }}." \
+            --generate-notes \
             "${FLAGS[@]}"
