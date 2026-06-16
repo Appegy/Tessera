@@ -1,0 +1,50 @@
+# Manual version bump: pick a bump type, the new version is computed from the current one
+# (so it is always valid semver and strictly greater - it can't jump or go backwards).
+# Sets the version in every place it lives, then commits to the branch it runs on.
+# Run it after a release to set the next version (model A: release.yml tags whatever
+# version is currently in src/package.json). The commit is authored by whoever triggers it.
+
+name: Bump version
+
+on:
+  workflow_dispatch:
+    inputs:
+      type:
+        description: "Version bump"
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+        default: patch
+
+permissions:
+  contents: write
+
+jobs:
+  bump:
+    name: Bump version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Bump and sync version
+        run: |
+          # npm version increments from the current value; --no-git-tag-version: no commit/tag here.
+          ( cd src && npm version "${{ inputs.type }}" --no-git-tag-version >/dev/null )
+          NEW="$(jq -r .version src/package.json)"
+          echo "Bumped to $NEW"
+          # keep the same version everywhere it lives
+          sed -i -E "s/(public const string Version = \")[^\"]*(\";)/\1$NEW\2/" src/Runtime/PackageInfo.cs
+          sed -i -E "s/^(  bundleVersion: ).*/\1$NEW/" "Appegy.Tessera.Lab/ProjectSettings/ProjectSettings.asset"
+          echo "VERSION=$NEW" >> "$GITHUB_ENV"
+          git diff --name-only
+
+      - name: Commit and push (authored by whoever ran this)
+        run: |
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
+          git add -A
+          git commit -m "Bump version to $VERSION"
+          git push

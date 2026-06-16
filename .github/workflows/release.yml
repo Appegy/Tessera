@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Read package version
         id: pkg
@@ -33,12 +33,6 @@ jobs:
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
-          # A '-' in the semver (e.g. 1.2.0-pre.1) marks a prerelease.
-          if [[ "$VERSION" == *-* ]]; then
-            echo "prerelease=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "prerelease=false" >> "$GITHUB_OUTPUT"
-          fi
           echo "Releasing v$VERSION"
 
       - name: Ensure tag does not already exist
@@ -52,9 +46,8 @@ jobs:
         run: |
           rm -rf pack && mkdir -p pack out
           cp -R src/. pack/
-          # README/LICENSE/CHANGELOG live at the repo root - fold them into the package
-          # so the published tarball is complete.
-          for f in README.md LICENSE CHANGELOG.md; do
+          # README/LICENSE live at the repo root - fold them into the package.
+          for f in README.md LICENSE; do
             [ -f "$f" ] && cp "$f" pack/
           done
 
@@ -75,9 +68,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          FLAGS=()
-          [ "${{ steps.pkg.outputs.prerelease }}" = "true" ] && FLAGS+=(--prerelease)
           gh release create "${{ steps.pkg.outputs.tag }}" "${{ steps.pack.outputs.tgz }}" \
             --title "${{ steps.pkg.outputs.tag }}" \
-            --notes "Automated release of ${{ steps.pkg.outputs.tag }}." \
-            "${FLAGS[@]}"
+            --generate-notes
