@@ -8,25 +8,36 @@ namespace Appegy.Tessera
     /// length. The tab is a 10-vertex polyline with a dovetail head: no curves, so it is the
     /// cheapest puzzle silhouette to mesh.
     ///
-    /// Internal ranges are chosen so the entire [0, 1]^4 input cube stays valid for every edge
-    /// seed without runtime clamping. Three couplings keep the polygon simple and lockable:
+    /// Each knob is orthogonal: it maps to exactly one visual quantity through a fixed independent
+    /// range, so moving one slider never disturbs another. The ranges are deliberately chosen so
+    /// the worst-case corner of the [0, 1]^4 cube (widest head + deepest tab + widest neck + max
+    /// per-edge jitter, all at once) still satisfies every geometric constraint, which is what lets
+    /// them stay independent without runtime clamping:
     ///   - corner clearance: inset >= depth + <see cref="CornerMargin"/>, so an inward head never
     ///     overlaps the perpendicular edge's head at a shared cell corner;
     ///   - dovetail/overhang: inset + neck-half &lt;= 0.5 - <see cref="MinShelf"/>, so the head is
     ///     always wider than the neck and the locking shelf is never thinner than MinShelf;
-    ///   - per-edge jitter budget: <see cref="MaxInsetJitter"/> + <see cref="MaxNeckJitter"/> are
-    ///     reserved out of both bounds, so a jittered edge can never cross either constraint.
+    ///   - per-edge jitter is reserved out of both bounds, so a jittered edge can never cross them.
+    ///
+    /// <see cref="Variation"/> drives independent per-edge jitter on depth, inset, and neck, so the
+    /// pieces look randomized while neighbours still stitch (jitter is deterministic per edge id).
     /// </summary>
     public readonly struct GeometricPuzzleParameters
     {
-        internal const float MinDepth = 0.06f;       // head protrusion at HeadDepth = 0
-        internal const float MaxDepth = 0.18f;       // ...at HeadDepth = 1 (< 0.5 so GetCellAt's 5-cell search holds)
-        internal const float InsetMax = 0.32f;       // narrowest head (head spans [inset, 1 - inset])
-        internal const float MinNeck = 0.05f;        // neck waist half-width floor
+        internal const float MinDepth = 0.05f;       // head protrusion at HeadDepth = 0
+        internal const float MaxDepth = 0.14f;       // ...at HeadDepth = 1
+        internal const float MaxDepthJitter = 0.025f;// per-edge depth wobble at Variation = 1
+
+        internal const float InsetMin = 0.22f;       // widest head (head spans [inset, 1 - inset]) at HeadWidth = 1
+        internal const float InsetMax = 0.31f;       // narrowest head at HeadWidth = 0
+        internal const float MaxInsetJitter = 0.025f;// per-edge inset wobble at Variation = 1
+
+        internal const float NeckMin = 0.04f;        // pinched neck waist half-width at NeckWidth = 0
+        internal const float NeckMax = 0.09f;        // open neck at NeckWidth = 1
+        internal const float MaxNeckJitter = 0.02f;  // per-edge neck wobble at Variation = 1
+
         internal const float MinShelf = 0.05f;       // thinnest locking overhang on each side of the neck
-        internal const float CornerMargin = 0.04f;   // inset margin over depth that clears the perpendicular edge's head
-        internal const float MaxInsetJitter = 0.03f; // per-edge inset wobble at Variation = 1
-        internal const float MaxNeckJitter = 0.03f;  // per-edge neck wobble at Variation = 1
+        internal const float CornerMargin = 0.025f;  // inset margin over depth that clears the perpendicular edge's head
         internal const float ShoulderFraction = 0.55f; // shelf height as a fraction of head depth
 
         // 10-vertex polyline: 2 endpoints + 8 interior vertices.
@@ -49,32 +60,21 @@ namespace Appegy.Tessera
 
         public int SamplesPerEdge => VertexCount;
 
-        // Head protrusion depth, perpendicular to the edge, in edge-length units.
+        // Head protrusion depth, perpendicular to the edge. Depends on HeadDepth only.
         internal float ResolvedDepth => math.lerp(MinDepth, MaxDepth, HeadDepth);
 
-        // Along-edge inset where the head starts (head spans [inset, 1 - inset]). HeadWidth = 1 gives
-        // the widest head (smallest inset). The floor tracks depth so the head always clears the
-        // perpendicular edge's head by CornerMargin even after the worst downward inset jitter.
-        internal float ResolvedInset
-        {
-            get
-            {
-                var floor = InsetFloor;
-                return math.lerp(floor, math.max(floor, InsetMax), 1f - HeadWidth);
-            }
-        }
+        // Along-edge inset where the head starts (head spans [inset, 1 - inset]). HeadWidth = 1 is
+        // the widest head (smallest inset). Depends on HeadWidth only.
+        internal float ResolvedInset => math.lerp(InsetMax, InsetMin, HeadWidth);
 
-        // Neck waist half-width (head locks because head is wider than 2 * neck-half). The ceiling is
-        // whatever the budget leaves after inset, the MinShelf overhang, and both jitter reserves, so
-        // inset + neck-half + jitter can never eat the shelf.
-        internal float ResolvedNeckHalf => math.lerp(MinNeck, NeckCeil, NeckWidth);
+        // Neck waist half-width (the head locks because it is wider than 2 * neck-half). Depends on
+        // NeckWidth only.
+        internal float ResolvedNeckHalf => math.lerp(NeckMin, NeckMax, NeckWidth);
 
+        // Per-edge jitter amplitudes. Depend on Variation only.
+        internal float ResolvedDepthJitter => Variation * MaxDepthJitter;
         internal float ResolvedInsetJitter => Variation * MaxInsetJitter;
         internal float ResolvedNeckJitter => Variation * MaxNeckJitter;
-
-        private float InsetFloor => ResolvedDepth + CornerMargin + MaxInsetJitter;
-
-        private float NeckCeil => math.max(MinNeck, 0.5f - ResolvedInset - MinShelf - MaxInsetJitter - MaxNeckJitter);
 
         private static float Normalize(float v) => float.IsNaN(v) ? 0.5f : math.clamp(v, 0f, 1f);
     }

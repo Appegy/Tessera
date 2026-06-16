@@ -49,6 +49,7 @@ namespace Appegy.Tessera
             var depth = parameters.ResolvedDepth;
             var inset = parameters.ResolvedInset;
             var neckHalf = parameters.ResolvedNeckHalf;
+            var depthJitter = parameters.ResolvedDepthJitter;
             var insetJitter = parameters.ResolvedInsetJitter;
             var neckJitter = parameters.ResolvedNeckJitter;
 
@@ -61,7 +62,7 @@ namespace Appegy.Tessera
                     var p1 = new float2((x + 1) * cellSize, y * cellSize);
                     var poly = new float2[_samplesPerEdge];
                     var es = PuzzleEdgeSeed.Compute(seed, 0, x, y);
-                    GeometricTab.Generate(p0, p1, es, depth, inset, neckHalf, insetJitter, neckJitter, poly);
+                    GeometricTab.Generate(p0, p1, es, depth, inset, neckHalf, depthJitter, insetJitter, neckJitter, poly);
                     _vertEdges[y * (width - 1) + x] = poly;
                 }
             }
@@ -75,7 +76,7 @@ namespace Appegy.Tessera
                     var p1 = new float2((x + 1) * cellSize, (y + 1) * cellSize);
                     var poly = new float2[_samplesPerEdge];
                     var es = PuzzleEdgeSeed.Compute(seed, 1, x, y);
-                    GeometricTab.Generate(p0, p1, es, depth, inset, neckHalf, insetJitter, neckJitter, poly);
+                    GeometricTab.Generate(p0, p1, es, depth, inset, neckHalf, depthJitter, insetJitter, neckJitter, poly);
                     _horizEdges[y * width + x] = poly;
                 }
             }
@@ -281,8 +282,9 @@ namespace Appegy.Tessera
             rx = math.clamp(rx, 0, Width - 1);
             ry = math.clamp(ry, 0, Height - 1);
 
-            // A head reaches at most MaxDepth * CellSize < 0.5 * CellSize perpendicular to the edge,
-            // so the point belongs to either the rectangle cell or one of its 4 axis neighbours.
+            // A head reaches at most (MaxDepth + MaxDepthJitter) * CellSize < 0.5 * CellSize
+            // perpendicular to the edge, so the point belongs to either the rectangle cell or one
+            // of its 4 axis neighbours.
             if (PointInCell(point, rx, ry)) return IdOf(rx, ry);
             for (var side = 0; side < 4; side++)
             {

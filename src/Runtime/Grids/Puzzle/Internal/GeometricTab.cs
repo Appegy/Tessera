@@ -26,6 +26,7 @@ namespace Appegy.Tessera
             float depth,
             float inset,
             float neckHalf,
+            float depthJitter,
             float insetJitter,
             float neckJitter,
             Span<float2> dest)
@@ -45,11 +46,13 @@ namespace Appegy.Tessera
             // Random sign: tab pokes outward (+) or inward (-). Both neighbours read the same
             // polyline; only the traversal direction differs.
             var s = rng.NextFloat() > 0.5f ? 1f : -1f;
+            // Per-edge jitter on every dimension so the tabs look randomized, not stamped.
+            var d = depth + rng.Range(-depthJitter, depthJitter);
             var a = inset + rng.Range(-insetJitter, insetJitter);
             var nh = neckHalf + rng.Range(-neckJitter, neckJitter);
 
-            var shoulder = s * depth * GeometricPuzzleParameters.ShoulderFraction;
-            var head = s * depth;
+            var shoulder = s * d * GeometricPuzzleParameters.ShoulderFraction;
+            var head = s * d;
 
             dest[0] = At(p0, tangent, perp, 0f, 0f);
             dest[1] = At(p0, tangent, perp, 0.5f - nh, 0f);

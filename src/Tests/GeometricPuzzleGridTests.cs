@@ -512,7 +512,79 @@ namespace Appegy.Tessera.Tests
             AssertPolygonsTileRectangle(g, $"{width}x{height}");
         }
 
+        // ---- Per-edge randomization (Variation) ----
+
+        [TestCase(0)]
+        [TestCase(3)]
+        [TestCase(42)]
+        public void Variation_Max_ProducesDistinctPerEdgeTabs(int seed)
+        {
+            // With Variation = 1 the tabs must look randomized, not stamped: depth, inset, and the
+            // poke direction should all vary across the interior edges.
+            var p = new GeometricPuzzleParameters(0.5f, 0.5f, 0.5f, 1f);
+            var g = new GeometricPuzzleGrid(6, 6, 1f, seed, p);
+
+            var depths = new System.Collections.Generic.HashSet<int>();
+            var insets = new System.Collections.Generic.HashSet<int>();
+            var sawOut = false;
+            var sawIn = false;
+
+            for (var id = 0; id < g.CellCount; id++)
+            {
+                if (g.GetNeighbor(id, 0) == -1) continue;
+                var (depth, inset, signed) = RightEdgeTabMetrics(g, id);
+                depths.Add(Quantize(depth));
+                insets.Add(Quantize(inset));
+                if (signed > 0f) sawOut = true;
+                if (signed < 0f) sawIn = true;
+            }
+
+            Assert.GreaterOrEqual(depths.Count, 3, $"seed={seed}: only {depths.Count} distinct tab depths - looks stamped");
+            Assert.GreaterOrEqual(insets.Count, 3, $"seed={seed}: only {insets.Count} distinct tab insets - looks stamped");
+            Assert.IsTrue(sawOut && sawIn, $"seed={seed}: tabs do not poke in both directions");
+        }
+
+        [Test]
+        public void Variation_Zero_AllTabsShareIdenticalShape()
+        {
+            // With Variation = 0 every interior tab is the same silhouette (only the random poke
+            // direction differs), so depth and inset are identical to within float tolerance.
+            var p = new GeometricPuzzleParameters(0.5f, 0.5f, 0.5f, 0f);
+            var g = new GeometricPuzzleGrid(6, 6, 1f, 7, p);
+
+            float? depth0 = null;
+            float? inset0 = null;
+            for (var id = 0; id < g.CellCount; id++)
+            {
+                if (g.GetNeighbor(id, 0) == -1) continue;
+                var (depth, inset, _) = RightEdgeTabMetrics(g, id);
+                depth0 ??= depth;
+                inset0 ??= inset;
+                Assert.AreEqual(depth0.Value, depth, Eps, $"cell={id} depth differs at Variation=0");
+                Assert.AreEqual(inset0.Value, inset, Eps, $"cell={id} inset differs at Variation=0");
+            }
+            Assert.IsTrue(depth0.HasValue, "no interior edges sampled");
+        }
+
         // ---- helpers ----
+
+        // Depth (perpendicular reach of the head apex), inset (along-edge position of the apex), and
+        // signed perpendicular (poke direction) for a cell's right-side interior edge polyline.
+        private static (float depth, float inset, float signed) RightEdgeTabMetrics(GeometricPuzzleGrid g, int id)
+        {
+            var len = g.GetSidePolylineLength(id, 0);
+            var poly = new float2[len];
+            g.CopySidePolyline(id, 0, poly);
+            var start = poly[0];
+            var dir = math.normalize(poly[len - 1] - start);
+            var normal = new float2(-dir.y, dir.x);
+            var apex = poly[4]; // first head-top vertex (at full depth)
+            var signed = math.dot(apex - start, normal);
+            var along = math.dot(apex - start, dir);
+            return (math.abs(signed), along, signed);
+        }
+
+        private static int Quantize(float v) => (int)math.round(v * 1000f);
 
         private static void AssertNoCellSelfIntersection(GeometricPuzzleGrid g, string label)
         {
