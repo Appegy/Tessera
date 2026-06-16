@@ -87,6 +87,11 @@ int hops = grid.Distance(0, grid.CellCount - 1);
 
 ### Square
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/square-dark.webp">
+  <img alt="Square grid" src="images/square-light.webp" width="480">
+</picture>
+
 ```csharp
 var grid = new SquareGrid(width: 16, height: 9, cellSize: 1f);
 int id = grid.IdOf(x: 3, y: 5);
@@ -94,6 +99,11 @@ int id = grid.IdOf(x: 3, y: 5);
 ```
 
 ### Hexagonal
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/hexagonal-dark.webp">
+  <img alt="Hexagonal grid" src="images/hexagonal-light.webp" width="480">
+</picture>
 
 `inscribedRadius` is the distance from a hex centre to an edge. `HexagonalGridType` selects orientation and offset:
 `PointyOdd`, `PointyEven`, `FlatOdd`, `FlatEven`.
@@ -103,6 +113,11 @@ var grid = new HexagonalGrid(width: 12, height: 10, inscribedRadius: 0.5f, Hexag
 ```
 
 ### Voronoi
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/voronoi-dark.webp">
+  <img alt="Voronoi grid" src="images/voronoi-light.webp" width="480">
+</picture>
 
 Scatters `cellCount` sites inside `bounds`, builds the Voronoi diagram, and applies `relaxationIterations`
 Lloyd passes to even out the cells. `seed` makes the layout reproducible.
@@ -114,8 +129,18 @@ var grid = new VoronoiGrid(bounds, cellCount: 120, seed: 1337, relaxationIterati
 
 ### Puzzle
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/classic-puzzle-dark.webp">
+  <img alt="Classic puzzle grid" src="images/classic-puzzle-light.webp" width="380">
+</picture>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/draradech-puzzle-dark.webp">
+  <img alt="Draradech puzzle grid" src="images/draradech-puzzle-light.webp" width="380">
+</picture>
+
 Jigsaw grids lay out a `width × height` tile field where adjacent tiles interlock via tabs and blanks.
-Two tab styles are available; both accept a parameters struct (or `Default`) to tune the tab shape.
+Two tab styles are available (`ClassicPuzzleGrid` left, `DraradechPuzzleGrid` right); both accept a
+parameters struct (or `Default`) to tune the tab shape.
 
 ```csharp
 // Classic interlocking tabs.
