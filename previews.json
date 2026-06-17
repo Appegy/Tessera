@@ -1,0 +1,38 @@
+[
+  {
+    "slug": "main",
+    "branch": "main",
+    "pr": null,
+    "title": "main"
+  },
+  {
+    "slug": "pr-19",
+    "branch": "ivan/bump-pr-mode",
+    "pr": 19,
+    "title": "bump-version: open a PR instead of pushing to main"
+  },
+  {
+    "slug": "pr-21",
+    "branch": "ivan/signing",
+    "pr": 21,
+    "title": "Sign releases with the Unity UPM CLI"
+  },
+  {
+    "slug": "pr-25",
+    "branch": "bump/v1.0.1",
+    "pr": 25,
+    "title": "Bump version to 1.0.1"
+  },
+  {
+    "slug": "pr-27",
+    "branch": "ivan/new-puzzle-grid",
+    "pr": 27,
+    "title": "feat: GeometricGrid (polygonal dovetail style)"
+  },
+  {
+    "slug": "pr-29",
+    "branch": "bump/v1.0.2",
+    "pr": 29,
+    "title": "chore: bump version to v1.0.2"
+  }
+]

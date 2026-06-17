@@ -1,0 +1,7 @@
+{
+  "type": "unity",
+  "loaderUrl": "Build/56411eabf16c415f1ece1cc5a48f5a87.loader.js",
+  "dataUrl": "Build/f05c24a5fa9b634833b609e9b21e3ef7.data",
+  "frameworkUrl": "Build/f1b52ae9f1438e4a83bc931f4aaf4b40.framework.js",
+  "codeUrl": "Build/7ccd845e31de8212075ffd48a39d4184.wasm"
+}
