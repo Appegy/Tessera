@@ -148,6 +148,10 @@ Scene: `Appegy.Tessera.Environment~/Assets/Scenes/ExampleScene.unity`. Component
 
 URP is configured for flat 2D — no lighting, no shadows, no post-processing. Colours render as set.
 
+## Lab icons
+
+Icon SVGs in `Appegy.Tessera.Lab/Assets/Art/Icons/` carry `fill="#ffffff"` on the `<svg>` root, and a new icon needs it too. Icon sets such as Material Symbols ship with no `fill`, so the imported `VectorImage` is black, and `-unity-background-image-tint-color` multiplies the image colour: black stays black under any tint, and the icon disappears on a dark panel. A white fill takes the tint (`var(--icon)`, `var(--accent)` in `Tessera.uss`) exactly.
+
 ## Agent / IDE config
 
 `.gitignore` excludes `.claude/`, `.codex/`, `.agents/`, and `opencode.json`. Agent-side config is per-developer; do not commit it. `AGENTS.md` is checked in and authoritative for shared instructions.
